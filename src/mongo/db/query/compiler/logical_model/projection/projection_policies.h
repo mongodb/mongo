@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 namespace mongo {
 
-struct ProjectionPolicies {
+struct MONGO_MOD_NEEDS_REPLACEMENT ProjectionPolicies {
     // Allows the caller to indicate whether the projection should default to including or
     // excluding the _id field in the event that the projection spec does not specify the
     // desired behavior. For instance, given a projection {a: 1}, specifying 'kExcludeId' is

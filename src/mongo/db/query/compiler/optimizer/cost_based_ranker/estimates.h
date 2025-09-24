@@ -34,6 +34,7 @@
 #include "mongo/db/query/util/named_enum.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fixed_string.h"
+#include "mongo/util/modules.h"
 
 #include <limits>
 

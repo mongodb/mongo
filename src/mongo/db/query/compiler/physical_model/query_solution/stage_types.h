@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 
@@ -47,7 +48,7 @@ static constexpr PlanNodeId kEmptyPlanNodeId = 0u;
  * These map to implementations of the PlanStage interface, all of which live in db/exec/. These
  * stage types are shared between Classic and SBE.
  */
-enum StageType {
+enum MONGO_MOD_NEEDS_REPLACEMENT StageType {
     STAGE_AND_HASH,
     STAGE_AND_SORTED,
     STAGE_BATCHED_DELETE,

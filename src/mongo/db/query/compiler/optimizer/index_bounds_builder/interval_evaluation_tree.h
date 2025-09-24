@@ -35,6 +35,7 @@
 #include "mongo/db/query/algebra/polyvalue.h"
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <stack>

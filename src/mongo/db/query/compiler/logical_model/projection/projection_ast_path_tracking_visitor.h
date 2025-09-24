@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_visitor.h"
+#include "mongo/util/modules.h"
 
 #include <list>
 #include <stack>

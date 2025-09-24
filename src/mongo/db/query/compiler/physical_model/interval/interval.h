@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <string>
@@ -40,7 +41,7 @@
 namespace mongo {
 
 /** A range of values for one field. */
-struct Interval {
+struct MONGO_MOD_NEEDS_REPLACEMENT Interval {
     // No BSONValue means we have to keep a BSONObj and pointers (BSONElement) into it.
     // 'start' may not point at the first field in _intervalData.
     // 'end' may not point at the last field in _intervalData.

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_algebra.h"
+#include "mongo/util/modules.h"
 
 #include <iosfwd>
 

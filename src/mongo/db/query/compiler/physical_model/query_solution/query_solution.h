@@ -70,6 +70,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/id_generator.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <iosfwd>
@@ -163,7 +164,7 @@ inline const static ProvidedSortSet kEmptySet;
  * This is an abstract representation of a query plan.  It can be transcribed into a tree of
  * PlanStages, which can then be handed to a PlanRunner for execution.
  */
-struct QuerySolutionNode {
+struct MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode {
     QuerySolutionNode() = default;
 
     /**
@@ -439,10 +440,10 @@ public:
 
     std::string summaryString() const;
 
-    const QuerySolutionNode* root() const {
+    MONGO_MOD_NEEDS_REPLACEMENT const QuerySolutionNode* root() const {
         return _root.get();
     }
-    QuerySolutionNode* root() {
+    MONGO_MOD_NEEDS_REPLACEMENT QuerySolutionNode* root() {
         return _root.get();
     }
 
@@ -822,7 +823,7 @@ struct FetchNode : public QuerySolutionNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 };
 
-struct IndexScanNode : public QuerySolutionNodeWithSortSet {
+struct MONGO_MOD_NEEDS_REPLACEMENT IndexScanNode : public QuerySolutionNodeWithSortSet {
     IndexScanNode(IndexEntry index);
     ~IndexScanNode() override {}
 

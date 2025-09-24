@@ -31,6 +31,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/util/modules.h"
 
 /**
  * This file containf rewrites from IndexBounds to MatchExpression for the purpose of cardinality

@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::ce {
 

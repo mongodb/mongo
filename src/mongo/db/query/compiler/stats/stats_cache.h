@@ -35,6 +35,7 @@
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/read_through_cache.h"
 
 #include <memory>

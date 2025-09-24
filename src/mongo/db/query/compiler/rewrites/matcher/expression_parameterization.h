@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <vector>

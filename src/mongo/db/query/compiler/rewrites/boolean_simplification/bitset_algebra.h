@@ -31,6 +31,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/util/dynamic_bitset.h"
+#include "mongo/util/modules.h"
 
 #include <initializer_list>
 #include <iosfwd>

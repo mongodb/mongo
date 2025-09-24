@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cmath>
@@ -515,7 +516,7 @@ private:
         i.e. given the same length and seed on any platform, we will produce the
         same string.
 */
-std::string genString(size_t len, size_t seed);
+MONGO_MOD_NEEDS_REPLACEMENT std::string genString(size_t len, size_t seed);
 
 /**
     Generate a set of elements consisting of strings and ints in the

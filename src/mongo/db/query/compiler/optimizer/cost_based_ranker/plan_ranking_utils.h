@@ -42,6 +42,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/service_context.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/util/modules.h"
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>

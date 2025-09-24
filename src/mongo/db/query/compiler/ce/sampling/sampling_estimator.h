@@ -32,6 +32,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::ce {
 

@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <string>
@@ -40,7 +41,7 @@
 
 namespace mongo {
 
-enum class BoundInclusion {
+enum class MONGO_MOD_NEEDS_REPLACEMENT BoundInclusion {
     kExcludeBothStartAndEndKeys,
     kIncludeStartKeyOnly,
     kIncludeEndKeyOnly,
@@ -50,7 +51,7 @@ enum class BoundInclusion {
 /**
  * An ordered list of intervals for one field.
  */
-struct OrderedIntervalList {
+struct MONGO_MOD_NEEDS_REPLACEMENT OrderedIntervalList {
     OrderedIntervalList() {}
     OrderedIntervalList(const std::string& n) : name(n) {}
 
@@ -129,7 +130,7 @@ struct OrderedIntervalList {
  * Tied to an index.  Permissible values for all fields in the index.  Requires the index to
  * interpret.  Previously known as FieldRangeVector.
  */
-struct IndexBounds {
+struct MONGO_MOD_NEEDS_REPLACEMENT IndexBounds {
     IndexBounds() : isSimpleRange(false), boundInclusion(BoundInclusion::kIncludeStartKeyOnly) {}
 
     // For each indexed field, the values that the field is allowed to take on.

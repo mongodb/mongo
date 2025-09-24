@@ -40,6 +40,7 @@
 #include "mongo/db/query/compiler/optimizer/index_bounds_builder/interval_evaluation_tree.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 
@@ -50,7 +51,7 @@ class CollatorInterface;
 /**
  * Translates expressions over fields into bounds on an index.
  */
-class IndexBoundsBuilder {
+class MONGO_MOD_NEEDS_REPLACEMENT IndexBoundsBuilder {
 public:
     static const Interval kUndefinedPointInterval;
     static const Interval kNullPointInterval;

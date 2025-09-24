@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

@@ -36,6 +36,7 @@
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
 #include "mongo/db/query/compiler/stats/scalar_histogram.h"
 #include "mongo/db/query/compiler/stats/value_utils.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::ce {
 

@@ -40,6 +40,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -100,7 +101,7 @@ struct CoreIndexInfo {
      * Has the same comparison and equality semantics as std::pair<string, string>.
      *
      */
-    struct Identifier {
+    struct MONGO_MOD_NEEDS_REPLACEMENT Identifier {
         explicit Identifier(std::string aCatalogName) : catalogName(std::move(aCatalogName)) {}
 
         Identifier(std::string aCatalogName, std::string nameDisambiguator)
@@ -183,7 +184,7 @@ struct CoreIndexInfo {
  * compute (i.e. for wildcard indexes, this requires reading the index) and so may not always be
  * available.
  */
-struct IndexEntry : CoreIndexInfo {
+struct MONGO_MOD_NEEDS_REPLACEMENT IndexEntry : CoreIndexInfo {
     IndexEntry(const BSONObj& kp,
                IndexType type,
                IndexDescriptor::IndexVersion version,

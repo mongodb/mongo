@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/matcher_type_set.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::parsers::matcher {
 /**

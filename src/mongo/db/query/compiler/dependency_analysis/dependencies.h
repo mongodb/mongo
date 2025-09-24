@@ -33,6 +33,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/util/modules.h"
 
 #include <compare>
 #include <cstddef>
@@ -69,12 +70,12 @@ struct ThreeWayPathComparator {
  * Set of field paths strings.  When iterated over, a parent path is seen directly before its
  * children (or descendants, more generally).  Eg., "a", "a.a", "a.b", "a-plus", "b".
  */
-typedef std::set<std::string, PathComparator> OrderedPathSet;
+MONGO_MOD_NEEDS_REPLACEMENT typedef std::set<std::string, PathComparator> OrderedPathSet;
 
 /**
  * This struct allows components in an agg pipeline to report what they need from their input.
  */
-struct DepsTracker {
+struct MONGO_MOD_NEEDS_REPLACEMENT DepsTracker {
     struct NoMetadataValidation {
         // Nothing.
     };

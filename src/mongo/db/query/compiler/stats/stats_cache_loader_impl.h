@@ -32,10 +32,11 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/compiler/stats/stats_cache_loader.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::stats {
 
-class StatsCacheLoaderImpl : public StatsCacheLoader {
+class MONGO_MOD_PUB StatsCacheLoaderImpl : public StatsCacheLoader {
 public:
     SemiFuture<StatsCacheVal> getStats(OperationContext* opCtx,
                                        const StatsPathString& statsPath) override;

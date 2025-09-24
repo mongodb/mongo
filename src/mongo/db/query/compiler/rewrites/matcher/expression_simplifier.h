@@ -31,6 +31,7 @@
 
 #include "mongo/db/commands/server_status/server_status_metric.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_bitset_tree_converter.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**

@@ -42,6 +42,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::ce {
 

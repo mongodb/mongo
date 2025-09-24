@@ -37,6 +37,7 @@
 #include "mongo/db/query/compiler/stats/stats_cache_loader.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <boost/move/utility_core.hpp>
 

@@ -32,6 +32,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/compiler/optimizer/cost_based_ranker/estimates.h"
 #include "mongo/db/query/compiler/physical_model/interval/interval.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::cost_based_ranker {
 

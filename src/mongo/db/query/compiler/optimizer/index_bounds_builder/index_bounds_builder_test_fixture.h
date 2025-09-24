@@ -47,6 +47,7 @@
 #include "mongo/db/query/compiler/rewrites/matcher/expression_optimizer.h"
 #include "mongo/db/query/compiler/rewrites/matcher/expression_parameterization.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>

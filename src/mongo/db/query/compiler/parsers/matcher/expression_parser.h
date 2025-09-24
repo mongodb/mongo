@@ -43,6 +43,7 @@
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 #include <limits>
@@ -101,7 +102,7 @@ enum class PathAcceptingKeyword {
     WITHIN,
 };
 
-class MatchExpressionParser {
+class MONGO_MOD_PUB MatchExpressionParser {
 public:
     /**
      * Features allowed in match expression parsing.

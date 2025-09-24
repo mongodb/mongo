@@ -34,6 +34,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <bitset>
@@ -91,7 +92,7 @@ public:
      * Returns true if the projection requires match details from the query,
      * and false otherwise.
      */
-    bool requiresMatchDetails() const {
+    MONGO_MOD_NEEDS_REPLACEMENT bool requiresMatchDetails() const {
         return _deps.requiresMatchDetails;
     }
 
@@ -115,7 +116,7 @@ public:
         return *_deps.paths;
     }
 
-    const QueryMetadataBitSet& metadataDeps() const {
+    MONGO_MOD_NEEDS_REPLACEMENT const QueryMetadataBitSet& metadataDeps() const {
         return _deps.metadataRequested;
     }
 

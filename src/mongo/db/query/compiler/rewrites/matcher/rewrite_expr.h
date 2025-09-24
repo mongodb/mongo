@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

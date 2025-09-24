@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/compiler/stats/ce_histogram.h"
 #include "mongo/db/query/compiler/stats/collection_statistics.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/bitset_algebra.h"
 #include "mongo/db/query/compiler/rewrites/boolean_simplification/petrick.h"
+#include "mongo/util/modules.h"
 
 #include <utility>
 #include <vector>

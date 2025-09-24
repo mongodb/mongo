@@ -33,6 +33,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

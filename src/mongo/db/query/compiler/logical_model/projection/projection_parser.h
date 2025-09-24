@@ -36,6 +36,7 @@
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -49,20 +50,22 @@ namespace projection_ast {
  *
  * 'query' and 'queryObj' refer to the associated filter provided in a find() command.
  */
-Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
-                           const BSONObj& obj,
-                           const MatchExpression* query,
-                           const BSONObj& queryObj,
-                           ProjectionPolicies policies,
-                           bool shouldOptimize = false);
+MONGO_MOD_NEEDS_REPLACEMENT Projection
+parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
+                const BSONObj& obj,
+                const MatchExpression* query,
+                const BSONObj& queryObj,
+                ProjectionPolicies policies,
+                bool shouldOptimize = false);
 
 /**
  * Overload of parse() to be used when not parsing a projection from a find() command.
  */
-Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
-                           const BSONObj& obj,
-                           ProjectionPolicies policies,
-                           bool shouldOptimize = false);
+MONGO_MOD_NEEDS_REPLACEMENT Projection
+parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
+                const BSONObj& obj,
+                ProjectionPolicies policies,
+                bool shouldOptimize = false);
 
 /**
  * Adds a node to the projection AST rooted at 'root' to the path specified by 'path'.

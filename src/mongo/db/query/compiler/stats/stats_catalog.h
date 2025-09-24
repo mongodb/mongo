@@ -38,6 +38,7 @@
 #include "mongo/db/query/compiler/stats/stats_cache_loader.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>
@@ -46,7 +47,7 @@ namespace mongo::stats {
 /**
  * This class owns statsCache and manages executor lifetime.
  */
-class StatsCatalog {
+class MONGO_MOD_PUB StatsCatalog {
 public:
     /**
      * Stores the catalog on the specified service context. May only be called once for the lifetime

@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/util/modules.h"
 
 #include <set>
 
