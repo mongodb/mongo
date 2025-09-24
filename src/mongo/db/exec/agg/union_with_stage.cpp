@@ -30,10 +30,10 @@
 
 #include "mongo/db/exec/agg/union_with_stage.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/exec/agg/document_source_to_stage_registry.h"
 #include "mongo/db/exec/agg/pipeline_builder.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
-#include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
 
@@ -87,33 +87,6 @@ MONGO_COMPILER_NOINLINE void logPipeline(int32_t id,
                                          const char (&msg)[N],
                                          const mongo::Pipeline& pipe) {
     LOGV2_DEBUG(id, 5, msg, "pipeline"_attr = pipe.serializeToBson());
-}
-
-std::unique_ptr<mongo::Pipeline> buildPipelineFromViewDefinition(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    ResolvedNamespace resolvedNs,
-    std::vector<BSONObj> currentPipeline,
-    NamespaceString userNss) {
-    auto validatorCallback = [](const mongo::Pipeline& pipeline) {
-        for (const auto& src : pipeline.getSources()) {
-            uassert(104245,
-                    str::stream() << src->getSourceName()
-                                  << " is not allowed within a $unionWith's sub-pipeline",
-                    src->constraints().isAllowedInUnionPipeline());
-        }
-    };
-
-    MakePipelineOptions opts;
-    opts.attachCursorSource = false;
-    // Only call optimize() here if we actually have a pipeline to resolve in the view definition.
-    opts.optimize = !resolvedNs.pipeline.empty();
-    opts.validator = validatorCallback;
-
-    auto subExpCtx =
-        makeCopyForSubPipelineFromExpressionContext(expCtx, resolvedNs.ns, resolvedNs.uuid);
-
-    return mongo::Pipeline::makePipelineFromViewDefinition(
-        subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
 }
 
 };  // namespace
@@ -173,7 +146,7 @@ GetNextResult UnionWithStage::doGetNext() {
             _sharedState->_executionState =
                 UnionWithSharedState::ExecutionProgress::kIteratingSubPipeline;
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
-            _sharedState->_pipeline = buildPipelineFromViewDefinition(
+            _sharedState->_pipeline = DocumentSourceUnionWith::buildPipelineFromViewDefinition(
                 pExpCtx,
                 ResolvedNamespace{e->getNamespace(), e->getPipeline()},
                 std::move(serializedPipe),

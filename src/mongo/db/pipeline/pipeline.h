@@ -199,7 +199,7 @@ public:
         AggregateCommandRequest& aggRequest,
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
-        MakePipelineOptions opts = MakePipelineOptions{});
+        const MakePipelineOptions& opts = MakePipelineOptions{});
 
     /**
      * Optimize the given pipeline after the stage that 'itr' points to.
@@ -210,19 +210,12 @@ public:
     static DocumentSourceContainer::iterator optimizeEndOfPipeline(
         DocumentSourceContainer::iterator itr, DocumentSourceContainer* container);
 
-    static std::unique_ptr<Pipeline> viewPipelineHelperForSearch(
-        const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
-        ResolvedNamespace resolvedNs,
-        std::vector<BSONObj> currentPipeline,
-        MakePipelineOptions opts,
-        NamespaceString originalNs);
-
     static std::unique_ptr<Pipeline> makePipelineFromViewDefinition(
         const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
         ResolvedNamespace resolvedNs,
         std::vector<BSONObj> currentPipeline,
-        MakePipelineOptions opts,
-        NamespaceString originalNs);
+        const MakePipelineOptions& opts,
+        const NamespaceString& originalNs);
 
     /**
      * Callers can optionally specify 'newExpCtx' to construct the deep clone with it. This will be
@@ -581,6 +574,12 @@ private:
         bool isFacetPipeline,
         std::function<BSONObj(T)> getElemFunc);
 
+    static std::unique_ptr<Pipeline> viewPipelineHelperForSearch(
+        const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
+        ResolvedNamespace resolvedNs,
+        std::vector<BSONObj> currentPipeline,
+        const MakePipelineOptions& opts,
+        const NamespaceString& originalNs);
 
     DocumentSourceContainer _sources;
 

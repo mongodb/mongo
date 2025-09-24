@@ -29,14 +29,12 @@
 
 #pragma once
 
-#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/exec/agg/exec_pipeline.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -47,14 +45,10 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
-#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 
-#include <algorithm>
 #include <list>
 #include <memory>
 #include <set>
@@ -230,6 +224,12 @@ public:
     std::shared_ptr<UnionWithSharedState> getSharedState() const {
         return _sharedState;
     }
+
+    static std::unique_ptr<Pipeline> buildPipelineFromViewDefinition(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const ResolvedNamespace& resolvedNs,
+        std::vector<BSONObj> currentPipeline,
+        const NamespaceString& userNss);
 
 protected:
     DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,

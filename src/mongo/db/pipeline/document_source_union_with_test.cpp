@@ -30,7 +30,6 @@
 #include "mongo/db/pipeline/document_source_union_with.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/oid.h"
@@ -38,7 +37,6 @@
 #include "mongo/db/exec/agg/mock_stage.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
@@ -52,12 +50,12 @@
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/db/pipeline/serverless_aggregation_context_fixture.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_controller.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
-#include "mongo/util/string_map.h"
 
 #include <array>
 #include <deque>

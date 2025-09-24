@@ -921,7 +921,7 @@ std::unique_ptr<Pipeline> Pipeline::makePipeline(
     AggregateCommandRequest& aggRequest,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     boost::optional<BSONObj> shardCursorsSortSpec,
-    const MakePipelineOptions opts) {
+    const MakePipelineOptions& opts) {
     tassert(10892201,
             "shardCursorsSortSpec must not be set if attachCursorSource is false.",
             opts.attachCursorSource || shardCursorsSortSpec == boost::none);
@@ -978,8 +978,8 @@ std::unique_ptr<Pipeline> Pipeline::viewPipelineHelperForSearch(
     const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
     ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline,
-    MakePipelineOptions opts,
-    NamespaceString originalNs) {
+    const MakePipelineOptions& opts,
+    const NamespaceString& originalNs) {
     // Search queries on mongot-indexed views behave differently than non-search aggregations on
     // views. When a user pipeline contains a $search/$vectorSearch stage, idLookup will apply the
     // view transforms as part of its subpipeline. In this way, the view stages will always
@@ -989,19 +989,20 @@ std::unique_ptr<Pipeline> Pipeline::viewPipelineHelperForSearch(
     // storedSource is disabled, idLookup will retrieve full/unmodified documents during
     // (from the _id values returned by mongot), apply the view's data transforms, and pass
     // said transformed documents through the rest of the user pipeline.
-    const ResolvedView resolvedView{resolvedNs.ns, resolvedNs.pipeline, BSONObj()};
+    const ResolvedView resolvedView{resolvedNs.ns, std::move(resolvedNs.pipeline), BSONObj()};
     subPipelineExpCtx->setView(
         boost::make_optional(std::make_pair(originalNs, resolvedView.getPipeline())));
 
     // return the user pipeline without appending the view stages.
     return Pipeline::makePipeline(currentPipeline, subPipelineExpCtx, opts);
 }
+
 std::unique_ptr<Pipeline> Pipeline::makePipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
     ResolvedNamespace resolvedNs,
     std::vector<BSONObj> currentPipeline,
-    MakePipelineOptions opts,
-    NamespaceString originalNs) {
+    const MakePipelineOptions& opts,
+    const NamespaceString& originalNs) {
 
     // Update subpipeline's ExpressionContext with the resolved namespace.
     subPipelineExpCtx->setNamespaceString(resolvedNs.ns);
@@ -1012,7 +1013,7 @@ std::unique_ptr<Pipeline> Pipeline::makePipelineFromViewDefinition(
 
     if (search_helper_bson_obj::isMongotPipeline(currentPipeline)) {
         return Pipeline::viewPipelineHelperForSearch(
-            subPipelineExpCtx, resolvedNs, currentPipeline, opts, originalNs);
+            subPipelineExpCtx, std::move(resolvedNs), std::move(currentPipeline), opts, originalNs);
     }
 
     auto resolvedPipeline = std::move(resolvedNs.pipeline);

@@ -30,6 +30,7 @@
 
 #include "mongo/db/pipeline/document_source_union_with.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_type.h"
@@ -44,19 +45,17 @@
 #include "mongo/db/pipeline/document_source_union_with_gen.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
-#include "mongo/db/pipeline/search/search_helper.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/uuid.h"
 
 #include <iterator>
-
-#include "variables.h"
 
 #include <absl/container/flat_hash_map.h>
 #include <boost/move/utility_core.hpp>
@@ -75,33 +74,6 @@ REGISTER_DOCUMENT_SOURCE(unionWith,
 ALLOCATE_DOCUMENT_SOURCE_ID(unionWith, DocumentSourceUnionWith::id)
 
 namespace {
-std::unique_ptr<Pipeline> buildPipelineFromViewDefinition(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    ResolvedNamespace resolvedNs,
-    std::vector<BSONObj> currentPipeline,
-    NamespaceString userNss) {
-    auto validatorCallback = [](const Pipeline& pipeline) {
-        for (const auto& src : pipeline.getSources()) {
-            uassert(31441,
-                    str::stream() << src->getSourceName()
-                                  << " is not allowed within a $unionWith's sub-pipeline",
-                    src->constraints().isAllowedInUnionPipeline());
-        }
-    };
-
-    MakePipelineOptions opts;
-    opts.attachCursorSource = false;
-    // Only call optimize() here if we actually have a pipeline to resolve in the view definition.
-    opts.optimize = !resolvedNs.pipeline.empty();
-    opts.validator = validatorCallback;
-
-    auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
-        expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
-
-    return Pipeline::makePipelineFromViewDefinition(
-        subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
-}
-
 MONGO_COMPILER_NOINLINE void logShardedViewFound(
     const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e,
     const std::vector<BSONObj>& pipeline) {
@@ -112,6 +84,27 @@ MONGO_COMPILER_NOINLINE void logShardedViewFound(
                 logAttrs(e->getNamespace()),
                 "pipeline"_attr = Value(e->getPipeline()),
                 "new_pipe"_attr = pipeline);
+}
+
+void validateUnionWithCollectionlessPipeline(
+    const boost::optional<std::vector<mongo::BSONObj>>& pipeline) {
+    const auto errMsg =
+        "$unionWith stage without explicit collection must have a pipeline with $documents as "
+        "first stage";
+
+    uassert(ErrorCodes::FailedToParse, errMsg, pipeline && pipeline->size() > 0);
+    const auto firstStageBson = (*pipeline)[0];
+    LOGV2_DEBUG(5909700,
+                4,
+                "$unionWith validating collectionless pipeline",
+                "pipeline"_attr = Pipeline::serializePipelineForLogging(*pipeline),
+                "first"_attr = redact(firstStageBson));
+    uassert(ErrorCodes::FailedToParse,
+            errMsg,
+            (firstStageBson.hasField(DocumentSourceDocuments::kStageName) ||
+             firstStageBson.hasField(DocumentSourceQueue::kStageName))
+
+    );
 }
 }  // namespace
 
@@ -179,7 +172,7 @@ DocumentSourceUnionWith::DocumentSourceUnionWith(
     if (expCtx->getExplain() &&
         expCtx->getExplain().value() != explain::VerbosityEnum::kQueryPlanner &&
         !resolvedNs.pipeline.empty()) {
-        _resolvedNsForView = resolvedNs;
+        _resolvedNsForView = std::move(resolvedNs);
     }
 
     _userNss = std::move(unionNss);
@@ -196,27 +189,6 @@ DocumentSourceUnionWith::~DocumentSourceUnionWith() {
             _sharedState->_execPipeline->dispose();
         }
     }
-}
-
-void validateUnionWithCollectionlessPipeline(
-    const boost::optional<std::vector<mongo::BSONObj>>& pipeline) {
-    const auto errMsg =
-        "$unionWith stage without explicit collection must have a pipeline with $documents as "
-        "first stage";
-
-    uassert(ErrorCodes::FailedToParse, errMsg, pipeline && pipeline->size() > 0);
-    const auto firstStageBson = (*pipeline)[0];
-    LOGV2_DEBUG(5909700,
-                4,
-                "$unionWith validating collectionless pipeline",
-                "pipeline"_attr = Pipeline::serializePipelineForLogging(*pipeline),
-                "first"_attr = redact(firstStageBson));
-    uassert(ErrorCodes::FailedToParse,
-            errMsg,
-            (firstStageBson.hasField(DocumentSourceDocuments::kStageName) ||
-             firstStageBson.hasField(DocumentSourceQueue::kStageName))
-
-    );
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::clone(
@@ -558,6 +530,33 @@ void DocumentSourceUnionWith::addInvolvedCollections(
     stdx::unordered_set<NamespaceString>* collectionNames) const {
     collectionNames->insert(_sharedState->_pipeline->getContext()->getNamespaceString());
     collectionNames->merge(_sharedState->_pipeline->getInvolvedCollections());
+}
+
+std::unique_ptr<Pipeline> DocumentSourceUnionWith::buildPipelineFromViewDefinition(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const ResolvedNamespace& resolvedNs,
+    std::vector<BSONObj> currentPipeline,
+    const NamespaceString& userNss) {
+    auto validatorCallback = [](const Pipeline& pipeline) {
+        for (const auto& src : pipeline.getSources()) {
+            uassert(31441,
+                    str::stream() << src->getSourceName()
+                                  << " is not allowed within a $unionWith's sub-pipeline",
+                    src->constraints().isAllowedInUnionPipeline());
+        }
+    };
+
+    MakePipelineOptions opts;
+    opts.attachCursorSource = false;
+    // Only call optimize() here if we actually have a pipeline to resolve in the view definition.
+    opts.optimize = !resolvedNs.pipeline.empty();
+    opts.validator = validatorCallback;
+
+    auto subExpCtx = makeCopyForSubPipelineFromExpressionContext(
+        expCtx, resolvedNs.ns, resolvedNs.uuid, userNss);
+
+    return Pipeline::makePipelineFromViewDefinition(
+        subExpCtx, resolvedNs, std::move(currentPipeline), opts, userNss);
 }
 
 }  // namespace mongo
