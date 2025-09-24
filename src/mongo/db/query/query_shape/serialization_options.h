@@ -39,6 +39,7 @@
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>
@@ -51,7 +52,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 /**
  * A policy enum for how to serialize literal values.
  */
@@ -255,4 +256,4 @@ struct SerializationOptions {
     bool isSerializingForQueryStats() const;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

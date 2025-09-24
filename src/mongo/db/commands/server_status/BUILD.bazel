@@ -222,7 +222,7 @@ mongo_cc_library(
         "//src/mongo/db/query/query_settings:query_settings_gen",
         "//src/mongo/db/query/query_settings:query_settings_hash.h",
         "//src/mongo/db/query/query_shape:query_shape.h",
-        "//src/mongo/db/query/query_shape:shape_helpers.h",
+        "//src/mongo/db/query/query_shape:query_shape_hash.h",
         "//src/mongo/db/query/query_stats:key.h",
         "//src/mongo/db/query/query_stats:transform_algorithm_gen",
         "//src/mongo/db/query/timeseries:bucket_spec.h",

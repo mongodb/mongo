@@ -49,6 +49,9 @@ mongo_cc_library(
         "shape_helpers.h",
         "//src/mongo/db/pipeline:aggregate_command_gen",
     ],
+    header_deps = [
+        ":query_shape_hash",
+    ],
     deps = [
         ":query_shape_common",
         "//src/mongo:base",
@@ -78,6 +81,9 @@ mongo_cc_library(
     name = "query_shape_hash",
     srcs = [
         ":query_shape_hash_gen",
+    ],
+    hdrs = [
+        "query_shape_hash.h",
     ],
     deps = [
         "//src/mongo/crypto:sha256_block",

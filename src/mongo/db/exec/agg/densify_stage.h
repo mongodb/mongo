@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_densify.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <list>

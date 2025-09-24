@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2025-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,33 +29,13 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/parsed_find_command.h"
-#include "mongo/db/query/query_shape/query_shape.h"
-#include "mongo/db/query/query_shape/serialization_options.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/util/modules.h"
 
-namespace mongo::query_shape {
+namespace mongo {
+namespace MONGO_MOD_PUB query_shape {
 
-/**
- * The struct stores the shapified version of the let parameter.
- */
-struct LetShapeComponent : public CmdSpecificShapeComponents {
-    LetShapeComponent(boost::optional<BSONObj> let,
-                      const boost::intrusive_ptr<ExpressionContext>& expCtx);
+using QueryShapeHash = SHA256Block;
 
-    void HashValue(absl::HashState state) const final;
-    size_t size() const final;
-
-    /**
-     * Appends the shapified let parameter to the builder.
-     */
-    void appendTo(BSONObjBuilder&,
-                  const SerializationOptions&,
-                  const boost::intrusive_ptr<ExpressionContext>&) const;
-
-    BSONObj shapifiedLet;
-    bool hasLet;
-};
-}  // namespace mongo::query_shape
+}  // namespace MONGO_MOD_PUB query_shape
+}  // namespace mongo

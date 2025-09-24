@@ -32,10 +32,11 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_shape/query_shape_hash.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/deferred.h"
+#include "mongo/util/modules.h"
 
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
@@ -44,7 +45,6 @@ namespace mongo::query_shape {
 class Shape;
 
 using DeferredQueryShape = DeferredFn<StatusWith<std::unique_ptr<Shape>>>;
-using QueryShapeHash = SHA256Block;
 
 /**
  * Each type of "query" command likely has different fields/options that are considered important

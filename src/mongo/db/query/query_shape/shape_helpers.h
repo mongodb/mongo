@@ -34,6 +34,7 @@
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::shape_helpers {
 

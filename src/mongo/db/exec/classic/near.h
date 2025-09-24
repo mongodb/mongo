@@ -34,6 +34,7 @@
 #include "mongo/db/exec/classic/working_set.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/util/modules.h"
 
 #include <limits>
 #include <memory>
