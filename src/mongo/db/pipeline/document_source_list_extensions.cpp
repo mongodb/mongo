@@ -87,7 +87,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListExtensions::createFromBso
         std::deque<DocumentSource::GetNextResult> queue;
 
         for (const auto& [extensionName, config] : loadedExtensions) {
-            // TODO(SERVER-111166): Convert config.extOptions to a BSON directly, not a string.
             queue.push_back(Document(BSON("extensionName" << extensionName << "extensionOptions"
                                                           << YAML::Dump(config.extOptions))));
         }

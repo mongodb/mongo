@@ -165,8 +165,6 @@ describe("$listExtensions with some extensions loaded", function () {
             .getDB("admin")
             .aggregate([{$listExtensions: {}}])
             .toArray();
-        // TODO(SERVER-111166): Update extensionOptions values after converting YAML to BSON
-        // properly.
         const expected = [
             {"extensionName": libFooExtension, "extensionOptions": "{}"},
             {"extensionName": libParseExtension, "extensionOptions": "checkMax: false\nmax: 1"},
