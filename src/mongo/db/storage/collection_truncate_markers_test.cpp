@@ -147,6 +147,30 @@ public:
         }
         wuow.commit();
     }
+
+    // returns total bytes and total records in the collection
+    std::tuple<size_t, size_t> createPopulatedCollection(const NamespaceString& collNs,
+                                                         Timestamp timestamp = Timestamp(1, 0)) {
+        static constexpr size_t kNumRounds = 200;
+        static constexpr size_t kElementSize = 15;
+
+        size_t totalBytes = 0;
+        size_t totalRecords = 0;
+
+        auto opCtx = getClient()->makeOperationContext();
+        createCollection(opCtx.get(), collNs);
+        // Add documents of various sizes
+        for (size_t round = 0; round < kNumRounds; round++) {
+            for (size_t numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
+                insertElements(opCtx.get(), collNs, numBytes, 1, timestamp);
+                totalRecords++;
+                totalBytes += numBytes;
+            }
+        }
+        ASSERT_EQ(totalBytes, 66'000);
+        ASSERT_EQ(totalRecords, 3'000);
+        return {totalBytes, totalRecords};
+    }
 };
 
 class TestCollectionMarkersWithPartialExpiration final
@@ -329,6 +353,10 @@ TEST_F(CollectionMarkersTest, CreateNewMarker) {
     createNewMarkerTest<TestCollectionMarkersWithPartialExpiration>(this, "partial_coll");
 }
 
+CollectionTruncateMarkers::RecordIdAndWallTime getIdAndWallTime(const Record& record) {
+    return {record.id, Date_t::now()};
+}
+
 // Verify that a collection marker isn't created if it would cause the logical representation of the
 // records to not be in increasing order.
 template <typename T>
@@ -408,9 +436,7 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
         UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
 
         auto result = CollectionTruncateMarkers::createMarkersByScanning(
-            opCtx.get(), iterator, kMinBytes, [](const Record& record) {
-                return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
-            });
+            opCtx.get(), iterator, kMinBytes, getIdAndWallTime);
         ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
         ASSERT_GTE(result.timeTaken, Microseconds(0));
         ASSERT_EQ(result.leftoverRecordsBytes, kElementSize);
@@ -425,81 +451,45 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
 
 // Test that initial marker creation works as expected when using sampling
 TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
-    static constexpr auto kNumRounds = 200;
-    static constexpr auto kElementSize = 15;
-
-    int totalBytes = 0;
-    int totalRecords = 0;
     auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
-    {
-        auto opCtx = getClient()->makeOperationContext();
-        createCollection(opCtx.get(), collNs);
-        // Add documents of various sizes
-        for (int round = 0; round < kNumRounds; round++) {
-            for (int numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
-                insertElements(opCtx.get(), collNs, numBytes, 1, Timestamp(1, 0));
-                totalRecords++;
-                totalBytes += numBytes;
-            }
-        }
+    auto [totalBytes, totalRecords] = createPopulatedCollection(collNs);
+
+    auto opCtx = getClient()->makeOperationContext();
+
+    AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+
+    static constexpr auto kNumMarkers = 15;
+    auto kMinBytesPerMarker = totalBytes / kNumMarkers;
+    auto kRecordsPerMarker = totalRecords / kNumMarkers;
+
+    UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
+
+    auto result = CollectionTruncateMarkers::createFromCollectionIterator(
+        opCtx.get(), iterator, kMinBytesPerMarker, getIdAndWallTime);
+
+    ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+    ASSERT_GTE(result.timeTaken, Microseconds(0));
+    const auto& firstMarker = result.markers.front();
+    auto recordCount = firstMarker.records;
+    auto recordBytes = firstMarker.bytes;
+    ASSERT_EQ(result.leftoverRecordsBytes, totalBytes % kMinBytesPerMarker);
+    ASSERT_EQ(result.leftoverRecordsCount, totalRecords % kRecordsPerMarker);
+    ASSERT_GT(recordCount, 0);
+    ASSERT_GT(recordBytes, 0);
+    ASSERT_EQ(result.markers.size(), kNumMarkers);
+    for (const auto& marker : result.markers) {
+        ASSERT_EQ(marker.bytes, recordBytes);
+        ASSERT_EQ(marker.records, recordCount);
     }
 
-    {
-        auto opCtx = getClient()->makeOperationContext();
-
-        AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
-
-        static constexpr auto kNumMarkers = 15;
-        auto kMinBytesPerMarker = totalBytes / kNumMarkers;
-        auto kRecordsPerMarker = totalRecords / kNumMarkers;
-
-        UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
-
-        auto result = CollectionTruncateMarkers::createFromCollectionIterator(
-            opCtx.get(), iterator, kMinBytesPerMarker, [](const Record& record) {
-                return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
-            });
-
-        ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
-        ASSERT_GTE(result.timeTaken, Microseconds(0));
-        const auto& firstMarker = result.markers.front();
-        auto recordCount = firstMarker.records;
-        auto recordBytes = firstMarker.bytes;
-        ASSERT_EQ(result.leftoverRecordsBytes, totalBytes % kMinBytesPerMarker);
-        ASSERT_EQ(result.leftoverRecordsCount, totalRecords % kRecordsPerMarker);
-        ASSERT_GT(recordCount, 0);
-        ASSERT_GT(recordBytes, 0);
-        ASSERT_EQ(result.markers.size(), kNumMarkers);
-        for (const auto& marker : result.markers) {
-            ASSERT_EQ(marker.bytes, recordBytes);
-            ASSERT_EQ(marker.records, recordCount);
-        }
-
-        ASSERT_EQ(recordBytes * kNumMarkers + result.leftoverRecordsBytes, totalBytes);
-        ASSERT_EQ(recordCount * kNumMarkers + result.leftoverRecordsCount, totalRecords);
-    }
+    ASSERT_EQ(recordBytes * kNumMarkers + result.leftoverRecordsBytes, totalBytes);
+    ASSERT_EQ(recordCount * kNumMarkers + result.leftoverRecordsCount, totalRecords);
 }
 
 // Test that Oplog sampling progress is logged.
 TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
-    static constexpr auto kNumRounds = 200;
-    static constexpr auto kElementSize = 15;
-
-    int totalBytes = 0;
     auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
-
-    // Create a collection and insert records into it.
-    {
-        auto opCtx = getClient()->makeOperationContext();
-        createCollection(opCtx.get(), collNs);
-        // Add documents of various sizes
-        for (int round = 0; round < kNumRounds; round++) {
-            for (int numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
-                insertElements(opCtx.get(), collNs, numBytes, 1, Timestamp(1, 0));
-                totalBytes += numBytes;
-            }
-        }
-    }
+    auto [totalBytes, _] = createPopulatedCollection(collNs);
 
     auto opCtx = getClient()->makeOperationContext();
     AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
@@ -516,15 +506,12 @@ TEST_F(CollectionMarkersTest, OplogSamplingLogging) {
     TickSourceMock mockTickSource;
     mockTickSource.setAdvanceOnRead(Milliseconds{500});
     unittest::LogCaptureGuard logs;
-    CollectionTruncateMarkers::createMarkersBySampling(
-        opCtx.get(),
-        iterator,
-        estimatedRecordsPerMarker,
-        estimatedBytesPerMarker,
-        [](const Record& record) {
-            return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
-        },
-        &mockTickSource);
+    CollectionTruncateMarkers::createMarkersBySampling(opCtx.get(),
+                                                       iterator,
+                                                       estimatedRecordsPerMarker,
+                                                       estimatedBytesPerMarker,
+                                                       getIdAndWallTime,
+                                                       &mockTickSource);
     logs.stop();
     ASSERT_GT(logs.countTextContaining("Collection sampling progress"), 0);
     ASSERT_EQUALS(logs.countTextContaining("Collection sampling complete"), 1);
