@@ -195,9 +195,9 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         }
     }
 
-    if (_unhashed.has_value()) {
-        BSONObjBuilder bob(resultObj->subobjStart("unhashed"));
-        for (const auto& [prefix, ids] : *_unhashed) {
+    if (_revealedIds.has_value()) {
+        BSONObjBuilder bob(resultObj->subobjStart("revealedIds"));
+        for (const auto& [prefix, ids] : *_revealedIds) {
             bob.append(prefix, ids);
         }
     }

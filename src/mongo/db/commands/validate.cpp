@@ -399,39 +399,39 @@ public:
                                     << " requires {collHash: true}.");
         }
 
-        // TODO (SERVER-110841): Sanitize prefixes in the unhash field.
-        // unhash parameter.
-        const auto rawUnhash = cmdObj["unhash"];
-        boost::optional<std::vector<std::string>> unhash = boost::none;
-        if (rawUnhash && replCoord->getSettings().isReplSet()) {
+        // TODO (SERVER-110841): Sanitize prefixes in the revealHashedIds field.
+        // revealHashedIds parameter.
+        const auto rawRevealHashedIds = cmdObj["revealHashedIds"];
+        boost::optional<std::vector<std::string>> revealHashedIds = boost::none;
+        if (rawRevealHashedIds && replCoord->getSettings().isReplSet()) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream()
-                          << "Running the validate command with { unhash: [] } can only be"
+                          << "Running the validate command with { revealHashedIds: [] } can only be"
                           << " performed in standalone mode.");
         }
-        if (rawUnhash && !collHash) {
+        if (rawRevealHashedIds && !collHash) {
             uasserted(ErrorCodes::InvalidOptions,
-                      str::stream() << "Running the validate command with { unhash: [] }"
+                      str::stream() << "Running the validate command with { revealHashedIds: [] }"
                                     << " requires {collHash: true}.");
         }
-        if (rawUnhash && rawHashPrefixes) {
+        if (rawRevealHashedIds && rawHashPrefixes) {
             uasserted(ErrorCodes::InvalidOptions,
-                      str::stream()
-                          << "Running the validate command with { unhash: [] } cannot be done with"
-                          << " {hashPrefixes: []}.");
+                      str::stream() << "Running the validate command with { revealHashedIds: [] } "
+                                       "cannot be done with"
+                                    << " {hashPrefixes: []}.");
         }
-        if (rawUnhash) {
-            const auto& rawUnhashArr = rawUnhash.Array();
-            if (rawUnhashArr.empty()) {
+        if (rawRevealHashedIds) {
+            const auto& rawRevealHashedIdsArr = rawRevealHashedIds.Array();
+            if (rawRevealHashedIdsArr.empty()) {
                 uasserted(
                     ErrorCodes::InvalidOptions,
                     str::stream()
                         << "Running the validate command with { unhash: [] } cannot be done with"
                         << " an empty array provided.");
             }
-            unhash = std::vector<std::string>();
-            for (const auto& e : rawUnhashArr) {
-                unhash->push_back(e.String());
+            revealHashedIds = std::vector<std::string>();
+            for (const auto& e : rawRevealHashedIdsArr) {
+                revealHashedIds->push_back(e.String());
             }
         }
 
@@ -500,7 +500,7 @@ public:
                                      : currentValidationVersion,
             getConfigOverrideOrThrow(rawConfigOverride),
             hashPrefixes,
-            unhash);
+            revealHashedIds);
 
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20514,

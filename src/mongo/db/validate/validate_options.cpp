@@ -37,13 +37,13 @@ ValidationOptions::ValidationOptions(ValidateMode validateMode,
                                      ValidationVersion validationVersion,
                                      boost::optional<std::string> verifyConfigurationOverride,
                                      boost::optional<std::vector<std::string>> hashPrefixes,
-                                     boost::optional<std::vector<std::string>> unhash)
+                                     boost::optional<std::vector<std::string>> revealHashedIds)
     : _validateMode(validateMode),
       _repairMode(repairMode),
       _logDiagnostics(logDiagnostics),
       _validationVersion(validationVersion),
       _verifyConfigurationOverride(std::move(verifyConfigurationOverride)),
       _hashPrefixes(std::move(hashPrefixes)),
-      _unhash(std::move(unhash)) {}
+      _revealHashedIds(std::move(revealHashedIds)) {}
 
 }  // namespace mongo::CollectionValidation

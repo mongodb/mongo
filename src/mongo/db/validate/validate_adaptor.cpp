@@ -890,11 +890,11 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     // zeroed out.
     SHA256Block accumulatedBlock;
     accumulatedBlock.xorInline(accumulatedBlock);
-    bool unhash = _validateState->getUnhash().has_value();
-    stdx::unordered_map<std::string, std::vector<BSONObj>> unhashed;
-    if (unhash) {
-        for (const auto& unhashPrefix : _validateState->getUnhash().get()) {
-            unhashed[unhashPrefix] = {};
+    bool revealHashedIds = _validateState->getRevealHashedIds().has_value();
+    stdx::unordered_map<std::string, std::vector<BSONObj>> revealedIds;
+    if (revealHashedIds) {
+        for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
+            revealedIds[hashPrefix] = {};
         }
     }
 
@@ -923,13 +923,13 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
             SHA256Block block = SHA256Block::computeHash(
                 {ConstDataRange(record->data.data(), record->data.size())});
             accumulatedBlock.xorInline(block);
-            if (unhash) {
+            if (revealHashedIds) {
                 const auto idField = record->data.toBson()["_id"];
                 auto idBlock = SHA256Block::computeHash(
                     {ConstDataRange(idField.value(), idField.valuesize())});
-                for (const auto& unhashPrefix : _validateState->getUnhash().get()) {
-                    if (idBlock.toHexString().starts_with(unhashPrefix)) {
-                        unhashed[unhashPrefix].push_back(idField.wrap());
+                for (const auto& hashPrefix : _validateState->getRevealHashedIds().get()) {
+                    if (idBlock.toHexString().starts_with(hashPrefix)) {
+                        revealedIds[hashPrefix].push_back(idField.wrap());
                     }
                 }
             }
@@ -1075,8 +1075,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
 
     if (_validateState->isCollHashValidation()) {
         results->addCollectionHash(accumulatedBlock.toHexString());
-        if (unhash) {
-            results->addUnhashed(std::move(unhashed));
+        if (revealHashedIds) {
+            results->addRevealedIds(std::move(revealedIds));
         }
     }
 

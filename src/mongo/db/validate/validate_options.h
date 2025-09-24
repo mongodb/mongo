@@ -103,7 +103,7 @@ public:
                       ValidationVersion validationVersion = currentValidationVersion,
                       boost::optional<std::string> verifyConfigurationOverride = boost::none,
                       boost::optional<std::vector<std::string>> hashPrefixes = boost::none,
-                      boost::optional<std::vector<std::string>> unhash = boost::none);
+                      boost::optional<std::vector<std::string>> revealHashedIds = boost::none);
 
     virtual ~ValidationOptions() = default;
 
@@ -157,8 +157,8 @@ public:
         return _hashPrefixes;
     }
 
-    const boost::optional<std::vector<std::string>>& getUnhash() const {
-        return _unhash;
+    const boost::optional<std::vector<std::string>>& getRevealHashedIds() const {
+        return _revealHashedIds;
     }
 
     RepairMode getRepairMode() const {
@@ -202,7 +202,7 @@ private:
 
     const boost::optional<std::vector<std::string>> _hashPrefixes;
 
-    const boost::optional<std::vector<std::string>> _unhash;
+    const boost::optional<std::vector<std::string>> _revealHashedIds;
 };
 
 }  // namespace mongo::CollectionValidation

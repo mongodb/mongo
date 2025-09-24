@@ -49,11 +49,11 @@ testValidate({collHash: true, hashPrefixes: []});
 
 assert.commandFailed(t.validate({hashPrefixes: ["aaa"]}));
 
-// Test unhash
-testValidate({collHash: true, unhash: ["aaa"]});
+// Test revealHashedIds
+testValidate({collHash: true, revealHashedIds: ["aaa"]});
 
-assert.commandFailed(t.validate({collHash: true, unhash: []}));
+assert.commandFailed(t.validate({collHash: true, revealHashedIds: []}));
 
-assert.commandFailed(t.validate({unhash: ["aaa"]}));
+assert.commandFailed(t.validate({revealHashedIds: ["aaa"]}));
 
-assert.commandFailed(t.validate({collHash: true, unhash: ["aaa"], hashPrefixes: ["aaa"]}));
+assert.commandFailed(t.validate({collHash: true, revealHashedIds: ["aaa"], hashPrefixes: ["aaa"]}));

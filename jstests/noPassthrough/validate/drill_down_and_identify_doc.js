@@ -48,10 +48,10 @@ function hashDrillDown(db1, db2) {
 
     jsTest.log.info("Prefix of differing bucket: " + tojson(prefix));
 
-    // Unhash with 'prefix' should return 'differingDocId'.
-    const res = assert.commandWorked(db1.coll.validate({collHash: true, unhash: [prefix]}));
-    assert.eq(res.unhashed[prefix].length, 1, res);
-    assert.eq(res.unhashed[prefix][0], {_id: differingDocId}, res);
+    // revealHashedIds with 'prefix' should return 'differingDocId'.
+    const res = assert.commandWorked(db1.coll.validate({collHash: true, revealHashedIds: [prefix]}));
+    assert.eq(res.revealedIds[prefix].length, 1, res);
+    assert.eq(res.revealedIds[prefix][0], {_id: differingDocId}, res);
 }
 
 hashDrillDown(db1, db2);
