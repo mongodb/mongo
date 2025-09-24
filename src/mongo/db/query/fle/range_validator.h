@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 // This overload is used when building validation error messages.

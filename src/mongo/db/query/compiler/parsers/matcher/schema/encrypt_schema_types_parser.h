@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/matcher/schema/encrypt_schema_types.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::parsers::matcher::schema {
 /**

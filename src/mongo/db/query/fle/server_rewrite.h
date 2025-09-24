@@ -45,6 +45,7 @@
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 
@@ -53,7 +54,7 @@
 /**
  * This file contains the interface for rewriting filters within CRUD commands for FLE2.
  */
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 class FLETagQueryInterface;
 
 namespace fle {
@@ -121,4 +122,4 @@ BSONObj rewriteEncryptedFilterInsideTxn(
     BSONObj filter,
     EncryptedCollScanModeAllowed mode = EncryptedCollScanModeAllowed::kDisallow);
 }  // namespace fle
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

@@ -36,6 +36,7 @@
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/json_pointer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <string>

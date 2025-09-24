@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

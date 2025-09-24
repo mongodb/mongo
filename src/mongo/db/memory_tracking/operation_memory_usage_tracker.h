@@ -31,6 +31,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/memory_tracking/memory_usage_tracker.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 

@@ -38,6 +38,7 @@
 #include "mongo/db/query/fle/range_predicate.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo::fle {

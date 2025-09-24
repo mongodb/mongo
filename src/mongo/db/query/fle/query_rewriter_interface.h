@@ -31,8 +31,9 @@
 
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class FLETagQueryInterface;
 
@@ -72,4 +73,4 @@ public:
     virtual ExpressionContext* getExpressionContext() const = 0;
 };
 }  // namespace fle
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo
