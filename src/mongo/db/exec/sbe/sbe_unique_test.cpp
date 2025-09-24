@@ -227,6 +227,29 @@ TEST_F(UniqueStageTest, ResetsStateAfterReopen) {
     ASSERT_TRUE(valueEquals(resetResultsTag, resetResultsVal, expectedTag, expectedVal));
 }
 
+TEST_F(UniqueStageTest, UniqueStageTracksMemory) {
+    // Mix short and long strings to exercise the how we estimate memory used.
+    auto [tag, val] = stage_builder::makeValue(
+        BSON_ARRAY("a" << "b-enormous" << "c" << "d-enormous" << "e" << "f-enormous"));
+    auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
+
+    auto unique = makeS<UniqueStage>(std::move(scanStage), sbe::makeSV(scanSlot), kEmptyPlanNodeId);
+    auto ctx = makeCompileCtx();
+    prepareTree(ctx.get(), unique.get());
+
+    const SimpleMemoryUsageTracker& tracker = *unique->getMemoryTracker();
+
+    size_t i = 0;
+    int64_t prevTrackedMem = tracker.inUseTrackedMemoryBytes();
+    for (auto st = unique->getNext(); st == PlanState::ADVANCED; st = unique->getNext(), ++i) {
+        // Since every output value represent a new value inserted into the _seen map, memory will
+        // always be increasing.
+        int64_t newTrackedMem = tracker.inUseTrackedMemoryBytes();
+        ASSERT_GT(newTrackedMem, prevTrackedMem);
+        prevTrackedMem = newTrackedMem;
+    }
+}
+
 TEST_F(UniqueRoaringStageTest, ResetsStateAfterReopen) {
     auto [tag, val] = stage_builder::makeValue(BSON_ARRAY(1 << 2 << 1 << 3));
     auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
@@ -252,5 +275,28 @@ TEST_F(UniqueRoaringStageTest, ResetsStateAfterReopen) {
     // The same result is seen after re-opening the plan tree. This proves the seen set has been
     // cleared, otherwise we would not get any result from the second run.
     ASSERT_TRUE(valueEquals(resetResultsTag, resetResultsVal, expectedTag, expectedVal));
+}
+
+TEST_F(UniqueRoaringStageTest, UniqueRoaringStageTracksMemory) {
+    // Mix short and long strings to exercise the how we estimate memory used.
+    auto [tag, val] =
+        stage_builder::makeValue(BSON_ARRAY(1 << 100 << 2 << 1 << 3 << 2 << 4 << 100));
+    auto [scanSlot, scanStage] = generateVirtualScan(tag, val);
+
+    auto unique = makeS<UniqueRoaringStage>(std::move(scanStage), scanSlot, kEmptyPlanNodeId);
+    auto ctx = makeCompileCtx();
+    prepareTree(ctx.get(), unique.get());
+
+    const SimpleMemoryUsageTracker& tracker = *unique->getMemoryTracker();
+
+    size_t i = 0;
+    int64_t prevTrackedMem = tracker.inUseTrackedMemoryBytes();
+    for (auto st = unique->getNext(); st == PlanState::ADVANCED; st = unique->getNext(), ++i) {
+        // Since every output value represent a new value inserted into the _seen HashRoaringSet,
+        // memory will always be increasing.
+        int64_t newTrackedMem = tracker.inUseTrackedMemoryBytes();
+        ASSERT_GT(newTrackedMem, prevTrackedMem);
+        prevTrackedMem = newTrackedMem;
+    }
 }
 }  // namespace mongo::sbe

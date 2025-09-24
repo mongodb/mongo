@@ -34,14 +34,34 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/memory_tracking/operation_memory_usage_tracker.h"
 
 #include <utility>
 
+#include <absl/container/flat_hash_set.h>
 #include <absl/container/inlined_vector.h>
 #include <absl/container/node_hash_map.h>
 
 namespace mongo {
 namespace sbe {
+namespace {
+
+template <typename T, typename H, typename E>
+size_t estimateSetSizeBytes(const absl::flat_hash_set<T, H, E>& hashSet) {
+    // from https://abseil.io/docs/cpp/guides/container#abslflat_hash_map-and-abslflat_hash_set
+    return (sizeof(T) + 1) * hashSet.bucket_count();
+}
+
+uint64_t estimateRowSizeBytes(const value::MaterializedRow& row) {
+    // MaterializedRow is a dynamic array of values, tags, and "owned" bools.
+    size_t valueAndTags =
+        row.size() * (sizeof(value::Value) + sizeof(value::TypeTags) + sizeof(bool));
+    // This call to estimate() computes any additional memory needed for non-shallow types.
+    return valueAndTags + size_estimator::estimate(row);
+}
+
+}  // namespace
 UniqueStage::UniqueStage(std::unique_ptr<PlanStage> input,
                          value::SlotVector keys,
                          PlanNodeId planNodeId,
@@ -61,6 +81,9 @@ void UniqueStage::prepare(CompileCtx& ctx) {
     for (auto&& keySlot : _keySlots) {
         _inKeyAccessors.emplace_back(_children[0]->getAccessor(ctx, keySlot));
     }
+
+    _memoryTracker =
+        OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(_opCtx);
 }
 
 value::SlotAccessor* UniqueStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -73,6 +96,8 @@ void UniqueStage::open(bool reOpen) {
 
     if (reOpen) {
         _seen.clear();
+        _prevSeenSizeBytes = 0;
+        _memoryTracker->set(0);
     }
     _children[0]->open(reOpen);
 }
@@ -92,6 +117,10 @@ PlanState UniqueStage::getNext() {
         auto [it, inserted] = _seen.emplace(std::move(key));
         if (inserted) {
             const_cast<value::MaterializedRow&>(*it).makeOwned();
+            size_t newSeenSizeBytes = estimateSetSizeBytes(_seen);
+            _memoryTracker->add((newSeenSizeBytes - _prevSeenSizeBytes) +
+                                estimateRowSizeBytes(*it));
+            _prevSeenSizeBytes = newSeenSizeBytes;
             return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.
@@ -107,6 +136,10 @@ void UniqueStage::close() {
     trackClose();
 
     _seen.clear();
+    _memoryTracker->set(0);
+    _prevSeenSizeBytes = 0;
+    _specificStats.peakTrackedMemBytes = _memoryTracker->peakTrackedMemoryBytes();
+
     _children[0]->close();
 }
 
@@ -119,6 +152,10 @@ std::unique_ptr<PlanStageStats> UniqueStage::getStats(bool includeDebugInfo) con
         bob.appendNumber("dupsTested", static_cast<long long>(_specificStats.dupsTested));
         bob.appendNumber("dupsDropped", static_cast<long long>(_specificStats.dupsDropped));
         bob.append("keySlots", _keySlots.begin(), _keySlots.end());
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
+        }
         ret->debugInfo = bob.obj();
     }
 
@@ -180,6 +217,8 @@ std::unique_ptr<PlanStage> UniqueRoaringStage::clone() const {
 void UniqueRoaringStage::prepare(CompileCtx& ctx) {
     _children[0]->prepare(ctx);
     _inKeyAccessor = _children[0]->getAccessor(ctx, _keySlot);
+    _memoryTracker =
+        OperationMemoryUsageTracker::createChunkedSimpleMemoryUsageTrackerForSBE(_opCtx);
 }
 
 value::SlotAccessor* UniqueRoaringStage::getAccessor(CompileCtx& ctx, value::SlotId slot) {
@@ -192,6 +231,8 @@ void UniqueRoaringStage::open(bool reOpen) {
 
     if (reOpen) {
         _seen.clear();
+        _memoryTracker->set(0);
+        _prevSeenSizeBytes = 0;
     }
     _children[0]->open(reOpen);
 }
@@ -233,6 +274,9 @@ PlanState UniqueRoaringStage::getNext() {
         ++_specificStats.dupsTested;
         auto inserted = _seen.addChecked(roaringVal);
         if (inserted) {
+            size_t newSeenSizeBytes = _seen.getApproximateSize();
+            _memoryTracker->add(newSeenSizeBytes - _prevSeenSizeBytes);
+            _prevSeenSizeBytes = newSeenSizeBytes;
             return trackPlanState(PlanState::ADVANCED);
         } else {
             // This row has been seen already, so we skip it.
@@ -248,6 +292,10 @@ void UniqueRoaringStage::close() {
     trackClose();
 
     _seen.clear();
+    _memoryTracker->set(0);
+    _prevSeenSizeBytes = 0;
+    _specificStats.peakTrackedMemBytes = _memoryTracker->peakTrackedMemoryBytes();
+
     _children[0]->close();
 }
 
@@ -260,6 +308,10 @@ std::unique_ptr<PlanStageStats> UniqueRoaringStage::getStats(bool includeDebugIn
         bob.appendNumber("dupsTested", static_cast<long long>(_specificStats.dupsTested));
         bob.appendNumber("dupsDropped", static_cast<long long>(_specificStats.dupsDropped));
         bob.append("keySlot", _keySlot);
+        if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
+            bob.appendNumber("peakTrackedMemBytes",
+                             static_cast<long long>(_specificStats.peakTrackedMemBytes));
+        }
         ret->debugInfo = bob.obj();
     }
 

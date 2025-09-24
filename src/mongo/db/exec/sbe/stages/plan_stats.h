@@ -183,6 +183,8 @@ struct UniqueStats : public SpecificStats {
 
     size_t dupsTested = 0;
     size_t dupsDropped = 0;
+
+    uint64_t peakTrackedMemBytes = 0;
 };
 
 struct BranchStats final : public SpecificStats {

@@ -37,11 +37,9 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/util/hash_roaring_set.h"
-#include "mongo/stdx/unordered_set.h"
 
 #include <cstddef>
 #include <memory>
-#include <queue>
 #include <vector>
 
 namespace mongo::sbe {
@@ -101,6 +99,7 @@ private:
                         value::MaterializedRowHasher,
                         value::MaterializedRowEq>
         _seen;
+    size_t _prevSeenSizeBytes = 0;
     UniqueStats _specificStats;
 };
 
@@ -145,6 +144,7 @@ private:
     const value::SlotId _keySlot;
     value::SlotAccessor* _inKeyAccessor = nullptr;
     HashRoaringSet _seen;
+    size_t _prevSeenSizeBytes = 0;
 
     UniqueStats _specificStats;
 };
