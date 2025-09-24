@@ -2,14 +2,21 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library", "mongo_cc_unit_test")
 
 package(default_visibility = ["//visibility:public"])
 
+exports_files([
+    "agg_join_model.h",
+    "agg_join_model.cpp",
+])
+
 mongo_cc_library(
     name = "join_ordering",
     srcs = [
         "join_graph.cpp",
+        "path_resolver.cpp",
     ],
     hdrs = [
         "join_graph.h",
         "logical_defs.h",
+        "path_resolver.h",
     ],
     deps = [
         "//src/mongo/db:server_base",
@@ -20,11 +27,15 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "join_ordering_test",
     srcs = [
+        "agg_join_model_test.cpp",
         "join_graph_test.cpp",
+        "path_resolver_test.cpp",
     ],
     tags = ["mongo_unittest_third_group"],
     deps = [
         ":join_ordering",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
     ],
 )
 

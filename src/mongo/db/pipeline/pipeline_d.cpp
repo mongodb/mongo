@@ -2142,4 +2142,34 @@ bool PipelineD::isSearchPresentAndEligibleForSbe(const Pipeline* pipeline) {
 
     return firstStageIsSearch && searchInSbeEnabled && !forceClassicEngine;
 }
+
+StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    Pipeline& pipeline) {
+    bool shouldProduceEmptyDocs;  // Don't care about result.
+    QueryMetadataBitSet availableMetadata(0);
+    auto queryObj = pipeline.getInitialQuery();
+
+    boost::intrusive_ptr<DocumentSourceMatch> leadingMatch;
+
+    // We assume that Pipeline::optimize() is called by this point so we can hopefully guarantee
+    // that we have exactly one $match at the front of the pipeline.
+    if (auto* match = dynamic_cast<DocumentSourceMatch*>(pipeline.peekFront()); match) {
+        leadingMatch = boost::intrusive_ptr<DocumentSourceMatch>(match);
+        pipeline.popFront();
+    }
+
+    return createCanonicalQuery(expCtx,
+                                nss,
+                                &pipeline,
+                                availableMetadata,
+                                queryObj,
+                                leadingMatch,
+                                boost::none,
+                                nullptr,
+                                MatchExpressionParser::kDefaultSpecialFeatures,
+                                false /*timeseriesBoundedSortOptimization*/,
+                                &shouldProduceEmptyDocs);
+}
 }  // namespace mongo

@@ -301,4 +301,9 @@ private:
         const FieldPath& sortFieldPath);
 };
 
+// Public-facing version of internal function for use in join-ordering opt.
+StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    Pipeline& pipeline);
 }  // namespace mongo

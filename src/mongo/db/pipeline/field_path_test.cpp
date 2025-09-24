@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -245,6 +246,17 @@ TEST(FieldPathTest, ConcatFailsIfExceedsMaxDepth) {
     FieldPath firstHalf(firstHalfStr);
     FieldPath secondHalf(secondHalfStr);
     ASSERT_THROWS_CODE(firstHalf.concat(secondHalf), AssertionException, ErrorCodes::Overflow);
+}
+
+TEST(FieldPathTest, SubstractPrefix) {
+    const FieldPath fp{"first.second.third"};
+    ASSERT_EQ(fp.subtractPrefix(2).fullPath(), std::string("third"));
+    ASSERT_EQ(fp.subtractPrefix(1).fullPath(), std::string("second.third"));
+    ASSERT_EQ(fp.subtractPrefix(0).fullPath(), std::string("first.second.third"));
+}
+
+DEATH_TEST_REGEX(FieldPathTest, SubstractPrefix_TooLargeCut, "Tripwire assertion.*10985000") {
+    FieldPath("first.second.third").subtractPrefix(3);
 }
 }  // namespace
 }  // namespace mongo

@@ -173,6 +173,16 @@ public:
             : lhsStr == rhsStr;
     }
 
+    FieldPath subtractPrefix(size_t prefixLength) const {
+        tassert(10985000,
+                "Expected prefixLength < numPathElements",
+                prefixLength + 1 < _fieldPathDotPosition.size());
+        if (prefixLength == 0) {
+            return *this;
+        }
+        return FieldPath(_fieldPath.substr(_fieldPathDotPosition[prefixLength] + 1));
+    }
+
 private:
     FieldPath(std::string string, std::vector<size_t> dots, std::vector<uint32_t> hashes)
         : _fieldPath(std::move(string)),
@@ -205,5 +215,10 @@ inline bool operator<(const FieldPath& lhs, const FieldPath& rhs) {
 
 inline bool operator==(const FieldPath& lhs, const FieldPath& rhs) {
     return lhs.fullPath() == rhs.fullPath();
+}
+
+template <typename H>
+H AbslHashValue(H h, const FieldPath& fieldPath) {
+    return H::combine(std::move(h), fieldPath.fullPath());
 }
 }  // namespace mongo
