@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/util/debug_util.h"
+#include "mongo/util/modules.h"
 
 /**
  * This header file contains non-trivial default initializers for query knobs.

@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/util/modules.h"
 
 #include <fmt/format.h>
 

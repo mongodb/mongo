@@ -38,6 +38,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

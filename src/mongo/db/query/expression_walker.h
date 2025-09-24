@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_visitor.h"
+#include "mongo/util/modules.h"
 
 namespace mongo::stage_builder {
 class ExpressionWalker final {

@@ -44,6 +44,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>

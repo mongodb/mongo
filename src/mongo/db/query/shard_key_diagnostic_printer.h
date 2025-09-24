@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/namespace_string_util.h"
 
 #include <fmt/format.h>

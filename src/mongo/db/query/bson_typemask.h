@@ -31,6 +31,7 @@
 
 
 #include "mongo/bson/bsontypes.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

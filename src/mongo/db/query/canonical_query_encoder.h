@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 

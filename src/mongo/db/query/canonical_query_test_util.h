@@ -37,6 +37,7 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

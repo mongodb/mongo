@@ -31,6 +31,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

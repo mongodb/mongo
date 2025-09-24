@@ -33,6 +33,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <functional>

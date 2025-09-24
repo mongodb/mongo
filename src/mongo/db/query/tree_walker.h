@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <type_traits>
 
 namespace mongo::tree_walker {

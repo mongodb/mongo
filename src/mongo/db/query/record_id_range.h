@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/record_id_bound.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 

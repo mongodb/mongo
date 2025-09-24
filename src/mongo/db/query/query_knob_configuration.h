@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings/query_settings_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**

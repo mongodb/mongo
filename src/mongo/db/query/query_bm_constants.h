@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace query_benchmark_constants {

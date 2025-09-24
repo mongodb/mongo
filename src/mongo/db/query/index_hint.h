@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/modules.h"
 
 #include <compare>
 #include <string>

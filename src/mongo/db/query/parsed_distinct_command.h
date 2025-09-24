@@ -38,6 +38,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/distinct_command_gen.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 

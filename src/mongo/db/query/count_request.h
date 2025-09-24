@@ -32,6 +32,7 @@
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 namespace count_request {

@@ -37,6 +37,7 @@
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/util/modules.h"
 
 #include <map>
 #include <memory>

@@ -32,6 +32,7 @@
 #include "mongo/db/curop_diagnostic_printer.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/modules.h"
 
 #include <fmt/format.h>
 

@@ -38,6 +38,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder/classic_stage_builder.h"
 #include "mongo/db/query/stage_builder/sbe/builder_data.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <vector>

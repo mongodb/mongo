@@ -33,6 +33,7 @@
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/platform/random.h"
 #include "mongo/unittest/benchmark_util.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 #include <vector>

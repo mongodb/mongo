@@ -38,6 +38,7 @@
 #include "mongo/db/query/plan_cache/sbe_plan_cache.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/serialization_context.h"
 
 #include <boost/optional/optional.hpp>

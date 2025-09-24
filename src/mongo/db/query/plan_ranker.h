@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/base/status.h"
