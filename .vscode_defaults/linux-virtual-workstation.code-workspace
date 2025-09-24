@@ -20,8 +20,6 @@
 			"javascript"
 		],
 		"files.associations": {
-			"SConstruct": "python",
-			"SConscript": "python",
 			"*.idl": "yaml",
 		},
 		"files.insertFinalNewline": true,
@@ -33,12 +31,10 @@
 		],
 		"python.autoComplete.extraPaths": [
 			"/opt/mongodbtoolchain/v4/share/gcc-11.3.0/python",
-			"src/third_party/scons-3.1.2/scons-local-3.1.2"
 		],
 		"python.defaultInterpreterPath": "python3-venv/bin/python",
 		"python.analysis.extraPaths": [
 			"/opt/mongodbtoolchain/v4/share/gcc-11.3.0/python",
-			"src/third_party/scons-3.1.2/scons-local-3.1.2"
 		],
 		"mypy-type-checker.path": [
 			"${interpreter}",

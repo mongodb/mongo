@@ -116,7 +116,6 @@ buildvariants:
     packager_arch: aarch64
     packager_distro: amazon2
     repo_edition: org
-    scons_cache_scope: shared
     large_distro_name: amazon2-arm64-latest-large
     core_analyzer_distro_name: amazon2-arm64-latest-xlarge
     compile_variant: amazon2-arm64
@@ -248,7 +247,6 @@ buildvariants:
     packager_arch: aarch64
     packager_distro: amazon2023
     repo_edition: org
-    scons_cache_scope: shared
     large_distro_name: amazon2023.3-arm64-large
     compile_variant: amazon2023-arm64
   tasks:
@@ -285,7 +283,6 @@ buildvariants:
       --enableEnterpriseTests=off
     has_packages: false
     repo_edition: org
-    scons_cache_scope: shared
     large_distro_name: amazon2023-arm64-latest-large-m8g
     compile_variant: amazon2023-arm64-grav4
   tasks:
@@ -362,7 +359,6 @@ buildvariants:
     multiversion_edition: enterprise
     multiversion_architecture: aarch64
     repo_edition: enterprise
-    scons_cache_scope: shared
     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
     external_auth_jobs_max: 1
     compile_variant: enterprise-amazon2023-arm64-grav4

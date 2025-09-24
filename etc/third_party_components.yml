@@ -350,14 +350,6 @@ components:
     team_owner: "Query"
     # Note: This is a test-only library and not compiled into the server.
 
-  "SCons - a Software Construction tool":
-    homepage_url: https://www.scons.org/
-    open_hub_url: https://www.openhub.net/p/scons
-    release_monitoring_id: 4770
-    local_directory_path: src/third_party/scons-4.9.1
-    team_owner: "Build"
-    upgrade_suppression: TODO SERVER-49324
-
   smhasher:
     homepage_url: https://github.com/aappleby/smhasher
     open_hub_url: https://www.openhub.net/p/smhasher

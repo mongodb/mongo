@@ -273,7 +273,6 @@ tasks:
       - "./etc/evergreen.yml"
       - "./etc/evergreen_yml_components/**"
       - "./etc/repo_config.yaml"
-      - "./etc/scons/**"
       - "./etc/macos_dev_entitlements.xml"
       - "docker_compose/**"
       - "buildscripts/**"
@@ -1690,15 +1689,6 @@ task_groups:
   tasks:
     - compile_libraries_for_unittests
 
-# These `parallel` task groups are only appropriate for builders that
-# use --link-model=dynamic, and have scons_cache_scope: shared and
-# scons_cache_mode: all. Such builders are able to share all build
-# artifacts, and therefore will not repeatedly re-link the same
-# code. In that mode, it makes sense to run all of these tasks
-# concurrently, since they will share state across machines and can
-# complete faster than running them serially. We keep them in task
-# groups so that if they do run on the same machine, they can avoid the
-# cost of re-running the setup tasks.
 - <<: *compile_task_group_template
   name: compile_test_parallel_core_stream_TG
   tasks:
@@ -1738,8 +1728,6 @@ task_groups:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "get buildnumber"
-  - func: "f_expansions_write"
-  - func: "set up win mount script"
   - func: "f_expansions_write"
   teardown_group:
   - func: "f_expansions_write"

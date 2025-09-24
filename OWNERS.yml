@@ -74,9 +74,6 @@ filters:
     approvers:
       - devprod-correctness
       - devprod-build
-  - "SConstruct":
-    approvers:
-      - devprod-build
   - "WORKSPACE.bazel":
     approvers:
       - devprod-build

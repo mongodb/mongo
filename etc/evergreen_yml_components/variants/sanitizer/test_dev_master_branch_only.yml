@@ -72,7 +72,7 @@ variables:
   large_distro_name: rhel8.8-medium
 
 # If you add anything to san_options, make sure the appropriate changes are
-# also made to SConstruct.
+# also made to build.
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -84,7 +84,7 @@ variables:
     ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
 # If you add anything to san_options, make sure the appropriate changes are
-# also made to SConstruct.
+# also made to build.
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -103,7 +103,6 @@ variables:
   resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
   hang_analyzer_dump_core: false
   max_sub_suites: 3
-  num_scons_link_jobs_available: 0.99
   large_distro_name: rhel8.8-large
   xlarge_distro_name: rhel8.8-xxlarge
   multiversion_platform: rhel80
@@ -500,9 +499,6 @@ buildvariants:
         --use_diagnostic_latches=True
     test_flags: >-
       --mongodSetParameters="{internalQueryEnableAggressiveSpillsInGroup: true}"
-    scons_cache_mode: all
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.99
     compile_variant: *enterprise-rhel8-unoptimized-64-bit
   tasks:
   - name: compile_test_parallel_core_stream_TG

@@ -1,4 +1,5 @@
 """Git Utility functions."""
+
 from __future__ import annotations
 
 import itertools
@@ -7,11 +8,9 @@ import re
 from pathlib import Path
 from typing import Callable, List
 
-from buildscripts import moduleconfig
 from buildscripts.linter import git_base as _git
 
 # Path to the modules in the mongodb source tree
-# Has to match the string in SConstruct
 MODULE_DIR = "src/mongo/db/modules"
 
 
@@ -30,24 +29,9 @@ def get_base_dir():
         return os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
 
-def get_module_paths() -> List[str]:
-    """Get a list of paths that contain modules."""
-    base_dir = get_base_dir()
-
-    # Get a list of modules
-    mongo_modules = moduleconfig.discover_module_directories(
-        os.path.join(base_dir, MODULE_DIR), None)
-
-    paths = [os.path.join(base_dir, MODULE_DIR, m) for m in mongo_modules]
-    paths.append(base_dir)
-
-    return paths
-
-
 def get_repos() -> List[Repo]:
     """Get a list of Repos to check linters for."""
-    paths = get_module_paths()
-    return [Repo(p) for p in paths]
+    return [Repo(get_base_dir())]
 
 
 class Repo(_git.Repository):
@@ -74,7 +58,8 @@ class Repo(_git.Repository):
         if candidates is not None and len(candidates) > 0:
             candidates = [self._get_local_dir(f) for f in candidates]
             valid_files = list(
-                set(candidates).intersection(self.get_candidate_files(filter_function)))
+                set(candidates).intersection(self.get_candidate_files(filter_function))
+            )
         else:
             valid_files = list(self.get_candidate_files(filter_function))
 
@@ -115,7 +100,8 @@ class Repo(_git.Repository):
 
         file_set = {
             os.path.normpath(os.path.join(self.directory, line.rstrip()))
-            for line in diff_files.splitlines() if filter_function(line.rstrip())
+            for line in diff_files.splitlines()
+            if filter_function(line.rstrip())
         }
 
         return list(file_set)
@@ -162,7 +148,9 @@ def get_files_to_check_working_tree(filter_function):
 
     valid_files = list(
         itertools.chain.from_iterable(
-            [r.get_working_tree_candidates(filter_function) for r in repos]))
+            [r.get_working_tree_candidates(filter_function) for r in repos]
+        )
+    )
 
     return valid_files
 
@@ -178,7 +166,8 @@ def get_valid_files_from_candidates(candidates, filter_fn: Callable[[str], bool]
     repos = get_repos()
 
     valid_files = list(
-        itertools.chain.from_iterable([r.get_candidates(candidates, filter_fn) for r in repos]))
+        itertools.chain.from_iterable([r.get_candidates(candidates, filter_fn) for r in repos])
+    )
 
     return valid_files
 
@@ -228,6 +217,8 @@ def get_my_files_to_check(filter_function, origin_branch):
 
     valid_files = list(
         itertools.chain.from_iterable(
-            [r.get_my_candidate_files(filter_function, origin_branch) for r in repos]))
+            [r.get_my_candidate_files(filter_function, origin_branch) for r in repos]
+        )
+    )
 
     return valid_files

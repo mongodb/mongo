@@ -83,9 +83,6 @@ buildvariants:
   - name: run_unit_tests_no_sandbox_TG
     distros:
     - windows-2022-xxlarge
-  - name: convert_scons_to_bazel_windows_TG
-    distros:
-    - windows-2022-xxlarge
   - name: .development_critical !.requires_large_host !.incompatible_windows
   - name: .development_critical .requires_large_host !.incompatible_windows
     distros:

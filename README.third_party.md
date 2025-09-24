@@ -63,7 +63,6 @@ a notice will be included in
 | [re2]                                                | BSD-3-Clause                      | 2023-11-01                               |                      | ✗                               |
 | [S2 Geometry Library]                                | Apache-2.0                        | c872048da5d1                             | ✗                    | ✗                               |
 | [SafeInt]                                            | MIT                               | 3.0.26                                   |                      | ✗                               |
-| [SCons - a Software Construction tool]               | MIT                               | 4.9.1                                    |                      |                                 |
 | [snappy]                                             | BSD-3-Clause                      | 1.1.10                                   | ✗                    | ✗                               |
 | [Snowball Stemming Algorithms (libstemmer)]          | BSD-3-Clause                      | 7b264ffa0f767c579d052fd8142558dc8264d795 | ✗                    | ✗                               |
 | [tcmalloc]                                           | Apache-2.0                        | 093ba93c1bd6dca03b0a8334f06d01b019244291 |                      | ✗                               |
@@ -91,7 +90,6 @@ a notice will be included in
 [PCRE2 - Perl-Compatible Regular Expressions]: http://www.pcre.org/
 [Protobuf]: https://github.com/protocolbuffers/protobuf
 [S2 Geometry Library]: https://github.com/google/s2geometry
-[SCons - a Software Construction tool]: https://github.com/SCons/scons
 [SafeInt]: https://github.com/dcleblanc/SafeInt
 [Snowball Stemming Algorithms (libstemmer)]: https://github.com/snowballstem/snowball
 [Unicode Character Database]: http://www.unicode.org/versions/enumeratedversions.html

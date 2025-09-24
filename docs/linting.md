@@ -42,14 +42,11 @@ Ex: `buildscripts/quickmongolint.py lint`
 
 ## Javascript Linters
 
-The `buildscripts/eslint.py` wrapper script runs the `eslint` javascript linter. You can see the
-usage message for the wrapper by running `buildscripts/eslint.py --help`.
+The `bazel run lint` command runs the `eslint` javascript linter.
 
-Ex: `buildscripts/eslint.py lint`
-
-| Linter   | Configuration File(s)           | Help Command    | Documentation                              |
-| -------- | ------------------------------- | --------------- | ------------------------------------------ |
-| `eslint` | `.eslintrc.yml` `.eslintignore` | `eslint --help` | [https://eslint.org/](https://eslint.org/) |
+| Linter   | Configuration File(s) | Help Command | Documentation                              |
+| -------- | --------------------- | ------------ | ------------------------------------------ |
+| `eslint` | `.eslint.config.mjs`  |              | [https://eslint.org/](https://eslint.org/) |
 
 ## Yaml Linters
 
@@ -66,41 +63,12 @@ Ex: `bash buildscripts/yamllinters.sh`
 
 ## Python Linters
 
-The `buildscripts/pylinters.py` wrapper script runs the Python linters. You can
-see the usage message for the wrapper by running the following command:
-`buildscripts/pylinters.py --help`. The following linters are supported: `pylint`, `mypy`,
-`pydocstyle` & `yapf`.
+The `bazel run lint` command runs all Python linters as well as several other linters in our code base. You can
+run auto-remediations via:
+`bazel run lint --fix`.
 
-Ex: `buildscripts/pylinters.py lint`
+Ex: `bazel run lint`
 
-| Linter       | Configuration File(s) | Help Command        | Documentation                                                                                |
-| ------------ | --------------------- | ------------------- | -------------------------------------------------------------------------------------------- |
-| `pylint`     | `.pylintrc`           | `pylint --help`     | [https://www.pylint.org/](https://www.pylint.org/)                                           |
-| `mypy`       | `.mypy.ini`           | `mypy --help`       | [https://readthedocs.org/projects/mypy/](https://readthedocs.org/projects/mypy/)             |
-| `pydocstyle` | `.pydocstyle`         | `pydocstyle --help` | [https://readthedocs.org/projects/pydocstyle/](https://readthedocs.org/projects/pydocstyle/) |
-| `yapf`       | `.style.yapf`         | `yapf --help`       | [https://github.com/google/yapf](https://github.com/google/yapf)                             |
-
-### SCons Linters
-
-`buildscripts/pylinters.py` has the `lint-scons` and `fix-scons` commands to lint
-and fix SCons and build system related code. Currently `yapf` is the only
-linter supported for SCons code.
-
-## Using SCons for linting
-
-You can use SCons to run most of the linters listed above via their corresponding Python wrapper
-script. SCons also provides the ability to run multiple linters in a single command. At this time,
-SCons does not support `clang-tidy` or `buildscripts/yamllinters.sh`
-
-Here are some examples:
-
-| SCons Target        | Linter(s)                                                                                       | Example                                   |
-| ------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `lint`              | `clang-format` `errorcodes.py` `quickmongolint.py` `eslint` `pylint` `mypy` `pydocstyle` `yapf` | `buildscripts/scons.py lint`              |
-| `lint-fast`         | `clang-format` `errorcodes.py` `eslint` `pylint` `mypy` `pydocstyle` `yapf`                     | `buildscripts/scons.py lint-fast`         |
-| `lint-clang-format` | `clang-format`                                                                                  | `buildscripts/scons.py lint-clang-format` |
-| `lint-errorcodes`   | `errorcodes.py`                                                                                 | `buildscripts/scons.py lint-errorcodes`   |
-| `lint-lint.py`      | `quickmongolint.py`                                                                             | `buildscripts/scons.py lint-lint.py`      |
-| `lint-eslint`       | `eslint`                                                                                        | `buildscripts/scons.py lint-eslint`       |
-| `lint-pylinters`    | `pylint` `mypy` `pydocstyle` `yapf`                                                             | `buildscripts/scons.py lint-pylinters`    |
-| `lint-sconslinters` | `yapf`                                                                                          | `buildscripts/scons.py lint-sconslinters` |
+| Linter | Configuration File(s) | Help Command | Documentation                                                |
+| ------ | --------------------- | ------------ | ------------------------------------------------------------ |
+| `ruff` | `pyproject.toml`      |              | [https://docs.astral.sh/ruff/](https://docs.astral.sh/ruff/) |

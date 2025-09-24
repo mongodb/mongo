@@ -49,7 +49,6 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: run_unit_tests_TG
-  - name: convert_scons_to_bazel_TG
   - name: .development_critical !.incompatible_mac
   - name: .release_critical !.incompatible_mac !publish_packages
 
@@ -97,6 +96,5 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: run_unit_tests_TG
-  - name: convert_scons_to_bazel_TG
   - name: .development_critical !.incompatible_mac
   - name: .release_critical !.incompatible_mac !publish_packages

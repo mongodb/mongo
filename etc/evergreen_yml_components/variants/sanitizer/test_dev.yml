@@ -72,7 +72,7 @@ variables:
   #   variant: linux-debug-aubsan-compile-required
 
 # If you add anything to san_options, make sure the appropriate changes are
-# also made to SConstruct.
+# also made to build.
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -84,7 +84,7 @@ variables:
     ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
 
 # If you add anything to san_options, make sure the appropriate changes are
-# also made to SConstruct.
+# also made to build.
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml
@@ -414,7 +414,7 @@ buildvariants:
     lang_environment: LANG=C
     toolchain_version: stable
     # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
+    # also made to build.
     san_options: *aubsan_options
     bazel_compile_flags: >-
       --config=dbg_aubsan
@@ -452,7 +452,7 @@ buildvariants:
     toolchain_version: stable
     compile_variant: *enterprise-rhel8-debug-tsan
     # If you add anything to san_options, make sure the appropriate
-    # changes are also made to SConstruct.
+    # changes are also made to build.
     #
     # TODO SERVER-49121: die_after_fork=0 is a temporary setting to
     # allow tests to continue while we figure out why we're running

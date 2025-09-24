@@ -123,7 +123,6 @@ variables:
     packager_arch: x86_64
     packager_distro: rhel88
     repo_edition: enterprise
-    scons_cache_scope: shared
     core_analyzer_distro_name: rhel8-large
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG

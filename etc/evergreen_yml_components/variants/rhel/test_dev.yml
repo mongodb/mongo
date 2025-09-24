@@ -93,7 +93,7 @@ variables:
   #   variant: linux-debug-aubsan-compile-required
 
 # If you add anything to san_options, make sure the appropriate changes are
-# also made to SConstruct.
+# also made to build.
 # THIS HAS COPIES IN:
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev_master_branch_only.yml
 # - etc/evergreen_yml_components/variants/sanitizer/test_dev.yml

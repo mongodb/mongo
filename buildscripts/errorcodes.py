@@ -138,11 +138,7 @@ def is_terminated(lines):
 
 
 def get_next_code(seen, server_ticket=0):
-    """Find next unused assertion code.
-
-    Called by: SConstruct and main()
-    Since SConstruct calls us, codes[] must be global OR WE REPARSE EVERYTHING
-    """
+    """Find next unused assertion code."""
     if not codes:
         (_, _, seen) = read_error_codes()
 
@@ -166,7 +162,7 @@ def get_next_code(seen, server_ticket=0):
 
 
 def check_error_codes():
-    """Check error codes as SConstruct expects a boolean response from this function."""
+    """Check error codes as the build expects a boolean response from this function."""
     (_, errors, _) = read_error_codes()
     return len(errors) == 0
 
