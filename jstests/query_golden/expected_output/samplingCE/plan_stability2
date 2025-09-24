@@ -104,7 +104,7 @@
     "keys" : 101083,
     "docs" :  99677,
     "sorts":      0,
-    "plans":     10,
+    "plans":     12,
     "rows" :  12026},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"field6_mixed_idx":{"$size":20},"field26_int_idx":{"$lte":98}},{"$and":[{"field16_str_idx":{"$regex":{"$regex":"r","$options":""}},"field13_list_idx":{"$gt":20},"field1_datetime_idx":{"$eq":"2024-02-03T00:00:00.000Z"},"field23_dict_idx":{"$gt":{"b":5}}},{"field40_list":{"$gt":"w"},"field15_mixed_idx":{"$lt":50}},{"field2_Timestamp_idx":{"$ne":{"$timestamp":{"t":1762732238,"i":0}}},"field26_int_idx":{"$gte":21}}]},{"field47_Timestamp":{"$gte":{"$timestamp":{"t":1732614212,"i":0}}},"field0_bool_idx":{"$type":"bool"}}]},{"$or":[{"field15_mixed_idx":{"$lt":"2024-03-02T00:00:00.000Z"},"field11_Timestamp_idx":{"$gte":{"$timestamp":{"t":1740537260,"i":0}}}},{"field17_int_idx":{"$lt":514},"field6_mixed_idx":{"$regex":{"$regex":"^k","$options":""}}}]}],"$or":[{"field43_str":{"$gt":"n"},"field24_mixed_idx":{"$eq":469},"field44_int":{"$type":"int"}},{"$or":[{"field5_dict_idx":{"$gte":{"b":2,"h":1}},"field35_int_idx":{"$gte":336},"field40_list":{"$elemMatch":{"$gt":88,"$size":13}}},{"field40_list":{"$size":1},"field25_str_idx":{"$exists":true}}]},{"field26_int_idx":{"$gt":1369},"field6_mixed_idx":[9,86649,94274,57181,4085,41083],"field22_list_idx":{"$gte":45}}],"field45_bool":{"$gt":false},"field24_mixed_idx":{"$nin":[]}}},{"$sort":{"field32_dict_idx":1,"field33_mixed_idx":-1,"field3_Decimal128_idx":-1}},{"$project":{"field13_list_idx":1,"_id":0}}],
@@ -248,7 +248,7 @@
     "keys" :   1321,
     "docs" :   1354,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :      9},
 
 {">>>pipeline": [{"$match":{"$or":[{"field27_bool_idx":{"$eq":false},"field37_datetime":{"$ne":"2024-02-17T00:00:00.000Z"}},{"field32_dict_idx":{"$exists":false},"field5_dict_idx":{"$lt":{"c":1,"b":3}},"field17_int_idx":{"$gte":161},"field46_datetime":{"$eq":"2024-01-10T00:00:00.000Z"}},{"field36_bool":{"$lte":false},"field44_int":{"$exists":true},"field17_int_idx":{"$lt":986}}],"field14_dict_idx":{"$ne":{"b":6}},"field23_dict_idx":{"$gt":{"b":13}}}},{"$sort":{"field17_int_idx":1}},{"$project":{"field13_list_idx":1,"field35_int_idx":1}}],
@@ -520,7 +520,7 @@
     "keys" :     41,
     "docs" :     39,
     "sorts":      0,
-    "plans":      7,
+    "plans":      8,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"$or":[{"field6_mixed_idx":[false],"field8_int_idx":{"$lte":4},"field31_list_idx":[14,21,92],"field13_list_idx":[]},{"$nor":[{"field11_Timestamp_idx":{"$eq":{"$timestamp":{"t":1741674710,"i":0}}},"field31_list_idx":12},{"$or":[{"field5_dict_idx":{"$gte":{"e":1,"b":3}},"field40_list":{"$in":["i","o","k","d","l"]},"field6_mixed_idx":false},{"$or":[{"field11_Timestamp_idx":{"$ne":{"$timestamp":{"t":1766897673,"i":0}}},"field24_mixed_idx":{"$timestamp":{"t":1767139200,"i":0}}},{"field17_int_idx":{"$gt":329},"field33_mixed_idx":{"$gt":58},"field4_list_idx":{"$elemMatch":{"$gte":"d"}}},{"field20_Timestamp_idx":{"$ne":{"$timestamp":{"t":1732429607,"i":0}}},"field40_list":{"$elemMatch":{"$gte":34,"$all":[26]}},"field41_dict":{"$lt":{"b":8}}}]},{"field4_list_idx":{"$exists":false},"field43_str":{"$gt":"r"}}]},{"field18_bool_idx":{"$gt":true},"field24_mixed_idx":{"$timestamp":{"t":1767139200,"i":0}},"field44_int":{"$type":"int"},"field6_mixed_idx":{"$lte":true}}]}],"$nor":[{"field32_dict_idx":{"$eq":{"d":2,"b":1,"c":2}},"field46_datetime":{"$lt":"2024-01-04T00:00:00.000Z"}},{"field3_Decimal128_idx":{"$lt":{"$numberDecimal":"4.1"}},"field32_dict_idx":{"$ne":{"d":1}}}],"field7_str_idx":{"$regex":{"$regex":"K","$options":""}},"field4_list_idx":{"$elemMatch":{"$ne":"l"}},"$and":[{"$or":[{"$or":[{"field35_int_idx":{"$lt":5416},"field22_list_idx":{"$eq":44}},{"field6_mixed_idx":{"$gt":true},"field7_str_idx":{"$regex":{"$regex":"nw","$options":""}}}]},{"field34_str_idx":{"$ne":"xI"},"field6_mixed_idx":[],"field27_bool_idx":{"$gte":false}},{"field1_datetime_idx":{"$type":"date"},"field37_datetime":{"$ne":"2024-08-02T00:00:00.000Z"}},{"field13_list_idx":{"$gt":20},"field15_mixed_idx":{"$lt":458},"field32_dict_idx":{"$gte":{"d":2,"b":1,"i":4}},"field39_Decimal128":{"$gte":{"$numberDecimal":"1.1"}},"field2_Timestamp_idx":{"$ne":{"$timestamp":{"t":1753861475,"i":0}}},"field24_mixed_idx":{"$regex":{"$regex":"q","$options":""}}}]},{"field6_mixed_idx":{"$exists":true},"field0_bool_idx":{"$lte":false},"field16_str_idx":{"$type":"string"}}]}},{"$sort":{"field23_dict_idx":-1}}],
@@ -1208,7 +1208,7 @@
     "keys" : 147063,
     "docs" : 149186,
     "sorts":      0,
-    "plans":      4,
+    "plans":      5,
     "rows" :   2123},
 
 {">>>pipeline": [{"$match":{"field17_int_idx":{"$lt":594},"field34_str_idx":{"$ne":"g"},"field20_Timestamp_idx":{"$lte":{"$timestamp":{"t":1746432455,"i":0}}},"$or":[{"field26_int_idx":{"$gte":36},"field47_Timestamp":{"$lt":{"$timestamp":{"t":1732614212,"i":0}}}},{"field6_mixed_idx":{"$size":5},"field31_list_idx":{"$size":5},"field13_list_idx":{"$all":[17,40,94,68,67,50,74,146]},"field2_Timestamp_idx":{"$gte":{"$timestamp":{"t":1757180477,"i":0}}}},{"field14_dict_idx":{"$eq":{}},"field36_bool":{"$exists":true},"field33_mixed_idx":{"$lte":31},"field6_mixed_idx":[false]}]}},{"$project":{"field38_Timestamp":1,"field11_Timestamp_idx":1,"_id":0}}],
@@ -1760,7 +1760,7 @@
     "keys" :  36642,
     "docs" :  36642,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :      8},
 
 {">>>pipeline": [{"$match":{"field0_bool_idx":{"$eq":false},"field31_list_idx":{"$lt":44},"$nor":[{"field31_list_idx":{"$size":3},"field40_list":[161,158,40,93,23,50,22,36,24]},{"field23_dict_idx":{"$lte":{"j":1,"b":1}},"field9_bool_idx":{"$gt":true}},{"$nor":[{"field9_bool_idx":{"$lte":false},"field31_list_idx":69,"field30_Decimal128_idx":{"$gte":{"$numberDecimal":"11.2"}}},{"field33_mixed_idx":{"$eq":48},"field45_bool":{"$lt":true},"field0_bool_idx":{"$gt":false},"field27_bool_idx":{"$ne":false},"field11_Timestamp_idx":{"$lte":{"$timestamp":{"t":1746289122,"i":0}}}},{"field4_list_idx":{"$exists":true},"field19_datetime_idx":{"$eq":"2024-03-10T00:00:00.000Z"}},{"field22_list_idx":{"$eq":206},"field3_Decimal128_idx":{"$lt":{"$numberDecimal":"5.2"}},"field0_bool_idx":{"$gt":true}},{"$or":[{"field10_datetime_idx":{"$ne":"2024-03-13T00:00:00.000Z"},"field32_dict_idx":{"$gte":{"y":1}},"field25_str_idx":{"$lte":"yf"}},{"field18_bool_idx":{"$eq":true},"field12_Decimal128_idx":{"$lt":{"$numberDecimal":"2.6"}}}]}]}],"$or":[{"$and":[{"field24_mixed_idx":{"$elemMatch":{"$size":9}},"field7_str_idx":{"$gt":"jnqK"}},{"field23_dict_idx":{"$gt":{"l":1}},"field46_datetime":{"$exists":true},"field6_mixed_idx":{"$size":6},"field34_str_idx":{"$ne":"m"}},{"field32_dict_idx":{"$lt":{"b":1}},"field16_str_idx":{"$type":"string"}},{"field6_mixed_idx":"l","field32_dict_idx":{"$lt":{"c":1,"b":3}}}]},{"field17_int_idx":{"$ne":621},"field25_str_idx":{"$ne":"dy"}}]}},{"$sort":{"field33_mixed_idx":-1}},{"$project":{"field29_Timestamp_idx":1}}],
@@ -1848,7 +1848,7 @@
     "keys" :   2821,
     "docs" :   2821,
     "sorts":      0,
-    "plans":     10,
+    "plans":     12,
     "rows" :      4},
 
 {">>>pipeline": [{"$match":{"field27_bool_idx":{"$gte":false},"field30_Decimal128_idx":{"$lte":{"$numberDecimal":"1.13"}},"field40_list":{"$regex":{"$regex":"^c","$options":""}},"field5_dict_idx":{"$exists":true},"field22_list_idx":{"$lte":16},"field23_dict_idx":{"$gte":{"b":12}},"field1_datetime_idx":{"$lte":"2026-04-17T00:00:00.000Z"}}},{"$project":{"field15_mixed_idx":1,"field37_datetime":1,"field21_Decimal128_idx":1,"_id":0}}],
@@ -1896,7 +1896,7 @@
     "keys" :   1453,
     "docs" :   1447,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :      5},
 
 {">>>pipeline": [{"$match":{"$or":[{"$or":[{"field23_dict_idx":{"$gte":{"j":1,"c":1,"b":1,"d":1}},"field32_dict_idx":{"$ne":{"d":3,"b":1}}},{"field40_list":{"$ne":"j"},"field17_int_idx":{"$lt":603},"field24_mixed_idx":{"$regex":{"$regex":"^t","$options":""}}}]},{"field34_str_idx":{"$lte":"I"},"field16_str_idx":{"$eq":"hD"},"field27_bool_idx":{"$lt":false},"field4_list_idx":{"$elemMatch":{"$eq":14,"$ne":1,"$all":["l","y","g","r","d","n","h","j"]}},"field35_int_idx":{"$gt":95}},{"field34_str_idx":{"$exists":false},"field31_list_idx":{"$lt":11},"field13_list_idx":{"$in":[]}}],"field9_bool_idx":{"$ne":false},"field21_Decimal128_idx":{"$gte":{"$numberDecimal":"1.29"}}}},{"$sort":{"field17_int_idx":-1}}],
@@ -2104,7 +2104,7 @@
     "keys" : 100054,
     "docs" : 200054,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :  90303},
 
 {">>>pipeline": [{"$match":{"$or":[{"field23_dict_idx":{"$gte":{"c":12}},"field26_int_idx":{"$gte":93},"field13_list_idx":{"$all":[184]}},{"field10_datetime_idx":{"$type":"date"},"field40_list":{"$lt":"q"}},{"$and":[{"field4_list_idx":{"$ne":50},"field26_int_idx":{"$gte":12},"field34_str_idx":{"$regex":{"$regex":"b","$options":""}}},{"field27_bool_idx":{"$lte":false},"field10_datetime_idx":{"$eq":"2024-01-23T00:00:00.000Z"}}]},{"field14_dict_idx":{"$lte":{"i":1,"b":4}},"field30_Decimal128_idx":{"$ne":{"$numberDecimal":"6.2"}},"field37_datetime":{"$ne":"2024-02-19T00:00:00.000Z"},"field10_datetime_idx":{"$type":"date"},"field4_list_idx":{"$lte":62}}],"field22_list_idx":[],"field9_bool_idx":{"$type":"bool"},"field6_mixed_idx":{"$in":["b"]},"field10_datetime_idx":{"$lt":"2024-03-17T00:00:00.000Z"},"field35_int_idx":{"$type":"int"}}},{"$project":{"field2_Timestamp_idx":1,"_id":0}}],
@@ -2160,7 +2160,7 @@
     "keys" :  24364,
     "docs" :  20948,
     "sorts":      0,
-    "plans":     13,
+    "plans":     14,
     "rows" :    103},
 
 {">>>pipeline": [{"$match":{"$nor":[{"field14_dict_idx":{"$lt":{"e":2,"b":1}},"field3_Decimal128_idx":{"$exists":true},"field42_mixed":{"$ne":false},"field35_int_idx":{"$eq":7208}},{"field40_list":{"$eq":"i"},"field45_bool":{"$exists":true},"field4_list_idx":{"$gt":29}}],"$or":[{"field5_dict_idx":{"$eq":{"b":2,"h":1}},"field13_list_idx":{"$in":[146,105,1,68]},"field22_list_idx":91},{"$and":[{"$nor":[{"field22_list_idx":{"$size":18},"field44_int":{"$gte":30}},{"field38_Timestamp":{"$lte":{"$timestamp":{"t":1704067200,"i":0}}},"field36_bool":{"$lte":false},"field19_datetime_idx":{"$lt":"2024-02-27T00:00:00.000Z"}},{"field23_dict_idx":{"$gte":{"c":3}},"field26_int_idx":{"$gte":6326}},{"field38_Timestamp":{"$gte":{"$timestamp":{"t":1704067200,"i":0}}},"field44_int":{"$ne":34},"field24_mixed_idx":{"$gte":35}}]},{"field11_Timestamp_idx":{"$lte":{"$timestamp":{"t":1721762051,"i":0}}},"field22_list_idx":{"$gte":22},"field39_Decimal128":{"$lt":{"$numberDecimal":"3.8"}}},{"field8_int_idx":{"$ne":871},"field22_list_idx":14,"field2_Timestamp_idx":{"$eq":{"$timestamp":{"t":1755844762,"i":0}}}}]},{"$or":[{"field16_str_idx":{"$lt":"E"},"field20_Timestamp_idx":{"$lte":{"$timestamp":{"t":1748670358,"i":0}}},"field22_list_idx":[31],"field40_list":{"$lte":32}},{"field45_bool":{"$ne":true},"field5_dict_idx":{"$lt":{"h":6,"e":1}}},{"field3_Decimal128_idx":{"$gt":{"$numberDecimal":"3.1"}},"field34_str_idx":{"$ne":"Pf"},"field47_Timestamp":{"$gt":{"$timestamp":{"t":1754714196,"i":0}}}}]}],"field22_list_idx":{"$nin":[54,193,55,35,21,85,57,62]},"field16_str_idx":{"$lt":"rv"},"field18_bool_idx":{"$lte":false}}},{"$sort":{"field29_Timestamp_idx":1}},{"$skip":226}],
@@ -2336,7 +2336,7 @@
     "keys" :  10451,
     "docs" :  10451,
     "sorts":      0,
-    "plans":     14,
+    "plans":     15,
     "rows" :    206},
 
 {">>>pipeline": [{"$match":{"$and":[{"field18_bool_idx":{"$lte":true},"field6_mixed_idx":{"$elemMatch":{"$nin":[true,false]}},"field20_Timestamp_idx":{"$ne":{"$timestamp":{"t":1758130931,"i":0}}}},{"$or":[{"field40_list":{"$size":16},"field43_str":{"$exists":true},"field21_Decimal128_idx":{"$lt":{"$numberDecimal":"1.5"}}},{"field21_Decimal128_idx":{"$lte":{"$numberDecimal":"15.1"}},"field6_mixed_idx":[9708,78208,65940,85477,79445,30204,83748,90518,90628]},{"$or":[{"field12_Decimal128_idx":{"$gt":{"$numberDecimal":"23.2"}},"field31_list_idx":[92,60,91,80,6,34,39]},{"field15_mixed_idx":{"$gt":"2024-01-04T00:00:00.000Z"},"field34_str_idx":{"$ne":"YC"},"field18_bool_idx":{"$type":"bool"}}]},{"field25_str_idx":{"$gt":"Cq"},"field39_Decimal128":{"$lt":{"$numberDecimal":"8.3"}}}]},{"field11_Timestamp_idx":{"$lte":{"$timestamp":{"t":1719747827,"i":0}}},"field10_datetime_idx":{"$lte":"2024-05-08T00:00:00.000Z"}}],"field3_Decimal128_idx":{"$lt":{"$numberDecimal":"3.1"}},"field34_str_idx":{"$lt":"PG"}}},{"$project":{"field40_list":1,"field2_Timestamp_idx":1,"_id":0}}],
@@ -2392,7 +2392,7 @@
     "keys" :     17,
     "docs" :     17,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"field43_str":{"$ne":"b"},"field23_dict_idx":{"$exists":true},"field11_Timestamp_idx":{"$gte":{"$timestamp":{"t":1732456719,"i":0}}},"$nor":[{"field4_list_idx":22,"field19_datetime_idx":{"$lte":"2024-03-11T00:00:00.000Z"},"field40_list":{"$elemMatch":{"$ne":"o"}}},{"field42_mixed":{"$gte":false},"field24_mixed_idx":{"$lt":952},"field35_int_idx":{"$exists":false}},{"$or":[{"field43_str":{"$lt":"f"},"field29_Timestamp_idx":{"$type":"timestamp"},"field35_int_idx":{"$type":"int"}},{"field8_int_idx":{"$eq":666},"field24_mixed_idx":{"$size":3},"field4_list_idx":{"$eq":117}}]},{"$and":[{"field6_mixed_idx":"c","field18_bool_idx":{"$gt":true}},{"$and":[{"field31_list_idx":[74,19,81],"field2_Timestamp_idx":{"$eq":{"$timestamp":{"t":1765695947,"i":0}}}},{"field31_list_idx":[3,29]}]}]}],"$or":[{"$and":[{"field18_bool_idx":{"$gt":false},"field6_mixed_idx":{"$ne":true},"field40_list":{"$type":"string"},"field12_Decimal128_idx":{"$eq":{"$numberDecimal":"1.39"}}},{"field43_str":{"$exists":false},"field2_Timestamp_idx":{"$lt":{"$timestamp":{"t":1743079031,"i":0}}},"field6_mixed_idx":{"$size":10}},{"field4_list_idx":{"$lte":33},"field30_Decimal128_idx":{"$eq":{"$numberDecimal":"7.6"}},"field20_Timestamp_idx":{"$eq":{"$timestamp":{"t":1744169155,"i":0}}}}]},{"field13_list_idx":{"$exists":true},"field45_bool":{"$ne":true},"field40_list":{"$size":5}},{"field32_dict_idx":{"$lt":{"j":1}},"field26_int_idx":{"$lt":70},"field25_str_idx":{"$type":"string"},"field1_datetime_idx":{"$type":"date"}}],"field19_datetime_idx":{"$ne":"2024-01-30T00:00:00.000Z"},"field22_list_idx":{"$nin":[221,53,45,206,11,5,115,42]},"field7_str_idx":{"$lt":"TI"}}},{"$skip":78}],
@@ -2528,7 +2528,7 @@
     "keys" :   9464,
     "docs" :   9464,
     "sorts":      0,
-    "plans":      8,
+    "plans":      9,
     "rows" :   3695},
 
 {">>>pipeline": [{"$match":{"$or":[{"field25_str_idx":{"$lt":"IN"},"field39_Decimal128":{"$lte":{"$numberDecimal":"10.1"}}},{"field38_Timestamp":{"$lt":{"$timestamp":{"t":1767139200,"i":0}}},"field24_mixed_idx":{"$nin":[34,351]},"field13_list_idx":38,"field4_list_idx":"k","field16_str_idx":{"$exists":true}}],"$and":[{"field18_bool_idx":{"$eq":false},"field14_dict_idx":{"$lte":{"b":1,"e":6,"d":1}}},{"field35_int_idx":{"$gt":8123},"field20_Timestamp_idx":{"$type":"timestamp"}}],"field2_Timestamp_idx":{"$lt":{"$timestamp":{"t":1760746718,"i":0}}},"field6_mixed_idx":{"$lt":"u"}}}],
@@ -2592,7 +2592,7 @@
     "keys" :    678,
     "docs" :    678,
     "sorts":      0,
-    "plans":     13,
+    "plans":     14,
     "rows" :    650},
 
 {">>>pipeline": [{"$match":{"field3_Decimal128_idx":{"$lte":{"$numberDecimal":"1.12"}},"field40_list":{"$nin":[]},"field6_mixed_idx":{"$lte":true},"field47_Timestamp":{"$gte":{"$timestamp":{"t":1744600910,"i":0}}},"field24_mixed_idx":{"$gt":"d"},"$and":[{"field31_list_idx":{"$lt":71},"field18_bool_idx":{"$lt":true},"field26_int_idx":{"$exists":true}},{"field40_list":{"$lte":24},"field35_int_idx":{"$lte":9870},"field27_bool_idx":{"$type":"bool"}}]}}],
@@ -2704,7 +2704,7 @@
     "keys" :   7927,
     "docs" :   7927,
     "sorts":   3813,
-    "plans":      5,
+    "plans":      6,
     "rows" :    525},
 
 {">>>pipeline": [{"$match":{"$nor":[{"field31_list_idx":35,"field13_list_idx":[145,75,61]},{"field13_list_idx":16,"field39_Decimal128":{"$ne":{"$numberDecimal":"6.2"}},"field1_datetime_idx":{"$eq":"2024-02-11T00:00:00.000Z"},"field33_mixed_idx":{"$ne":33},"field43_str":{"$regex":{"$regex":"^t","$options":""}}},{"field38_Timestamp":{"$lte":{"$timestamp":{"t":1767139200,"i":0}}},"field40_list":{"$lt":"o"}}],"field17_int_idx":{"$gt":665},"field28_datetime_idx":{"$eq":null},"field25_str_idx":{"$regex":{"$regex":"^UC","$options":""}},"field5_dict_idx":{"$gt":{"d":2,"b":1}},"field1_datetime_idx":{"$lte":"2024-03-25T00:00:00.000Z"},"field35_int_idx":{"$lte":91}}},{"$project":{"field44_int":1,"_id":0}}],
@@ -2768,7 +2768,7 @@
     "keys" :  37174,
     "docs" :  37174,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :   7918},
 
 {">>>pipeline": [{"$match":{"$nor":[{"field6_mixed_idx":{"$all":[]},"field13_list_idx":{"$elemMatch":{"$size":7,"$gt":68}}},{"field37_datetime":{"$lte":"2024-03-25T00:00:00.000Z"},"field2_Timestamp_idx":{"$type":"timestamp"},"field6_mixed_idx":{"$in":[]},"field25_str_idx":{"$gte":"BI"}},{"field13_list_idx":105,"field23_dict_idx":{"$gte":{"b":1,"c":9}},"field22_list_idx":77},{"$nor":[{"$and":[{"field22_list_idx":{"$lt":53},"field29_Timestamp_idx":{"$gt":{"$timestamp":{"t":1734865976,"i":0}}},"field19_datetime_idx":{"$gt":"2024-02-03T00:00:00.000Z"}},{"field17_int_idx":{"$gt":621},"field16_str_idx":{"$regex":{"$regex":"^z","$options":""}}},{"field43_str":{"$eq":"l"},"field5_dict_idx":{"$ne":{"b":1,"d":7}}}]},{"field9_bool_idx":{"$lt":true},"field35_int_idx":{"$gte":998}}]}],"$and":[{"$and":[{"field23_dict_idx":{"$lt":{"c":1,"b":1,"e":1}},"field30_Decimal128_idx":{"$ne":{"$numberDecimal":"9.5"}}},{"field46_datetime":{"$type":"date"},"field7_str_idx":{"$gt":"jdF"}}]},{"field46_datetime":{"$ne":"2024-02-19T00:00:00.000Z"},"field3_Decimal128_idx":{"$exists":true},"field1_datetime_idx":{"$lt":"2024-01-25T00:00:00.000Z"}},{"field26_int_idx":{"$lte":9},"field6_mixed_idx":{"$lte":false}}]}}],
@@ -3512,7 +3512,7 @@
     "keys" :    851,
     "docs" :    851,
     "sorts":      0,
-    "plans":      5,
+    "plans":      6,
     "rows" :    119},
 
 {">>>pipeline": [{"$match":{"field25_str_idx":{"$type":"string"},"field31_list_idx":{"$lte":82},"field17_int_idx":{"$ne":644},"field12_Decimal128_idx":{"$ne":{"$numberDecimal":"6.6"}},"field10_datetime_idx":{"$lt":"2024-03-05T00:00:00.000Z"},"field21_Decimal128_idx":{"$lte":{"$numberDecimal":"5.4"}},"field24_mixed_idx":{"$gte":529}}},{"$project":{"field19_datetime_idx":1,"field16_str_idx":1}}],
@@ -3640,7 +3640,7 @@
     "keys" :  56925,
     "docs" :  49088,
     "sorts":      0,
-    "plans":      8,
+    "plans":     10,
     "rows" :     96},
 
 {">>>pipeline": [{"$match":{"field18_bool_idx":{"$ne":true},"field35_int_idx":{"$lte":5998},"field12_Decimal128_idx":{"$gte":{"$numberDecimal":"1.11"}},"$or":[{"field40_list":{"$elemMatch":{"$in":[19,26,17,102,36,67]}},"field19_datetime_idx":{"$lte":"2024-02-20T00:00:00.000Z"}},{"$and":[{"field11_Timestamp_idx":{"$lt":{"$timestamp":{"t":1764464891,"i":0}}},"field7_str_idx":{"$eq":"yK"}},{"$or":[{"field2_Timestamp_idx":{"$gte":{"$timestamp":{"t":1743741290,"i":0}}},"field42_mixed":{"$eq":{"c":5}}},{"field11_Timestamp_idx":{"$gte":{"$timestamp":{"t":1766385096,"i":0}}},"field4_list_idx":{"$in":[23,117,53]}}]},{"$and":[{"field6_mixed_idx":{"$all":["f","r","x","p"]},"field13_list_idx":{"$eq":78},"field24_mixed_idx":{"$timestamp":{"t":1767139200,"i":0}}},{"field22_list_idx":[35],"field31_list_idx":[47,34,11,77,7,56]}]}]}]}}],
@@ -3712,7 +3712,7 @@
     "keys" :     36,
     "docs" :     36,
     "sorts":      0,
-    "plans":      7,
+    "plans":      8,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"field13_list_idx":{"$lte":13},"field35_int_idx":{"$gt":8086},"field17_int_idx":{"$gte":737},"$or":[{"field24_mixed_idx":[{"$timestamp":{"t":1704067200,"i":0}}],"field22_list_idx":62},{"field4_list_idx":{"$lte":3},"field39_Decimal128":{"$lte":{"$numberDecimal":"71.1"}},"field2_Timestamp_idx":{"$ne":{"$timestamp":{"t":1745358904,"i":0}}}}],"field30_Decimal128_idx":{"$gt":{"$numberDecimal":"5.4"}},"field42_mixed":{"$lte":true}}}],
@@ -3896,7 +3896,7 @@
     "keys" :  86672,
     "docs" :  86672,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :   1745},
 
 {">>>pipeline": [{"$match":{"field35_int_idx":{"$ne":3630},"field17_int_idx":{"$gte":161},"$or":[{"field6_mixed_idx":{"$eq":true},"field16_str_idx":{"$lte":"rv"},"field25_str_idx":{"$gte":"b"}},{"$or":[{"field23_dict_idx":{"$lt":{"c":1,"b":1}},"field6_mixed_idx":{"$elemMatch":{"$gte":true,"$size":18}}},{"field22_list_idx":{"$in":[39]},"field29_Timestamp_idx":{"$lte":{"$timestamp":{"t":1746432455,"i":0}}},"field19_datetime_idx":{"$lte":"2024-01-31T00:00:00.000Z"}},{"field11_Timestamp_idx":{"$lte":{"$timestamp":{"t":1732619972,"i":0}}},"field16_str_idx":{"$gte":"zA"}}]}],"$nor":[{"$nor":[{"field22_list_idx":{"$lte":221},"field6_mixed_idx":{"$size":6},"field46_datetime":{"$gt":"2025-01-02T00:00:00.000Z"}},{"field16_str_idx":{"$gt":"cz"},"field4_list_idx":{"$size":20}},{"field31_list_idx":{"$type":"int"},"field7_str_idx":{"$gte":"xK"},"field8_int_idx":{"$lte":998}}]},{"field41_dict":{"$type":"objectId"},"field24_mixed_idx":[{"$timestamp":{"t":1704067200,"i":0}}]}]}}],
@@ -4144,7 +4144,7 @@
     "keys" :    242,
     "docs" :    267,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :     16},
 
 {">>>pipeline": [{"$match":{"$or":[{"field17_int_idx":{"$gt":865},"field33_mixed_idx":{"$gt":99},"field40_list":{"$type":"string"}},{"field45_bool":{"$type":"bool"},"field25_str_idx":{"$ne":"K"}},{"$and":[{"field21_Decimal128_idx":{"$gte":{"$numberDecimal":"2.12"}},"field1_datetime_idx":{"$lt":"2024-01-31T00:00:00.000Z"}},{"field2_Timestamp_idx":{"$lt":{"$timestamp":{"t":1758003753,"i":0}}},"field9_bool_idx":{"$gte":false},"field41_dict":{"$eq":{"c":4}},"field40_list":{"$elemMatch":{"$eq":"i"}}}]}],"field34_str_idx":{"$ne":"g"},"field26_int_idx":{"$gte":6326},"field35_int_idx":{"$ne":7434},"field29_Timestamp_idx":{"$ne":{"$timestamp":{"t":1766367518,"i":0}}},"field44_int":{"$ne":2},"field46_datetime":{"$lte":"2024-01-22T00:00:00.000Z"}}},{"$project":{"field45_bool":1,"_id":0}}],
@@ -4408,7 +4408,7 @@
     "keys" :   1798,
     "docs" :   1797,
     "sorts":      0,
-    "plans":      9,
+    "plans":     11,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"field22_list_idx":{"$elemMatch":{"$gt":11}},"field4_list_idx":{"$lt":69},"field42_mixed":{"$type":"bool"},"field15_mixed_idx":{"$lte":"2024-01-29T00:00:00.000Z"},"field0_bool_idx":{"$lt":true},"$or":[{"$or":[{"field4_list_idx":{"$in":["g","y","p","l"]},"field6_mixed_idx":{"$nin":[]}},{"field31_list_idx":{"$nin":[10,202,26,77]},"field30_Decimal128_idx":{"$lt":{"$numberDecimal":"9.5"}}},{"field46_datetime":{"$gte":"2024-02-28T00:00:00.000Z"},"field4_list_idx":[],"field43_str":{"$regex":{"$regex":"i","$options":""}}}]},{"$or":[{"field22_list_idx":{"$all":[731,19]},"field29_Timestamp_idx":{"$eq":{"$timestamp":{"t":1754507512,"i":0}}},"field2_Timestamp_idx":{"$type":"timestamp"}},{"field22_list_idx":{"$all":[69,25,40,62]},"field40_list":[]}]}]}},{"$skip":8}],
@@ -4416,7 +4416,7 @@
     "keys" :   1031,
     "docs" :   1030,
     "sorts":      0,
-    "plans":     12,
+    "plans":     14,
     "rows" :    605},
 
 {">>>pipeline": [{"$match":{"$nor":[{"field22_list_idx":{"$all":[12,18,113,8,17,1,731,40]},"field38_Timestamp":{"$lte":{"$timestamp":{"t":1767139200,"i":0}}},"field32_dict_idx":{"$ne":{"b":5}}},{"field20_Timestamp_idx":{"$gt":{"$timestamp":{"t":1761263967,"i":0}}},"field30_Decimal128_idx":{"$gte":{"$numberDecimal":"4.3"}}},{"$or":[{"field47_Timestamp":{"$ne":{"$timestamp":{"t":1756917908,"i":0}}},"field9_bool_idx":{"$exists":false},"field4_list_idx":"e","field16_str_idx":{"$regex":{"$regex":"^hI","$options":""}}},{"field39_Decimal128":{"$ne":{"$numberDecimal":"6.4"}},"field7_str_idx":{"$gt":"BnsK"}}]}],"field8_int_idx":{"$type":"int"},"field30_Decimal128_idx":{"$ne":{"$numberDecimal":"1.29"}},"$or":[{"field4_list_idx":{"$ne":16}},{"field17_int_idx":{"$eq":652},"field22_list_idx":[19,77,36,25],"field14_dict_idx":{"$eq":{"f":1,"b":1,"d":1}},"field45_bool":{"$gt":false}},{"field44_int":{"$gte":89479},"field28_datetime_idx":{"$exists":false},"field24_mixed_idx":{"$size":5}}]}},{"$sort":{"field6_mixed_idx":-1,"field0_bool_idx":-1,"field26_int_idx":1}},{"$project":{"field6_mixed_idx":1,"field11_Timestamp_idx":1}}],
@@ -4712,7 +4712,7 @@
     "keys" :    182,
     "docs" :    153,
     "sorts":      0,
-    "plans":      7,
+    "plans":      8,
     "rows" :     15},
 
 {">>>pipeline": [{"$match":{"$or":[{"$or":[{"field26_int_idx":{"$lte":2},"field10_datetime_idx":{"$ne":"2024-01-14T00:00:00.000Z"}},{"field19_datetime_idx":{"$gt":"2024-02-11T00:00:00.000Z"},"field31_list_idx":{"$in":[10,41]},"field5_dict_idx":{"$type":"objectId"}},{"field40_list":{"$size":15},"field6_mixed_idx":{"$regex":{"$regex":"e","$options":""}},"field36_bool":{"$eq":false}}]},{"field6_mixed_idx":{"$all":[]},"field24_mixed_idx":{"$eq":"o"}},{"field39_Decimal128":{"$gt":{"$numberDecimal":"3.1"}},"field0_bool_idx":{"$exists":false}}],"field7_str_idx":{"$ne":"jdF"},"field17_int_idx":{"$eq":551},"field1_datetime_idx":{"$ne":"2024-03-18T00:00:00.000Z"},"field24_mixed_idx":{"$timestamp":{"t":1767139200,"i":0}}}}],
@@ -4960,7 +4960,7 @@
     "keys" :  97240,
     "docs" :  97240,
     "sorts":      0,
-    "plans":      5,
+    "plans":      6,
     "rows" :   6989},
 
 {">>>pipeline": [{"$match":{"$and":[{"$or":[{"$and":[{"field40_list":"m","field37_datetime":{"$ne":"2024-02-12T00:00:00.000Z"},"field23_dict_idx":{"$ne":{"b":1,"k":2}},"field13_list_idx":{"$lte":24}},{"field4_list_idx":{"$gt":96},"field34_str_idx":{"$gt":"Lr"}},{"field36_bool":{"$ne":false},"field6_mixed_idx":{"$size":18}}]},{"field5_dict_idx":{"$lt":{"b":1,"d":1}},"field13_list_idx":{"$elemMatch":{"$gte":37,"$nin":[]}}}]},{"field19_datetime_idx":{"$lte":"2024-01-09T00:00:00.000Z"},"field17_int_idx":{"$gte":571}}]}},{"$project":{"field24_mixed_idx":1,"_id":0}}],
@@ -5064,7 +5064,7 @@
     "keys" :    103,
     "docs" :    103,
     "sorts":     95,
-    "plans":      9,
+    "plans":     10,
     "rows" :     23},
 
 {">>>pipeline": [{"$match":{"$nor":[{"field2_Timestamp_idx":{"$lte":{"$timestamp":{"t":1726986325,"i":0}}},"field40_list":{"$lt":"q"},"field43_str":{"$type":"string"},"field6_mixed_idx":{"$size":11}},{"field44_int":{"$lte":49},"field15_mixed_idx":{"$lte":"2024-03-23T00:00:00.000Z"},"field13_list_idx":{"$all":[90,124,59,18,36,58,75]}},{"field3_Decimal128_idx":{"$gte":{"$numberDecimal":"10.1"}}},{"field14_dict_idx":{"$gte":{"l":1,"b":1}},"field4_list_idx":28}],"field35_int_idx":{"$exists":true},"field43_str":{"$exists":true},"field32_dict_idx":{"$lt":{"b":8}},"field29_Timestamp_idx":{"$exists":true},"field7_str_idx":{"$ne":"weq"}}}],
@@ -5208,7 +5208,7 @@
     "keys" : 115147,
     "docs" :  99780,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :     13},
 
 {">>>pipeline": [{"$match":{"field4_list_idx":{"$ne":"e"},"field22_list_idx":{"$nin":[42]},"field15_mixed_idx":{"$gt":72},"$nor":[{"field4_list_idx":{"$elemMatch":{"$size":19}},"field6_mixed_idx":{"$size":16}},{"field15_mixed_idx":{"$gte":788},"field29_Timestamp_idx":{"$eq":{"$timestamp":{"t":1744991101,"i":0}}}},{"field17_int_idx":{"$lt":79},"field32_dict_idx":{"$gt":{"b":27,"d":1}}},{"$or":[{"field43_str":{"$lt":"v"},"field1_datetime_idx":{"$eq":"2024-02-13T00:00:00.000Z"}},{"field10_datetime_idx":{"$ne":"2024-02-22T00:00:00.000Z"},"field6_mixed_idx":{"$eq":false}},{"field20_Timestamp_idx":{"$lte":{"$timestamp":{"t":1747742273,"i":0}}},"field19_datetime_idx":{"$eq":"2024-02-08T00:00:00.000Z"},"field21_Decimal128_idx":{"$ne":{"$numberDecimal":"8.2"}}}]}],"$or":[{"field13_list_idx":{"$gte":48},"field30_Decimal128_idx":{"$lt":{"$numberDecimal":"9.2"}}},{"$or":[{"field31_list_idx":{"$size":6},"field12_Decimal128_idx":{"$lt":{"$numberDecimal":"8.3"}}},{"field6_mixed_idx":{"$size":16},"field39_Decimal128":{"$gte":{"$numberDecimal":"7.6"}},"field35_int_idx":{"$lte":9558}}]},{"field28_datetime_idx":{"$gte":"2024-01-14T00:00:00.000Z"},"field25_str_idx":{"$lt":"r"},"field31_list_idx":[56]},{"$or":[{"field24_mixed_idx":{"$timestamp":{"t":1704067200,"i":0}},"field30_Decimal128_idx":{"$gt":{"$numberDecimal":"6.4"}}},{"field6_mixed_idx":{"$all":[]},"field27_bool_idx":{"$eq":false}}]},{"field0_bool_idx":{"$ne":true},"field6_mixed_idx":{"$size":8},"field30_Decimal128_idx":{"$lt":{"$numberDecimal":"1.14"}},"field17_int_idx":{"$gte":865}}],"field16_str_idx":{"$exists":true},"field10_datetime_idx":{"$ne":"2024-03-21T00:00:00.000Z"},"field21_Decimal128_idx":{"$lt":{"$numberDecimal":"6.3"}}}}],
@@ -5752,7 +5752,7 @@
     "keys" :  11751,
     "docs" :  11751,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :   1047},
 
 {">>>pipeline": [{"$match":{"field13_list_idx":{"$gt":51},"field7_str_idx":{"$lt":"PO"},"$or":[{"$and":[{"field37_datetime":{"$ne":"2024-04-06T00:00:00.000Z"},"field2_Timestamp_idx":{"$lte":{"$timestamp":{"t":1761412760,"i":0}}},"field22_list_idx":{"$all":[62,77,129]}},{"$nor":[{"field31_list_idx":31,"field25_str_idx":{"$lte":"C"}},{"field22_list_idx":{"$ne":56},"field24_mixed_idx":{"$timestamp":{"t":1704067200,"i":0}},"field11_Timestamp_idx":{"$type":"timestamp"},"field4_list_idx":[]},{"$nor":[{"field2_Timestamp_idx":{"$lte":{"$timestamp":{"t":1748689088,"i":0}}},"field10_datetime_idx":{"$ne":"2024-01-07T00:00:00.000Z"},"field13_list_idx":56,"field45_bool":{"$gte":true}},{"field47_Timestamp":{"$eq":{"$timestamp":{"t":1751055531,"i":0}}},"field24_mixed_idx":{"$nin":[]}},{"field4_list_idx":[60,62,64,8,128,15,2],"field24_mixed_idx":{"$in":[]},"field34_str_idx":{"$gt":"HE"}}]},{"field11_Timestamp_idx":{"$ne":{"$timestamp":{"t":1746319557,"i":0}}},"field4_list_idx":[]}]}]},{"field31_list_idx":{"$lt":96},"field37_datetime":{"$lte":"2024-05-10T00:00:00.000Z"}}]}}],
@@ -5760,7 +5760,7 @@
     "keys" :     51,
     "docs" :     51,
     "sorts":      0,
-    "plans":      6,
+    "plans":      7,
     "rows" :     14},
 
 {">>>pipeline": [{"$match":{"field7_str_idx":{"$gte":"mXea"},"field24_mixed_idx":{"$gte":{"$timestamp":{"t":1767139200,"i":0}}},"$nor":[{"field24_mixed_idx":"l","field30_Decimal128_idx":{"$ne":{"$numberDecimal":"9.3"}}},{"field40_list":{"$elemMatch":{"$size":10,"$gt":6,"$in":["j","g","q","s"]}},"field1_datetime_idx":{"$eq":"2024-02-17T00:00:00.000Z"},"field10_datetime_idx":{"$gt":"2024-03-13T00:00:00.000Z"}}],"$or":[{"field10_datetime_idx":{"$gt":"2024-01-10T00:00:00.000Z"},"field38_Timestamp":{"$eq":{"$timestamp":{"t":1704067200,"i":0}}},"field39_Decimal128":{"$ne":{"$numberDecimal":"1.18"}}},{"field39_Decimal128":{"$gt":{"$numberDecimal":"13.1"}},"field13_list_idx":{"$nin":[53,21,199,27,95,58,109]},"field0_bool_idx":{"$ne":true}}]}},{"$project":{"field46_datetime":1,"field27_bool_idx":1}}],
@@ -5808,7 +5808,7 @@
     "keys" :      1,
     "docs" :      1,
     "sorts":      1,
-    "plans":      7,
+    "plans":      8,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"$nor":[{"field30_Decimal128_idx":{"$gte":{"$numberDecimal":"10.2"}},"field31_list_idx":61,"field43_str":{"$regex":{"$regex":"y","$options":""}}},{"field6_mixed_idx":{"$ne":false},"field34_str_idx":{"$eq":"CM"},"field40_list":{"$size":7},"field21_Decimal128_idx":{"$gte":{"$numberDecimal":"1.2"}}}],"field32_dict_idx":{"$gte":{"b":23}},"field15_mixed_idx":{"$gte":"2024-02-22T00:00:00.000Z"},"$or":[{"field43_str":{"$regex":{"$regex":"l","$options":""}},"field7_str_idx":{"$lte":"T"},"field28_datetime_idx":{"$eq":"2024-01-03T00:00:00.000Z"},"field24_mixed_idx":{"$nin":["i","n","c","y","f","a","l","v","x"]}},{"field33_mixed_idx":{"$gte":23},"field37_datetime":{"$lte":"2024-08-02T00:00:00.000Z"}}]}}],
@@ -5872,7 +5872,7 @@
     "keys" :  93200,
     "docs" :  93200,
     "sorts":      0,
-    "plans":     10,
+    "plans":     11,
     "rows" :  45302},
 
 {">>>pipeline": [{"$match":{"field6_mixed_idx":{"$ne":"w"},"field35_int_idx":{"$type":"int"},"$or":[{"field4_list_idx":{"$ne":"z"},"field33_mixed_idx":{"$gt":41},"field36_bool":{"$lte":false},"field25_str_idx":{"$lte":"CM"}},{"$and":[{"$nor":[{"field5_dict_idx":{"$gt":{"i":2}},"field20_Timestamp_idx":{"$eq":{"$timestamp":{"t":1740885110,"i":0}}},"field29_Timestamp_idx":{"$lt":{"$timestamp":{"t":1736169852,"i":0}}}},{"field1_datetime_idx":{"$eq":"2024-01-14T00:00:00.000Z"},"field6_mixed_idx":{"$regex":{"$regex":"^t","$options":""}}}]},{"field17_int_idx":{"$ne":773},"field13_list_idx":54},{"$nor":[{"field25_str_idx":{"$eq":"hD"},"field34_str_idx":{"$gte":"Z"}},{"$or":[{"field40_list":{"$gte":21},"field6_mixed_idx":true},{"field7_str_idx":{"$regex":{"$regex":"^j","$options":""}},"field35_int_idx":{"$lt":91},"field40_list":{"$size":12}}]}]}]},{"$or":[{"field22_list_idx":{"$ne":26},"field47_Timestamp":{"$gte":{"$timestamp":{"t":1763930520,"i":0}}},"field24_mixed_idx":{"$gte":"v"}},{"field5_dict_idx":{"$gte":{"d":3}},"field6_mixed_idx":{"$in":["r","m","u","c","o","g","e"]},"field34_str_idx":{"$regex":{"$regex":"^O","$options":""}}}]},{"$or":[{"field4_list_idx":{"$size":15},"field31_list_idx":{"$lt":21}},{"field2_Timestamp_idx":{"$gte":{"$timestamp":{"t":1729113782,"i":0}}},"field24_mixed_idx":["m","a","x"]}]}]}}],
@@ -5944,7 +5944,7 @@
     "keys" : 100000,
     "docs" : 100000,
     "sorts":      0,
-    "plans":      5,
+    "plans":      7,
     "rows" :   4887},
 
 {">>>pipeline": [{"$match":{"field35_int_idx":{"$gte":314},"field5_dict_idx":{"$ne":{"e":1,"b":3}},"field7_str_idx":{"$gt":"CWG"},"field1_datetime_idx":{"$gt":"2024-01-29T00:00:00.000Z"},"$or":[{"field6_mixed_idx":true,"field37_datetime":{"$lt":"2024-05-22T00:00:00.000Z"}},{"$or":[{"field2_Timestamp_idx":{"$lt":{"$timestamp":{"t":1748851581,"i":0}}}},{"field15_mixed_idx":{"$gt":{"$timestamp":{"t":1730703667,"i":0}}},"field31_list_idx":{"$size":3},"field47_Timestamp":{"$gte":{"$timestamp":{"t":1736559935,"i":0}}}}]}]}},{"$project":{"field25_str_idx":1,"_id":0}}],
@@ -5984,7 +5984,7 @@
     "keys" :  47575,
     "docs" :  47575,
     "sorts":      0,
-    "plans":      7,
+    "plans":      8,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"field16_str_idx":{"$gte":"dy"},"field22_list_idx":{"$type":"int"},"$or":[{"field46_datetime":{"$gte":"2024-03-17T00:00:00.000Z"},"field9_bool_idx":{"$gte":false}},{"$or":[{"$and":[{"$and":[{"field28_datetime_idx":{"$eq":"2024-01-11T00:00:00.000Z"},"field16_str_idx":{"$regex":{"$regex":"^AP","$options":""}}},{"field1_datetime_idx":{"$gt":"2024-01-10T00:00:00.000Z"},"field35_int_idx":{"$eq":2863},"field4_list_idx":[]}]},{"field22_list_idx":39,"field3_Decimal128_idx":{"$eq":{"$numberDecimal":"6.1"}}},{"field31_list_idx":{"$nin":[]},"field7_str_idx":{"$lt":"KV"}}]},{"field10_datetime_idx":{"$ne":"2024-02-12T00:00:00.000Z"},"field17_int_idx":{"$lt":419}}]},{"$or":[{"field36_bool":{"$exists":false},"field22_list_idx":{"$lt":26},"field13_list_idx":35},{"field34_str_idx":{"$ne":"nz"},"field1_datetime_idx":{"$type":"date"},"field9_bool_idx":{"$eq":true}}]}],"field17_int_idx":{"$lt":239},"field27_bool_idx":{"$gte":false},"field12_Decimal128_idx":{"$ne":{"$numberDecimal":"6.5"}}}},{"$project":{"field32_dict_idx":1,"_id":0}}],
@@ -6336,7 +6336,7 @@
     "keys" :   1905,
     "docs" :   1904,
     "sorts":      0,
-    "plans":     12,
+    "plans":     13,
     "rows" :      9},
 
 {">>>pipeline": [{"$match":{"field0_bool_idx":{"$eq":false},"field33_mixed_idx":{"$gt":32},"field29_Timestamp_idx":{"$ne":{"$timestamp":{"t":1755184645,"i":0}}},"field2_Timestamp_idx":{"$lt":{"$timestamp":{"t":1764181167,"i":0}}},"field24_mixed_idx":{"$lte":"q"},"field35_int_idx":{"$ne":2039},"field6_mixed_idx":{"$elemMatch":{"$gt":"j"}}}}],
@@ -6408,7 +6408,7 @@
     "keys" : 101541,
     "docs" : 100000,
     "sorts":      0,
-    "plans":     10,
+    "plans":     12,
     "rows" :  89114},
 
 {">>>pipeline": [{"$match":{"field34_str_idx":{"$regex":{"$regex":"h","$options":""}},"field35_int_idx":{"$lte":726},"field19_datetime_idx":{"$ne":"2024-01-03T00:00:00.000Z"},"$or":[{"field43_str":{"$ne":"y"},"field21_Decimal128_idx":{"$exists":false}},{"field4_list_idx":37,"field18_bool_idx":{"$gte":true}},{"$and":[{"field4_list_idx":{"$all":[]},"field10_datetime_idx":{"$gt":"2024-01-04T00:00:00.000Z"},"field7_str_idx":{"$lt":"Hh"}},{"field4_list_idx":{"$elemMatch":{"$size":19}},"field30_Decimal128_idx":{"$lte":{"$numberDecimal":"1.45"}}}]},{"field19_datetime_idx":{"$gt":"2024-01-23T00:00:00.000Z"},"field13_list_idx":{"$size":9},"field25_str_idx":{"$lte":"DW"},"field29_Timestamp_idx":{"$lte":{"$timestamp":{"t":1736169852,"i":0}}}},{"$and":[{"field7_str_idx":{"$gt":"JgeX"},"field27_bool_idx":{"$lte":false},"field21_Decimal128_idx":{"$gte":{"$numberDecimal":"3.4"}}},{"field45_bool":{"$gt":false},"field18_bool_idx":{"$exists":true}}]}]}},{"$project":{"field18_bool_idx":1}}],
@@ -6816,7 +6816,7 @@
     "keys" :   1883,
     "docs" :   1883,
     "sorts":     95,
-    "plans":     10,
+    "plans":     11,
     "rows" :     23},
 
 {">>>pipeline": [{"$match":{"field25_str_idx":{"$lte":"V"},"field40_list":{"$lte":161},"$or":[{"field47_Timestamp":{"$ne":{"$timestamp":{"t":1746938824,"i":0}}},"field9_bool_idx":{"$gte":false},"field39_Decimal128":{"$gt":{"$numberDecimal":"21.1"}}},{"$and":[{"field13_list_idx":10,"field39_Decimal128":{"$ne":{"$numberDecimal":"1.5"}},"field12_Decimal128_idx":{"$eq":{"$numberDecimal":"1.6"}},"field46_datetime":{"$lt":"2024-02-10T00:00:00.000Z"}},{"field15_mixed_idx":{"$lt":{"$timestamp":{"t":1756606227,"i":0}}},"field3_Decimal128_idx":{"$eq":{"$numberDecimal":"1.9"}},"field23_dict_idx":{"$gte":{"e":3,"c":2,"b":2}}}]},{"field37_datetime":{"$ne":"2024-03-25T00:00:00.000Z"},"field27_bool_idx":{"$lt":false},"field6_mixed_idx":{"$gte":"f"}},{"field31_list_idx":[],"field22_list_idx":{"$size":19}}],"$nor":[{"field4_list_idx":{"$lt":"f"},"field47_Timestamp":{"$lte":{"$timestamp":{"t":1744600910,"i":0}}}},{"field31_list_idx":[125,1,47,38,46],"field10_datetime_idx":{"$eq":"2024-07-19T00:00:00.000Z"}}],"field33_mixed_idx":{"$gte":16},"field16_str_idx":{"$lte":"hD"}}}],
@@ -7624,7 +7624,7 @@
     "keys" :   8280,
     "docs" :   8280,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :      1},
 
 {">>>pipeline": [{"$match":{"$or":[{"field13_list_idx":{"$size":5},"field40_list":{"$size":8},"field29_Timestamp_idx":{"$gte":{"$timestamp":{"t":1753388555,"i":0}}}},{"field27_bool_idx":{"$gte":false},"field7_str_idx":{"$lte":"rN"},"field17_int_idx":{"$lt":983}}],"field2_Timestamp_idx":{"$lte":{"$timestamp":{"t":1762732238,"i":0}}},"field30_Decimal128_idx":{"$gte":{"$numberDecimal":"8.4"}}}}],
@@ -7656,7 +7656,7 @@
     "keys" :  11515,
     "docs" :   9983,
     "sorts":      0,
-    "plans":     11,
+    "plans":     12,
     "rows" :      2},
 
 {">>>pipeline": [{"$match":{"$or":[{"$nor":[{"field23_dict_idx":{"$lte":{"h":1}},"field22_list_idx":{"$gte":17}},{"field15_mixed_idx":{"$gte":{"$timestamp":{"t":1765563083,"i":0}}},"field5_dict_idx":{"$ne":{"b":3}},"field22_list_idx":{"$size":17}},{"field23_dict_idx":{"$gt":{"c":1,"b":2,"d":1}},"field10_datetime_idx":{"$lte":"2024-04-26T00:00:00.000Z"}}]},{"field10_datetime_idx":{"$type":"date"},"field31_list_idx":{"$size":15}}],"$and":[{"field29_Timestamp_idx":{"$exists":true},"field13_list_idx":{"$nin":[85,45,9,127,15,25,17]},"field9_bool_idx":{"$lte":true}},{"field24_mixed_idx":{"$timestamp":{"t":1704067200,"i":0}},"field35_int_idx":{"$type":"int"}}]}}],
@@ -7768,7 +7768,7 @@
     "keys" :    125,
     "docs" :    124,
     "sorts":      0,
-    "plans":     12,
+    "plans":     14,
     "rows" :      3},
 
 {">>>pipeline": [{"$match":{"field0_bool_idx":{"$lte":true},"field7_str_idx":{"$gte":"CWG"},"field14_dict_idx":{"$gte":{"d":1}},"$or":[{"field37_datetime":{"$type":"date"},"field22_list_idx":{"$elemMatch":{"$nin":[91,95,295,24]}}},{"field16_str_idx":{"$gte":"yf"},"field45_bool":{"$lt":true}},{"field31_list_idx":{"$in":[20]},"field34_str_idx":{"$regex":{"$regex":"^tL","$options":""}},"field32_dict_idx":{"$lt":{"i":1}},"field45_bool":{"$exists":true}}]}},{"$project":{"field16_str_idx":1,"field35_int_idx":1,"field30_Decimal128_idx":1}}],
@@ -8284,7 +8284,7 @@
     "rows" :  96224}
 
 ],
-">>>totals": {"pipelines": 1034, "plans": 7923, "keys": 30280180, "docs": 29346428, "sorts": 7930437, "rows": 10055721, "errors":      0},
+">>>totals": {"pipelines": 1034, "plans": 7970, "keys": 30280180, "docs": 29346428, "sorts": 7930437, "rows": 10055721, "errors":      0},
 ">>>parameters": {"planRankerMode":"samplingCE","samplingMarginOfError":5,"samplingConfidenceInterval":"95","internalQuerySamplingCEMethod":"random","internalQuerySamplingBySequentialScan":true}}
 
 

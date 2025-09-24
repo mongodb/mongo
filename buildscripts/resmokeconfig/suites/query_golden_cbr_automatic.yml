@@ -24,3 +24,4 @@ executor:
         planRankerMode: "automaticCE"
         # In case automaticCE ever involves samplingCE
         internalQuerySamplingBySequentialScan: true
+        internalQueryPlannerEnableSortIndexIntersection: true
