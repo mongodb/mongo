@@ -440,6 +440,7 @@ boost::optional<IndexEntry> createExpandedIndexEntry(const IndexEntry& wildcardI
                      wildcardIndex.infoObj,
                      wildcardIndex.collator,
                      wildcardIndex.indexPathProjection,
+                     wildcardIndex.indexCatalogEntryStorage,
                      wildcardFieldPos);
     return entry;
 }
