@@ -206,8 +206,7 @@ namespace exec::agg {
 class ListMqlEntitiesStage;
 }  // namespace exec::agg
 
-// TODO SPM-4106: Remove virtual keyword once the refactoring is done.
-class DocumentSource : public virtual RefCountable {
+class DocumentSource : public RefCountable {
 public:
     // In general a parser returns a list of DocumentSources, to accommodate "multi-stage aliases"
     // like $bucket.
@@ -351,7 +350,7 @@ public:
                                           DocumentSourceContainer::const_iterator pos,
                                           const DocumentSourceContainer& container) const {
         MONGO_UNIMPLEMENTED_TASSERT(7183905);
-    };
+    }
 
     /**
      * Get the stage's name.
@@ -404,6 +403,7 @@ public:
                           << " is not allowed with the current configuration. You may need to "
                              "enable the corresponding feature flag");
     }
+
     /**
      * Registers a DocumentSource with a parsing function, so that when a stage with the given name
      * is encountered, it will call 'parser' to construct that stage.
@@ -412,6 +412,7 @@ public:
      * this file.
      */
     static void registerParser(std::string name, Parser parser, FeatureFlag* featureFlag = nullptr);
+
     /**
      * Convenience wrapper for the common case, when DocumentSource::Parser returns a list of one
      * DocumentSource.
@@ -738,7 +739,7 @@ protected:
     virtual DocumentSourceContainer::iterator doOptimizeAt(DocumentSourceContainer::iterator itr,
                                                            DocumentSourceContainer* container) {
         return std::next(itr);
-    };
+    }
 
     /**
      * Utility which describes when a stage needs to nominate a merging shard.
@@ -776,7 +777,7 @@ private:
     static StringMap<ParserRegistration> parserMap;
 
     /**
-     * Return the map of curently registered parsers.
+     * Return the map of currently registered parsers.
      */
     static const StringMap<ParserRegistration>& getParserMap() {
         return parserMap;
