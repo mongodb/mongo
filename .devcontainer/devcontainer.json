@@ -42,6 +42,7 @@
     "venvActivation": "echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/poetry_sync.sh' >> ~/.bashrc && echo 'source ${containerWorkspaceFolder}/python3-venv/bin/activate && ${containerWorkspaceFolder}/buildscripts/poetry_sync.sh' >> ~/.zshrc;",
     "createDataDir": "sudo mkdir -p /data/db && sudo chown -R $(whoami): /data/db"
   },
+  "shutdownAction": "none",
   "customizations": {
     "vscode": {
       "settings": {

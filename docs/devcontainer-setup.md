@@ -27,20 +27,31 @@ Afterwards, it is recommended to increase the amount of CPU and Memory available
 
 ## Setup Instructions
 
-### 1. Clone the MongoDB Repository
+### 1. Install the Remote Containers VSCode Extension
+
+Install the [Remote Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension from the VSCode marketplace.
+
+### 2. Clone the MongoDB Repository in a Named Container Volume
+
+For best performance and compatibility (especially with Bazel on macOS), **do not clone the repository to your local filesystem first**. Instead, open VSCode and use the VSCode command palette:
+
+1. Open the command palette (`Ctrl+Shift+P` or `Cmd+Shift+P` on Mac).
+2. Run **"Dev Containers: Clone Repository in Named Container Volume..."**
+3. Enter the repository URL (it is recommended you use the ssh url)
+4. Use whatever name you like for the named volume, this name will be presented in the docker volume list if you need to reference it later.
+5. VS Code will automatically set up the devcontainer in an isolated volume, improving performance and resolving compatibility issues with Bazel on macOS filesystems over using a bind-mounted workspace.
+
+If you have already cloned the repository locally, you can still use the command above for a better experience.
+
+### 3. Fetch Complete Git History (Recommended)
+
+After the container opens for the first time, it's recommended to run the following command in the terminal to fetch the complete git history since the above clone workflow may only do a shallow clone:
 
 ```bash
-git clone https://github.com/mongodb/mongo.git
-cd mongo
+git fetch --unshallow --all
 ```
 
-### 2. Install the Remote Containers VSCode Extension
-
-Install the [Dev Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) extension from the VSCode marketplace.
-
-### 3. Open the clone in VSCode
-
-You may be automatically prompted to open the devcontainer and can confirm. If this does not happen, open the VSCode command palette and enter ">Dev Containers: Reopen in Container".
+This ensures you have access to the full repository history and all branches, which may be needed for certain development workflows (e.g., `bazel build install-dist`).
 
 ### 4. Access Your Development Environment
 
