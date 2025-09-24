@@ -943,6 +943,8 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryTwoResumes) {
     _mockServer->insert(_nss, BSON("_id" << 7));
 
     // Preliminary setup for hanging failpoints.
+    auto beforeBatchFailpoint = globalFailPointRegistry().find(
+        "initialSyncHangCollectionClonerBeforeHandlingBatchResponse");
     auto afterBatchFailpoint =
         globalFailPointRegistry().find("initialSyncHangCollectionClonerAfterHandlingBatchResponse");
     auto timesEnteredAfterBatch = afterBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
@@ -972,6 +974,8 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryTwoResumes) {
     failNextBatch->setMode(FailPoint::nTimes, 1, fromjson("{errorType: 'HostUnreachable'}"));
 
     afterBatchFailpoint->setMode(FailPoint::off, 0);
+    // Ensure that the retry state is initially cleared.
+    ASSERT_EQUALS(0, cloner->getRetryableOperationCount_forTest());
     beforeRetryFailPoint->waitForTimesEntered(timesEnteredBeforeRetry + 1);
 
     // Allow copying two more batches before the next error.
@@ -980,20 +984,38 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryTwoResumes) {
     failNextBatch->setMode(FailPoint::skip, 2, fromjson("{errorType: 'HostUnreachable'}"));
 
     // Do a failpoint dance so we can get to the next retry.
+    auto timesEnteredBeforeBatch = beforeBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
     timesEnteredAfterBatch = afterBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
     beforeRetryFailPoint->setMode(FailPoint::off, 0);
+    beforeBatchFailpoint->waitForTimesEntered(timesEnteredBeforeBatch + 1);
+    // Ensure that the retry state records the last transient error retrial.
+    ASSERT_EQUALS(1, cloner->getRetryableOperationCount_forTest());
+    beforeBatchFailpoint->setMode(FailPoint::off, 0);
+
     afterBatchFailpoint->waitForTimesEntered(timesEnteredAfterBatch + 1);
+    // Ensure that the retry state is cleared after a successful batch.
+    ASSERT_EQUALS(0, cloner->getRetryableOperationCount_forTest());
+
     timesEnteredBeforeRetry = beforeRetryFailPoint->setMode(
         FailPoint::alwaysOn, 0, fromjson("{cloner: 'CollectionCloner', stage: 'query'}"));
     afterBatchFailpoint->setMode(FailPoint::off, 0);
     beforeRetryFailPoint->waitForTimesEntered(timesEnteredBeforeRetry + 1);
+    timesEnteredBeforeBatch = beforeBatchFailpoint->setMode(FailPoint::alwaysOn, 0);
 
     // Allow the clone to finish.
     failNextBatch->setMode(FailPoint::off, 0);
     beforeRetryFailPoint->setMode(FailPoint::off, 0);
 
+    beforeBatchFailpoint->waitForTimesEntered(timesEnteredBeforeBatch + 1);
+    // Ensure that the retry state records the last transient error retrial.
+    ASSERT_EQUALS(1, cloner->getRetryableOperationCount_forTest());
+    beforeBatchFailpoint->setMode(FailPoint::off, 0);
+
+
     clonerThread.join();
 
+    // Ensure that the retry state is cleared after a successful batch.
+    ASSERT_EQUALS(0, cloner->getRetryableOperationCount_forTest());
     /**
      * Since the CollectionMockStats class does not de-duplicate inserts, it is possible to insert
      * the same document more than once, thereby also increasing the insertCount more than once.

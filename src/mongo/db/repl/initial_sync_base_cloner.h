@@ -46,10 +46,17 @@ public:
                           ThreadPool* dbPool);
     virtual ~InitialSyncBaseCloner() = default;
 
+    int getRetryableOperationCount_forTest();
+
 protected:
     InitialSyncSharedData* getSharedData() const final {
         return checked_cast<InitialSyncSharedData*>(BaseCloner::getSharedData());
     }
+
+    /**
+     * Clears _retryableOp.
+     */
+    void clearRetryingState() final;
 
 private:
     /**
@@ -70,11 +77,6 @@ private:
      * source is temporarily unusable (e.g. restarting).
      */
     Status checkSyncSourceIsStillValid();
-
-    /**
-     * Clears _retryableOp.
-     */
-    void clearRetryingState() final;
 
     /**
      * Checks to see if we are still within our allowed outage duration.

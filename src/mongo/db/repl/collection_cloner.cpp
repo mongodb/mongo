@@ -59,9 +59,34 @@ namespace repl {
 // collection 'namespace'.
 MONGO_FAIL_POINT_DEFINE(initialSyncHangDuringCollectionClone);
 
-// Failpoint which causes initial sync to hang after handling the next batch of results from the
-// DBClientConnection, optionally limited to a specific collection.
+// Failpoint which causes initial sync to hang before/after handling the next batch of results from
+// the DBClientConnection, optionally limited to a specific collection.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangCollectionClonerBeforeHandlingBatchResponse);
 MONGO_FAIL_POINT_DEFINE(initialSyncHangCollectionClonerAfterHandlingBatchResponse);
+
+namespace {
+void waitWhileFailPointEnabled(FailPoint* failPoint,
+                               const NamespaceString& sourceNss,
+                               const std::function<bool()>& mustExit) {
+    failPoint->executeIf(
+        [&](const BSONObj&) {
+            while (MONGO_unlikely(failPoint->shouldFail()) && !mustExit()) {
+                LOGV2(8659100,
+                      "{FailPoint} is enabled. Blocking until fail point is disabled.",
+                      "FailPoint"_attr = failPoint->getName(),
+                      logAttrs(sourceNss));
+                mongo::sleepmillis(100);
+            }
+        },
+        [&](const BSONObj& data) {
+            const auto ns = data.getStringField("nss"_sd);
+            const auto fpNss =
+                NamespaceStringUtil::deserialize(boost::none, ns, SerializationContext());
+            // Only hang when cloning the specified collection, or if no collection was specified.
+            return fpNss.isEmpty() || fpNss == sourceNss;
+        });
+}
+}  // namespace
 
 CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                                    const CollectionOptions& collectionOptions,
@@ -377,7 +402,11 @@ void CollectionCloner::runQuery() {
     }
 }
 
+
 void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
+    waitWhileFailPointEnabled(&initialSyncHangCollectionClonerBeforeHandlingBatchResponse,
+                              _sourceNss,
+                              [&]() { return mustExit(); });
     {
         stdx::lock_guard<InitialSyncSharedData> lk(*getSharedData());
         if (!getSharedData()->getStatus(lk).isOK()) {
@@ -425,25 +454,12 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
     // Store the resume token for this batch.
     _resumeToken = cursor.getPostBatchResumeToken();
 
-    initialSyncHangCollectionClonerAfterHandlingBatchResponse.executeIf(
-        [&](const BSONObj&) {
-            while (MONGO_unlikely(
-                       initialSyncHangCollectionClonerAfterHandlingBatchResponse.shouldFail()) &&
-                   !mustExit()) {
-                LOGV2(21137,
-                      "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point "
-                      "enabled for {namespace}. Blocking until fail point is disabled.",
-                      "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point "
-                      "enabled. Blocking until fail point is disabled",
-                      logAttrs(_sourceNss));
-                mongo::sleepsecs(1);
-            }
-        },
-        [&](const BSONObj& data) {
-            // Only hang when cloning the specified collection, or if no collection was specified.
-            auto nss = data["nss"].str();
-            return nss.empty() || nss == _sourceNss.toString();
-        });
+    // Clear retrying state after a successful batch.
+    clearRetryingState();
+
+    waitWhileFailPointEnabled(&initialSyncHangCollectionClonerAfterHandlingBatchResponse,
+                              _sourceNss,
+                              [&]() { return mustExit(); });
 }
 
 void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::CallbackArgs& cbd) {

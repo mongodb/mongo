@@ -60,6 +60,15 @@ void InitialSyncBaseCloner::clearRetryingState() {
     _retryableOp = boost::none;
 }
 
+int InitialSyncBaseCloner::getRetryableOperationCount_forTest() {
+    if (!_retryableOp) {
+        return 0;
+    }
+
+    stdx::lock_guard<InitialSyncSharedData> lk(*_retryableOp->getSharedData());
+    return _retryableOp->getSharedData()->getRetryingOperationsCount(lk);
+}
+
 void InitialSyncBaseCloner::handleStageAttemptFailed(BaseClonerStage* stage, Status lastError) {
     auto isThisStageFailPoint = [this, stage](const BSONObj& data) {
         return data["stage"].str() == stage->getName() && isMyFailPoint(data);
