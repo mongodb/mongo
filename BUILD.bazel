@@ -306,6 +306,7 @@ mongo_install(
         "//src/mongo/db/local_catalog/lock_manager:lock_gdb_test.py": "//src/mongo/db:mongod",
         "//src/mongo/db/query/stage_builder/sbe/abt:optimizer_gdb_test.py": "//src/mongo/db/query/stage_builder/sbe/abt:optimizer_gdb_test_program",
     },
+    try_zstd = True,
     deps = [
         "//src/mongo/db/modules/enterprise:dist-test",
     ],

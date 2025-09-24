@@ -137,7 +137,6 @@ tasks:
             - "src/evergreen/run_python_script.sh"
             - "evergreen/macos_notary.py"
             - "bazel-bin/dist-test-stripped.${ext|tgz}"
-
       - command: subprocess.exec
         params:
           binary: bash
@@ -169,6 +168,38 @@ tasks:
           permissions: public-read
           content_type: text/plain
           display_name: Binaries SHA256
+      - command: subprocess.exec
+        params:
+          binary: bash
+          add_expansions_to_env: true
+          continue_on_err: true
+          args:
+            - "src/evergreen/run_python_script.sh"
+            - "buildscripts/s3_binary/sha256sum.py"
+            - "bazel-bin/dist-test-stripped.zst"
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/dist-test-stripped.zst
+          remote_file: ${mongo_binaries_zstd}
+          bucket: mciuploads
+          permissions: public-read
+          content_type: application/gzip
+          # Sys-perf relies on this display name, please reach out before changing it.
+          display_name: Binaries zstd
+      - command: s3.put
+        params:
+          optional: true
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: src/bazel-bin/dist-test-stripped.zst.sha256
+          remote_file: ${mongo_binaries_zstd}.sha256
+          bucket: mciuploads
+          permissions: public-read
+          content_type: text/plain
+          display_name: Binaries SHA256 zstd
 
       - func: "f_expansions_write"
       - func: "gen feature flags"
@@ -245,6 +276,19 @@ tasks:
           visibility: signed
           content_type: application/tar
           display_name: Artifacts
+
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: artifacts.tgz.zst
+          remote_file: ${mongo_artifacts_zstd}
+          bucket: mciuploads
+          permissions: private
+          visibility: signed
+          content_type: application/tar
+          display_name: Artifacts
+          optional: true
 
       - command: archive.targz_pack
         params:

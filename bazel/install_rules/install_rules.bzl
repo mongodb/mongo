@@ -428,6 +428,7 @@ def mongo_install(
         archive_license_files = ["//:archive_license_files"],
         package_extract_name = "dist-test",
         publish_debug_in_stripped = False,
+        try_zstd = False,
         **kwargs):
     """Perform install actions
 
@@ -439,10 +440,6 @@ def mongo_install(
         target_compatible_with: forward target_compatible_with args to the rules
 
     """
-    compressor = select({
-        "@pigz//:pigz_tool_available": "@pigz//:bin",
-        "//conditions:default": None,
-    })
 
     # this macro create several install targets for each instance of an install:
     # "": normal install includes bins and debug info
@@ -547,6 +544,30 @@ def mongo_install(
             testonly = testonly,
         )
 
+        pkg_zip(
+            name = "archive-" + name + install_type + "_zip",
+            srcs = [install_target + "_files", install_target + "_licenses"],
+            package_dir = package_extract_name,
+            package_file_name = name + install_type + ".zip",
+            exec_properties = {
+                "no-cache": "1",
+                "no-sandbox": "1",
+                "no-remote": "1",
+                "local": "1",
+            },
+            testonly = testonly,
+            target_compatible_with = select({
+                "@platforms//os:windows": [],
+                "//conditions:default": ["@platforms//:incompatible"],
+            }),
+            **kwargs
+        )
+
+        compressor = select({
+            "@pigz//:pigz_tool_available": "@pigz//:bin",
+            "//conditions:default": None,
+        })
+
         # package up the the install into an archive.
         pkg_tar(
             name = "archive-" + name + install_type + "_tar",
@@ -569,33 +590,49 @@ def mongo_install(
             **kwargs
         )
 
-        pkg_zip(
-            name = "archive-" + name + install_type + "_zip",
-            srcs = [install_target + "_files", install_target + "_licenses"],
-            package_dir = package_extract_name,
-            package_file_name = name + install_type + ".zip",
-            exec_properties = {
-                "no-cache": "1",
-                "no-sandbox": "1",
-                "no-remote": "1",
-                "local": "1",
-            },
-            testonly = testonly,
-            target_compatible_with = select({
-                "@platforms//os:windows": [],
-                "//conditions:default": ["@platforms//:incompatible"],
-            }),
-            **kwargs
-        )
+        if try_zstd:
+            compressor = select({
+                "@zstd//:zstd_tool_available": "@zstd//:bin",
+                "//conditions:default": None,
+            })
+            pkg_tar(
+                name = "archive-" + name + install_type + "_zst",
+                srcs = [install_target + "_files", install_target + "_licenses"],
+                compressor = compressor,
+                package_dir = package_extract_name,
+                package_file_name = name + install_type + ".zst",
+                extension = "zst",
+                exec_properties = {
+                    "no-cache": "1",
+                    "no-sandbox": "1",
+                    "no-remote": "1",
+                    "local": "1",
+                },
+                testonly = testonly,
+                target_compatible_with = select({
+                    "@platforms//os:windows": ["@platforms//:incompatible"],
+                    "//conditions:default": [],
+                }),
+                **kwargs
+            )
 
-        # Used to run zip on windows and tar on every other os
-        native.alias(
-            name = "archive-" + name + install_type,
-            actual = select({
-                "@platforms//os:windows": "archive-" + name + install_type + "_zip",
-                "//conditions:default": "archive-" + name + install_type + "_tar",
-            }),
-        )
+            native.filegroup(
+                name = "archive-" + name + install_type,
+                srcs = select({
+                    "@platforms//os:windows": ["archive-" + name + install_type + "_zip"],
+                    "//conditions:default": ["archive-" + name + install_type + "_tar", "archive-" + name + install_type + "_zst"],
+                }),
+                testonly = testonly,
+            )
+        else:
+            native.filegroup(
+                name = "archive-" + name + install_type,
+                srcs = select({
+                    "@platforms//os:windows": ["archive-" + name + install_type + "_zip"],
+                    "//conditions:default": ["archive-" + name + install_type + "_tar"],
+                }),
+                testonly = testonly,
+            )
 
 def _extensions_with_config_impl(ctx):
     """Implementation for the extensions_with_config rule."""

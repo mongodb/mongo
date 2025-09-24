@@ -172,11 +172,22 @@ functions:
       bucket: mciuploads
       local_file: "fetched_artifacts.tgz"
 
+  "fetch artifacts zstd": &fetch_artifacts_zstd
+    command: s3.get
+    display_name: "fetch artifacts"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_artifacts_zstd}
+      bucket: mciuploads
+      local_file: "fetched_artifacts.zst"
+      optional: true
+
   "extract artifacts": &extract_artifacts
     command: shell.exec
     params:
       script: |
-        tar -xf fetched_artifacts.tgz
+        tar --zstd -xf fetched_artifacts.zst || tar -xf fetched_artifacts.tgz
 
   "fetch venv": &fetch_venv
     command: s3.get
@@ -295,7 +306,18 @@ functions:
       bucket: mciuploads
       local_file: src/mongo-binaries.tgz
 
-  "verify binaries sha": &verify_binaries_sha
+  "fetch binaries zstd": &fetch_binaries_zstd
+    command: s3.get
+    display_name: "fetch binaries"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_binaries_zstd}
+      bucket: mciuploads
+      local_file: src/mongo-binaries.zst
+      optional: true
+
+  "fetch and verify binaries sha": &fetch_and_verify_binaries_sha
     command: subprocess.exec
     params:
       binary: bash
@@ -306,6 +328,24 @@ functions:
         - "https://mciuploads.s3.amazonaws.com/${mongo_binaries}"
         - "mongo-binaries.tgz"
         - "--remote-sha"
+
+  # Check for zstd support before attempting .zst extraction
+  "fetch and verify binaries sha zstd": &fetch_and_verify_binaries_sha_zstd
+    command: subprocess.exec
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+        - "-c"
+        - |
+          if tar --help | grep -q -- --zstd; then
+            bash src/evergreen/run_python_script.sh \
+            buildscripts/s3_binary/download.py \
+            https://mciuploads.s3.amazonaws.com/${mongo_binaries_zstd} \
+            mongo-binaries.zst \
+            --remote-sha \
+            --ignore-file-not-exist
+          fi
 
   "fetch jstestshell": &fetch_jstestshell
     command: s3.get
@@ -353,6 +393,7 @@ functions:
         - "--tarball=mongo-binaries.tgz"
         - "--extraction-command=${decompress}"
         - "--change-dir=${extraction_change_dir}"
+        - "--try-zstd=mongo-binaries.zst"
         - "${move_outputs}"
 
   "extract jstestshell": &extract_jstestshell
@@ -669,6 +710,8 @@ functions:
       updates:
         - key: mongo_binaries
           value: ${project}/${compile_variant}/${version_id}/binaries/mongo-${revision_order_id}.${ext|tgz}
+        - key: mongo_binaries_zstd
+          value: ${project}/${compile_variant}/${version_id}/binaries/mongo-${revision_order_id}.zst
         - key: all_mongo_binaries
           value: ${project}/${compile_variant}/${version_id}/binaries/all_mongo-${revision_order_id}.${ext|tgz}
         - key: mongo_cryptd
@@ -683,6 +726,8 @@ functions:
           value: ${project}/${compile_variant}/${version_id}/binaries/mongo-jstestshell-debugsymbols-${revision_order_id}.tgz
         - key: mongo_artifacts
           value: ${project}/${compile_variant}/${version_id}/artifacts/artifacts-${revision_order_id}.tgz
+        - key: mongo_artifacts_zstd
+          value: ${project}/${compile_variant}/${version_id}/artifacts/artifacts-${revision_order_id}.zst
         - key: mongo_benchmarks
           value: ${project}/${compile_variant}/${version_id}/binaries/benchmarks-${revision_order_id}.${ext|tgz}
         - key: mongo_benchmarks_debugsymbols
@@ -787,13 +832,14 @@ functions:
     - *generate_github_token
     - *conditionally_clone_repo
     - *fetch_artifacts
+    - *fetch_artifacts_zstd
     - *extract_artifacts
     - *kill_processes
     - *cleanup_environment
     - *fetch_venv
     - *adjust_venv
-    - *fetch_binaries
-    - *verify_binaries_sha
+    - *fetch_and_verify_binaries_sha
+    - *fetch_and_verify_binaries_sha_zstd
     - *fetch_jstestshell
     - *verify_jstestshell_sha
     - *extract_binaries
@@ -817,6 +863,7 @@ functions:
   "write and set downstream expansions":
     - *f_expansions_write
     - *fetch_artifacts
+    - *fetch_artifacts_zstd
     - *extract_artifacts
     - *kill_processes
     - *cleanup_environment
@@ -1376,6 +1423,7 @@ functions:
 
   "generate resmoke tasks":
     - *fetch_artifacts
+    - *fetch_artifacts_zstd
     - *extract_artifacts
     - *f_expansions_write
     - *kill_processes

@@ -91,7 +91,7 @@ def validate_file(s3_path, output_path, remote_sha_allowed):
         raise ValueError(f"No SHA256 hash available for {s3_path}")
 
 
-def _download_and_verify(s3_path, output_path, remote_sha_allowed):
+def _download_and_verify(s3_path, output_path, remote_sha_allowed, ignore_file_not_exist):
     for i in range(5):
         try:
             print(f"Downloading {s3_path}...")
@@ -106,6 +106,8 @@ def _download_and_verify(s3_path, output_path, remote_sha_allowed):
         except Exception:
             print("Download failed:")
             traceback.print_exc()
+            if ignore_file_not_exist:
+                return
             if i == 4:
                 raise
             print("Retrying download...")
@@ -117,6 +119,7 @@ def download_s3_binary(
     s3_path: str,
     local_path: str = None,
     remote_sha_allowed=False,
+    ignore_file_not_exist=False,
 ) -> bool:
     if local_path is None:
         local_path = s3_path.split("/")[-1]
@@ -133,7 +136,7 @@ def download_s3_binary(
     try:
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             tempfile_name = temp_file.name
-            _download_and_verify(s3_path, tempfile_name, remote_sha_allowed)
+            _download_and_verify(s3_path, tempfile_name, remote_sha_allowed, ignore_file_not_exist)
 
         try:
             os.replace(tempfile_name, local_path)
@@ -159,8 +162,15 @@ if __name__ == "__main__":
     parser.add_argument("s3_path", help="S3 URL to download from")
     parser.add_argument("local_path", nargs="?", help="Optional output file path")
     parser.add_argument("--remote-sha", action="store_true", help="Allow remote .sha256 lookup")
+    parser.add_argument(
+        "--ignore-file-not-exist",
+        action="store_true",
+        help="Don't fail when remote file doesn't exist.",
+    )
 
     args = parser.parse_args()
 
-    if not download_s3_binary(args.s3_path, args.local_path, args.remote_sha):
+    if not download_s3_binary(
+        args.s3_path, args.local_path, args.remote_sha, args.ignore_file_not_exist
+    ):
         sys.exit(1)

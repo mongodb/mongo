@@ -4,6 +4,7 @@ rm -rf \
     /data/db/* \
     mongo-diskstats* \
     mongo-*.tgz \
+    mongo-*.zst \
     ~/.aws \
     ~/.boto \
     venv \

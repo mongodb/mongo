@@ -29,6 +29,22 @@ import pathlib
 import shutil
 import subprocess
 import sys
+from typing import List
+
+ZSTD_EXTRACTION = "tar --zstd -xf"
+
+
+def get_cmd(tarball: str, extraction_command: str) -> List[str]:
+    shell = os.environ.get("SHELL", "/bin/bash")
+    if sys.platform == "win32":
+        proc = subprocess.run(
+            ["C:/cygwin/bin/cygpath.exe", "-w", shell], text=True, capture_output=True
+        )
+        bash = pathlib.Path(proc.stdout.strip())
+        return [bash.as_posix(), "-c", f"{extraction_command} {tarball}"]
+
+    return [shell, "-c", f"{extraction_command} {tarball}"]
+
 
 parser = argparse.ArgumentParser()
 
@@ -55,6 +71,12 @@ parser.add_argument(
     action="store_true",
     help="Should this fail if extraction fails. Useful for optional success.",
 )
+parser.add_argument(
+    "--try-zstd",
+    type=str,
+    action="store",
+    help="Try extracting zstd archive first given archive name.",
+)
 args = parser.parse_args()
 
 if args.change_dir:
@@ -66,21 +88,24 @@ else:
     working_dir = None
     tarball = pathlib.Path(args.tarball).as_posix()
 
-shell = os.environ.get("SHELL", "/bin/bash")
-
-if sys.platform == "win32":
+# Attempt zstd extraction first, if enabled.
+zstd_succeeded = False
+if args.try_zstd:
+    print("Attempting zstd extraction...")
+    zstd_archive = args.try_zstd
+    cmd = get_cmd(zstd_archive, ZSTD_EXTRACTION)
+    print(f"Extracting: {' '.join(cmd)}")
     proc = subprocess.run(
-        ["C:/cygwin/bin/cygpath.exe", "-w", shell], text=True, capture_output=True
+        cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=working_dir
     )
-    bash = pathlib.Path(proc.stdout.strip())
-    cmd = [bash.as_posix(), "-c", f"{args.extraction_command} {tarball}"]
-else:
-    cmd = [shell, "-c", f"{args.extraction_command} {tarball}"]
+    zstd_succeeded = proc.returncode == 0
 
-print(f"Extracting: {' '.join(cmd)}")
-proc = subprocess.run(
-    cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=working_dir
-)
+if not zstd_succeeded:
+    cmd = get_cmd(tarball, args.extraction_command)
+    print(f"Extracting: {' '.join(cmd)}")
+    proc = subprocess.run(
+        cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=working_dir
+    )
 
 print(proc.stdout)
 

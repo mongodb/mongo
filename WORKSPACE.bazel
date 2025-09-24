@@ -173,6 +173,12 @@ setup_pigz(
     name = "pigz",
 )
 
+load("//bazel/install_rules:zstd.bzl", "setup_zstd")
+
+setup_zstd(
+    name = "zstd",
+)
+
 # This repository is normally created by db-contrib-tool or manually extracting the binaries at the proper location
 new_local_repository(
     name = "mongot_localdev",

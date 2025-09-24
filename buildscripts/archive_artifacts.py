@@ -40,9 +40,24 @@ def create_tarball(output_filename, file_patterns, exclude_patterns):
     else:
         files_to_add = included_files
 
+    try:
+        from pyzstd import ZstdFile
+    except:
+        pass
+
     print(f"Creating tarball: {output_filename}")
     try:
+        if shutil.which("zstd") and "pyzstd" in sys.modules:
+            print("Creating zstd archive")
+            zstd_filename = output_filename + ".zst"
+            with (
+                ZstdFile(zstd_filename, mode="w") as _fileobj,
+                tarfile.open(fileobj=_fileobj, mode="w", dereference=True) as tar,
+            ):
+                for file_path in sorted(list(files_to_add)):
+                    tar.add(file_path, file_path)
         if shutil.which("pigz"):
+            print("pyzstd not installed. Using pigz.")
             with tempfile.NamedTemporaryFile(mode="w+", encoding="utf-8") as tmp_file:
                 for file in sorted(list(files_to_add)):
                     tmp_file.write(file + "\n")

@@ -348,4 +348,14 @@ py_binary(
 py_binary(
     name = "archive_artifacts",
     srcs = ["archive_artifacts.py"],
+    deps = [
+        dependency(
+            "pyzstd",
+            group = "modules_poc",
+        ),
+        dependency(
+            "cffi",
+            group = "modules_poc",
+        ),
+    ],
 )
