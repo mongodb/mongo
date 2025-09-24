@@ -111,9 +111,6 @@ public:
     void prepare(const LambdaAbstraction& lam);
     std::unique_ptr<sbe::EExpression> transport(const LambdaAbstraction& lam,
                                                 std::unique_ptr<sbe::EExpression> body);
-    std::unique_ptr<sbe::EExpression> transport(const LambdaApplication&,
-                                                std::unique_ptr<sbe::EExpression> lam,
-                                                std::unique_ptr<sbe::EExpression> arg);
     std::unique_ptr<sbe::EExpression> transport(
         const FunctionCall& fn, std::vector<std::unique_ptr<sbe::EExpression>> args);
 

@@ -44,7 +44,6 @@ class If;
 class Let;
 class MultiLet;
 class LambdaAbstraction;
-class LambdaApplication;
 class FunctionCall;
 class Source;
 class Switch;

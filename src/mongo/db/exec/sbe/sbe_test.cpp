@@ -507,9 +507,9 @@ TEST(SBEVM, CodeFragmentPrintStable) {
     code.appendFillEmpty(vm::Instruction::Null);
     code.appendFillEmpty(vm::Instruction::False);
     code.appendFillEmpty(vm::Instruction::True);
-    code.appendTraverseP(0xAA, vm::Instruction::Nothing);
-    code.appendTraverseP(0xAA, vm::Instruction::Int32One);
-    code.appendTraverseF(0xBB, vm::Instruction::True);
+    code.appendTraverseP(0xAA, 1, vm::Instruction::Nothing);
+    code.appendTraverseP(0xAA, 1, vm::Instruction::Int32One);
+    code.appendTraverseF(0xBB, 1, vm::Instruction::True);
     code.appendGetField({}, "Hello world!"_sd);
     code.appendAdd({}, {});
 

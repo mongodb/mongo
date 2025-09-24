@@ -153,16 +153,7 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
     auto frameId = it->second;
     _lambdaMap.erase(it);
 
-    return sbe::makeE<sbe::ELocalLambda>(frameId, std::move(body));
-}
-
-std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
-    const LambdaApplication&,
-    std::unique_ptr<sbe::EExpression> lam,
-    std::unique_ptr<sbe::EExpression> arg) {
-    // lambda applications are not directly supported by SBE (yet) and must not be present.
-    tasserted(6624208, "lambda application is not implemented");
-    return nullptr;
+    return sbe::makeE<sbe::ELocalLambda>(frameId, std::move(body), lam.varNames().size());
 }
 
 std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(const Variable& var) {
@@ -193,8 +184,13 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(const Variabl
             // than a slot.
             auto it = _lambdaMap.find(lam);
             tassert(6624204, "incorrect lambda map", it != _lambdaMap.end());
+            const ProjectionNameVector& varNames = lam->varNames();
+            auto itVar = std::find(varNames.begin(), varNames.end(), var.name());
+            tassert(
+                10800801, "variable is not defined in associated lambda", itVar != varNames.end());
 
-            return sbe::makeE<sbe::EVariable>(it->second, 0, _env.isLastRef(var));
+            return sbe::makeE<sbe::EVariable>(
+                it->second, std::distance(varNames.begin(), itVar), _env.isLastRef(var));
         }
     }
 

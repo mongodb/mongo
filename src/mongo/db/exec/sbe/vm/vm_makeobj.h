@@ -356,7 +356,9 @@ private:
         size_t argIdx = lambdaArg.argIdx;
         auto [_, lamTag, lamVal] = getArg(argIdx);
 
-        tassert(7103506, "Expected arg to be LocalLambda", lamTag == value::TypeTags::LocalLambda);
+        tassert(7103506,
+                "Expected arg to be LocalLambda",
+                lamTag == value::TypeTags::LocalOneArgLambda);
         int64_t lamPos = value::bitcastTo<int64_t>(lamVal);
 
         auto [outputOwned, outputTag, outputVal] = invokeLambda(lamPos, tag, val);

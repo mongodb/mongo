@@ -165,6 +165,138 @@ TEST_F(AbtToSbeExpression, Lower4) {
     sbe::value::ValueGuard guard(resultTag, resultVal);
 
     ASSERT_EQ(sbe::value::TypeTags::Array, resultTag);
+    auto arrResult = sbe::value::getArrayView(resultVal);
+    ASSERT_EQ(4, arrResult->size());
+    auto arrResult0 = arrResult->values()[0];
+    ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult0.first);
+    ASSERT_EQ(11, sbe::value::bitcastTo<int64_t>(arrResult0.second));
+    auto arrResult1 = arrResult->values()[1];
+    ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult1.first);
+    ASSERT_EQ(12, sbe::value::bitcastTo<int64_t>(arrResult1.second));
+    auto arrResult2 = arrResult->values()[2];
+    ASSERT_EQ(sbe::value::TypeTags::Array, arrResult2.first);
+    auto arrResult2v = sbe::value::getArrayView(arrResult2.second);
+    ASSERT_EQ(2, arrResult2v->size());
+
+    auto arrResult2v0 = arrResult2v->values()[0];
+    ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult2v0.first);
+    ASSERT_EQ(31, sbe::value::bitcastTo<int64_t>(arrResult2v0.second));
+    auto arrResult2v1 = arrResult2v->values()[1];
+    ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult2v1.first);
+    ASSERT_EQ(32, sbe::value::bitcastTo<int64_t>(arrResult2v1.second));
+
+    auto arrResult3 = arrResult->values()[3];
+    ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult3.first);
+    ASSERT_EQ(13, sbe::value::bitcastTo<int64_t>(arrResult3.second));
+}
+
+TEST_F(AbtToSbeExpression, Lower4TwoArgsOneLevel) {
+    auto [tagArr, valArr] = sbe::value::makeNewArray();
+    auto arr = sbe::value::getArrayView(valArr);
+    arr->push_back(sbe::value::TypeTags::NumberInt64, 1);
+    arr->push_back(sbe::value::TypeTags::NumberInt64, 2);
+    auto [tagArrNest, valArrNest] = sbe::value::makeNewArray();
+    auto arrNest = sbe::value::getArrayView(valArrNest);
+    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 21);
+    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 22);
+    arr->push_back(tagArrNest, valArrNest);
+    arr->push_back(sbe::value::TypeTags::NumberInt64, 3);
+
+    auto tree = make<FunctionCall>(
+        "traverseP",
+        makeSeq(
+            make<Constant>(tagArr, valArr),
+            make<LambdaAbstraction>(
+                "value",
+                "index",
+                make<If>(
+                    // Comparing the index with a full int64 implies we only process the first
+                    // level.
+                    make<BinaryOp>(Operations::Eq, make<Variable>("index"), Constant::int64(1)),
+                    make<BinaryOp>(Operations::Add, make<Variable>("value"), Constant::int64(10)),
+                    Constant::nothing())),
+            Constant::nothing()));
+    auto env = VariableEnvironment::build(tree);
+    SlotVarMap map;
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
+
+    ASSERT(expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+    sbe::value::ValueGuard guard(resultTag, resultVal);
+
+    ASSERT_EQ(sbe::value::TypeTags::Array, resultTag);
+    auto arrResult = sbe::value::getArrayView(resultVal);
+    ASSERT_EQ(2, arrResult->size());
+    auto arrResult0 = arrResult->values()[0];
+    ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult0.first);
+    ASSERT_EQ(12, sbe::value::bitcastTo<int64_t>(arrResult0.second));
+    auto arrResult1 = arrResult->values()[1];
+    ASSERT_EQ(sbe::value::TypeTags::Array, arrResult1.first);
+    ASSERT_EQ(0, sbe::value::getArrayView(arrResult1.second)->size());
+}
+
+
+TEST_F(AbtToSbeExpression, Lower4TwoArgsAnyLevel) {
+    auto [tagArr, valArr] = sbe::value::makeNewArray();
+    auto arr = sbe::value::getArrayView(valArr);
+    arr->push_back(sbe::value::TypeTags::NumberInt64, 1);
+    arr->push_back(sbe::value::TypeTags::NumberInt64, 2);
+    auto [tagArrNest, valArrNest] = sbe::value::makeNewArray();
+    auto arrNest = sbe::value::getArrayView(valArrNest);
+    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 21);
+    arrNest->push_back(sbe::value::TypeTags::NumberInt64, 22);
+    arr->push_back(tagArrNest, valArrNest);
+    arr->push_back(sbe::value::TypeTags::NumberInt64, 3);
+
+    auto tree = make<FunctionCall>(
+        "traverseP",
+        makeSeq(
+            make<Constant>(tagArr, valArr),
+            make<LambdaAbstraction>(
+                "value",
+                "index",
+                make<If>(
+                    // Trimming the index to the lowest 32 bits makes the test work on any level.
+                    make<BinaryOp>(
+                        Operations::Eq,
+                        make<FunctionCall>(
+                            "mod", makeSeq(make<Variable>("index"), Constant::int64(1LL << 32))),
+                        Constant::int64(1)),
+                    make<BinaryOp>(Operations::Add, make<Variable>("value"), Constant::int64(10)),
+                    Constant::nothing())),
+            Constant::nothing()));
+    auto env = VariableEnvironment::build(tree);
+    SlotVarMap map;
+    sbe::InputParamToSlotMap inputParamToSlotMap;
+    auto expr =
+        SBEExpressionLowering{env, map, *runtimeEnv(), slotIdGenerator(), inputParamToSlotMap}
+            .optimize(tree);
+
+    ASSERT(expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
+    sbe::value::ValueGuard guard(resultTag, resultVal);
+
+    ASSERT_EQ(sbe::value::TypeTags::Array, resultTag);
+    auto arrResult = sbe::value::getArrayView(resultVal);
+    ASSERT_EQ(2, arrResult->size());
+    auto arrResult0 = arrResult->values()[0];
+    ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult0.first);
+    ASSERT_EQ(12, sbe::value::bitcastTo<int64_t>(arrResult0.second));
+    auto arrResult1 = arrResult->values()[1];
+    ASSERT_EQ(sbe::value::TypeTags::Array, arrResult1.first);
+    auto arrResult1v = sbe::value::getArrayView(arrResult1.second);
+    ASSERT_EQ(1, arrResult1v->size());
+
+    auto arrResult1v0 = arrResult1v->values()[0];
+    ASSERT_EQ(sbe::value::TypeTags::NumberInt64, arrResult1v0.first);
+    ASSERT_EQ(32, sbe::value::bitcastTo<int64_t>(arrResult1v0.second));
 }
 
 TEST_F(AbtToSbeExpression, Lower5) {

@@ -495,27 +495,34 @@ public:
 };
 
 /**
- * Represents a single argument lambda. Defines a local variable (representing the argument) which
- * can be referenced within the lambda. The variable takes on the value to which LambdaAbstraction
- * is applied by its parent.
+ * Represents a lambda with either one or two input arguments. Defines local variables (representing
+ * the arguments) which can be referenced within the lambda. The variables take on the values to
+ * which LambdaAbstraction is applied by its parent.
  */
 class LambdaAbstraction final : public ABTOpFixedArity<1>, public ExpressionSyntaxSort {
     using Base = ABTOpFixedArity<1>;
 
-    ProjectionName _varName;
+    ProjectionNameVector _varNames;
 
 public:
-    LambdaAbstraction(ProjectionName var, ABT inBody)
-        : Base(std::move(inBody)), _varName(std::move(var)) {
+    LambdaAbstraction(ProjectionName var, ABT inBody) : Base(std::move(inBody)) {
+        _varNames.emplace_back(std::move(var));
+        assertExprSort(getBody());
+    }
+
+    LambdaAbstraction(ProjectionName var1, ProjectionName var2, ABT inBody)
+        : Base(std::move(inBody)) {
+        _varNames.emplace_back(std::move(var1));
+        _varNames.emplace_back(std::move(var2));
         assertExprSort(getBody());
     }
 
     bool operator==(const LambdaAbstraction& other) const {
-        return _varName == other._varName && getBody() == other.getBody();
+        return _varNames == other._varNames && getBody() == other.getBody();
     }
 
-    auto& varName() const {
-        return _varName;
+    auto& varNames() const {
+        return _varNames;
     }
 
     const ABT& getBody() const {
@@ -524,41 +531,6 @@ public:
 
     ABT& getBody() {
         return get<0>();
-    }
-};
-
-/**
- * Evaluates an expression representing a function over an expression representing the argument to
- * the function.
- */
-class LambdaApplication final : public ABTOpFixedArity<2>, public ExpressionSyntaxSort {
-    using Base = ABTOpFixedArity<2>;
-
-public:
-    LambdaApplication(ABT inLambda, ABT inArgument)
-        : Base(std::move(inLambda), std::move(inArgument)) {
-        assertExprSort(getLambda());
-        assertExprSort(getArgument());
-    }
-
-    bool operator==(const LambdaApplication& other) const {
-        return getLambda() == other.getLambda() && getArgument() == other.getArgument();
-    }
-
-    const ABT& getLambda() const {
-        return get<0>();
-    }
-
-    ABT& getLambda() {
-        return get<0>();
-    }
-
-    const ABT& getArgument() const {
-        return get<1>();
-    }
-
-    ABT& getArgument() {
-        return get<1>();
     }
 };
 

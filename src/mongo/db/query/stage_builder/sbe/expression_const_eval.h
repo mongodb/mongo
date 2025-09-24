@@ -64,7 +64,6 @@ public:
     void transport(abt::ABT& n, const abt::Let& let, abt::ABT&, abt::ABT& in);
     void prepare(abt::ABT&, const abt::MultiLet& multiLet);
     void transport(abt::ABT& n, const abt::MultiLet& multiLet, std::vector<abt::ABT>& args);
-    void transport(abt::ABT& n, const abt::LambdaApplication& app, abt::ABT& lam, abt::ABT& arg);
     void prepare(abt::ABT&, const abt::LambdaAbstraction&);
     void transport(abt::ABT&, const abt::LambdaAbstraction&, abt::ABT&);
 

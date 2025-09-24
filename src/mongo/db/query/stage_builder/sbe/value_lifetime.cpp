@@ -143,12 +143,18 @@ ValueLifetime::ValueType ValueLifetime::operator()(abt::ABT& n, abt::FunctionCal
 
         auto lambda = op.nodes()[1].cast<abt::LambdaAbstraction>();
         // Define the lambda variable with the type of the 'bind' expression type.
-        _bindings[lambda->varName()] = argType;
+        _bindings[lambda->varNames()[0]] = argType;
+        if (lambda->varNames().size() > 1) {
+            _bindings[lambda->varNames()[1]] = ValueType::GlobalValue;
+        }
 
         // Process the lambda knowing that its argument will be exactly the type we got from
         // processing the first argument.
         ValueType lambdaType = op.nodes()[1].visit(*this);
-        _bindings.erase(lambda->varName());
+        _bindings.erase(lambda->varNames()[0]);
+        if (lambda->varNames().size() > 1) {
+            _bindings.erase(lambda->varNames()[1]);
+        }
 
         // If the first argument is an array, the result is always a local value (array of cloned
         // results for traverseP, a boolean value for traverseF). If it is not an array, then the

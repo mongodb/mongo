@@ -179,6 +179,7 @@ public:
     SbExpr makeLet(sbe::FrameId frameId, SbExpr::Vector binds, SbExpr expr);
 
     SbExpr makeLocalLambda(sbe::FrameId frameId, SbExpr expr);
+    SbExpr makeLocalLambda2(sbe::FrameId frameId, SbExpr expr);
 
     SbExpr makeNumericConvert(SbExpr expr, sbe::value::TypeTags tag);
 

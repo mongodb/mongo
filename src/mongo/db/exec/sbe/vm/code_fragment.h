@@ -70,7 +70,7 @@ public:
     void appendAccessVal(value::SlotAccessor* accessor);
     void appendMoveVal(value::SlotAccessor* accessor);
     void appendLocalVal(FrameId frameId, int variable, bool moveFrom);
-    void appendLocalLambda(int codePosition);
+    void appendLocalLambda(int codePosition, size_t numArgs);
     void appendPop();
     void appendSwap();
     void appendMakeOwn(Instruction::Parameter arg);
@@ -126,9 +126,9 @@ public:
     void appendCollComparisonKey(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendGetFieldOrElement(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendTraverseP();
-    void appendTraverseP(int codePosition, Instruction::Constants k);
+    void appendTraverseP(int codePosition, size_t numArgs, Instruction::Constants k);
     void appendTraverseF();
-    void appendTraverseF(int codePosition, Instruction::Constants k);
+    void appendTraverseF(int codePosition, size_t numArgs, Instruction::Constants k);
     void appendMagicTraverseF();
     void appendSetField();
     void appendGetArraySize(Instruction::Parameter input);

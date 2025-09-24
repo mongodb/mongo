@@ -141,8 +141,11 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
         case TypeTags::bsonBinData:
             stream << "bsonBinData";
             break;
-        case TypeTags::LocalLambda:
-            stream << "LocalLambda";
+        case TypeTags::LocalOneArgLambda:
+            stream << "LocalOneArgLambda";
+            break;
+        case TypeTags::LocalTwoArgLambda:
+            stream << "LocalTwoArgLambda";
             break;
         case TypeTags::bsonUndefined:
             stream << "bsonUndefined";
@@ -534,8 +537,11 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
         case TypeTags::bsonUndefined:
             stream << "undefined";
             break;
-        case TypeTags::LocalLambda:
-            stream << "LocalLambda";
+        case TypeTags::LocalOneArgLambda:
+            stream << "LocalOneArgLambda";
+            break;
+        case TypeTags::LocalTwoArgLambda:
+            stream << "LocalTwoArgLambda";
             break;
         case TypeTags::keyString: {
             auto ks = getKeyString(val);

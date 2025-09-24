@@ -220,7 +220,8 @@ void ByteCode::traverseP(const CodeFragment* code) {
     popAndReleaseStack();
 
     if ((maxDepthTag != value::TypeTags::Nothing && maxDepthTag != value::TypeTags::NumberInt32) ||
-        lamTag != value::TypeTags::LocalLambda) {
+        (lamTag != value::TypeTags::LocalOneArgLambda &&
+         lamTag != value::TypeTags::LocalTwoArgLambda)) {
         popAndReleaseStack();
         pushStack(false, value::TypeTags::Nothing, 0);
         return;
@@ -231,10 +232,13 @@ void ByteCode::traverseP(const CodeFragment* code) {
         ? value::bitcastTo<int32_t>(maxDepthVal)
         : std::numeric_limits<int64_t>::max();
 
-    traverseP(code, lamPos, maxDepth);
+    traverseP(code, lamPos, lamTag == value::TypeTags::LocalTwoArgLambda, maxDepth);
 }
 
-void ByteCode::traverseP(const CodeFragment* code, int64_t position, int64_t maxDepth) {
+void ByteCode::traverseP(const CodeFragment* code,
+                         int64_t position,
+                         bool providePosition,
+                         int64_t maxDepth) {
     auto [own, tag, val] = getFromStack(0);
 
     if (value::isArray(tag) && maxDepth > 0) {
@@ -245,9 +249,19 @@ void ByteCode::traverseP(const CodeFragment* code, int64_t position, int64_t max
             --maxDepth;
         }
 
-        traverseP_nested(code, position, tag, val, maxDepth);
+        traverseP_nested(code, position, tag, val, providePosition, maxDepth, 0);
     } else {
+        if (providePosition) {
+            // Push a -1 on the stack (to indicate that we are not iterating over an array) before
+            // the value to be processed
+            pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(-1));
+        }
         runLambdaInternal(code, position);
+        if (providePosition) {
+            // Remove the position from the stack.
+            swapStack();
+            popStack();
+        }
     }
 }
 
@@ -255,7 +269,9 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
                                 int64_t position,
                                 value::TypeTags tagInput,
                                 value::Value valInput,
-                                int64_t maxDepth) {
+                                bool providePosition,
+                                int64_t maxDepth,
+                                int64_t curDepth) {
     auto decrement = [](int64_t d) {
         return d == std::numeric_limits<int64_t>::max() ? d : d - 1;
     };
@@ -263,14 +279,31 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
     auto [tagArrOutput, valArrOutput] = value::makeNewArray();
     auto arrOutput = value::getArrayView(valArrOutput);
     value::ValueGuard guard{tagArrOutput, valArrOutput};
-
+    // The array position we will be sending to the lambda holds the depth in the highest 32 bit,
+    // and the actual index in the current array in the lowest 32 bit.
+    size_t arrayPos = curDepth << 32;
     value::arrayForEach(tagInput, valInput, [&](value::TypeTags elemTag, value::Value elemVal) {
         if (maxDepth > 0 && value::isArray(elemTag)) {
-            traverseP_nested(code, position, elemTag, elemVal, decrement(maxDepth));
+            traverseP_nested(code,
+                             position,
+                             elemTag,
+                             elemVal,
+                             providePosition,
+                             decrement(maxDepth),
+                             curDepth + 1);
         } else {
             pushStack(false, elemTag, elemVal);
+            if (providePosition) {
+                pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(arrayPos));
+            }
             runLambdaInternal(code, position);
+            if (providePosition) {
+                // Remove the position from the stack.
+                swapStack();
+                popStack();
+            }
         }
+        arrayPos++;
 
         auto [retOwn, retTag, retVal] = getFromStack(0);
         popStack();
@@ -377,7 +410,8 @@ void ByteCode::traverseF(const CodeFragment* code) {
     auto [lamOwn, lamTag, lamVal] = getFromStack(0);
     popAndReleaseStack();
 
-    if (lamTag != value::TypeTags::LocalLambda) {
+    if (lamTag != value::TypeTags::LocalOneArgLambda &&
+        lamTag != value::TypeTags::LocalTwoArgLambda) {
         popAndReleaseStack();
         pushStack(false, value::TypeTags::Nothing, 0);
         return;
@@ -386,16 +420,29 @@ void ByteCode::traverseF(const CodeFragment* code) {
 
     bool compareArray = numberTag == value::TypeTags::Boolean && value::bitcastTo<bool>(numberVal);
 
-    traverseF(code, lamPos, compareArray);
+    traverseF(code, lamPos, lamTag == value::TypeTags::LocalTwoArgLambda, compareArray);
 }
 
-void ByteCode::traverseF(const CodeFragment* code, int64_t position, bool compareArray) {
+void ByteCode::traverseF(const CodeFragment* code,
+                         int64_t position,
+                         bool providePosition,
+                         bool compareArray) {
     auto [ownInput, tagInput, valInput] = getFromStack(0);
 
     if (value::isArray(tagInput)) {
-        traverseFInArray(code, position, compareArray);
+        traverseFInArray(code, position, providePosition, compareArray);
     } else {
+        // Push a -1 on the stack (to indicate that we are not iterating over an array) before the
+        // value to be processed
+        if (providePosition) {
+            pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(-1));
+        }
         runLambdaInternal(code, position);
+        // Remove the item position from the stack.
+        if (providePosition) {
+            swapStack();
+            popStack();
+        }
     }
 }
 
@@ -411,18 +458,32 @@ bool ByteCode::runLambdaPredicate(const CodeFragment* code, int64_t position) {
     return isTrue;
 }
 
-void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool compareArray) {
+void ByteCode::traverseFInArray(const CodeFragment* code,
+                                int64_t position,
+                                bool providePosition,
+                                bool compareArray) {
     auto [ownInput, tagInput, valInput] = getFromStack(0);
 
     value::ValueGuard input(ownInput, tagInput, valInput);
     popStack();
 
+    size_t arrayPos = 0;
     const bool passed =
         value::arrayAny(tagInput, valInput, [&](value::TypeTags tag, value::Value val) {
             pushStack(false, tag, val);
+            if (providePosition) {
+                pushStack(
+                    false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(arrayPos++));
+            }
             if (runLambdaPredicate(code, position)) {
+                if (providePosition) {
+                    popStack();
+                }
                 pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
                 return true;
+            }
+            if (providePosition) {
+                popStack();
             }
             return false;
         });
@@ -436,8 +497,15 @@ void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool
     if (compareArray) {
         // Transfer the ownership to the lambda
         pushStack(ownInput, tagInput, valInput);
+        if (providePosition) {
+            pushStack(false, value::TypeTags::NumberInt64, value::bitcastTo<int64_t>(-1));
+        }
         input.reset();
         runLambdaInternal(code, position);
+        if (providePosition) {
+            swapStack();
+            popStack();
+        }
         return;
     }
 

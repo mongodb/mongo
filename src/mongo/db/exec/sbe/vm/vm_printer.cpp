@@ -254,7 +254,8 @@ public:
                     break;
                 }
                 // Instructions with a single integer argument.
-                case Instruction::pushLocalLambda: {
+                case Instruction::pushOneArgLambda:
+                case Instruction::pushTwoArgLambda: {
                     auto offset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(offset);
                     os << "target: " << _formatter.pcPointer(pcPointer + offset);
@@ -280,11 +281,14 @@ public:
                 // Instructions with other kinds of arguments.
                 case Instruction::traversePImm:
                 case Instruction::traverseFImm: {
+                    auto providePosition = readFromMemory<Instruction::Constants>(pcPointer);
+                    pcPointer += sizeof(providePosition);
                     auto k = readFromMemory<Instruction::Constants>(pcPointer);
                     pcPointer += sizeof(k);
                     auto offset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(offset);
-                    os << "k: " << Instruction::toStringConstants(k)
+                    os << "providePosition: " << Instruction::toStringConstants(providePosition)
+                       << ", k: " << Instruction::toStringConstants(k)
                        << ", target: " << _formatter.pcPointer(pcPointer + offset);
                     break;
                 }

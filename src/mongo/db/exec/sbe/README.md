@@ -74,12 +74,13 @@ overview of the different EExpression types:
   Provides the ability to define multiple variables in a local scope. They are particularly useful
   when we want to reference some intermediate value multiple times.
 - [ELocalLambda](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L487-L507)
-  Represents an anonymous function which takes a single input parameter. Many `EFunctions` accept
+  Represents an anonymous function which takes one or two input parameters. Many `EFunctions` accept
   these as parameters. A good example of this is the [`traverseF`
   function](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/vm/vm.cpp#L1329-L1357):
   it accepts 2 parameters: an input and an `ELocalLambda`. If the input is an array, the
   `ELocalLambda` is applied to each element in the array, otherwise, it is applied to the input on
-  its own.
+  its own. The second argument of the lambda receives the 0-based position of the element being examined;
+  when the `ELocalLambda` is being applied to the entire input, the second argument will have a value of -1.
 
 EExpressions cannot be executed directly. Rather, [they are
 compiled](https://github.com/mongodb/mongo/blob/06a931ffadd7ce62c32288d03e5a38933bd522d3/src/mongo/db/exec/sbe/expressions/expression.h#L81-L84)

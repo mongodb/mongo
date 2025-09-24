@@ -585,38 +585,40 @@ Vectorizer::Tree Vectorizer::operator()(const abt::ABT& n, const abt::FunctionCa
         if (TypeSignature::kBlockType.isSubset(argument.typeSignature) &&
             argument.sourceCell.has_value()) {
             const abt::LambdaAbstraction* lambda = op.nodes()[1].cast<abt::LambdaAbstraction>();
-            // Reuse the variable name of the lambda so that we don't have to manipulate the code
-            // inside the lambda (and to avoid problems if the expression we are going to iterate
-            // over has side effects and the lambda references it multiple times, as replacing it
-            // directly in code would imply executing more than once). Don't propagate the reference
-            // to the cell slot, as we are going to fold the result and we don't want that the
-            // lambda does it too.
-            _variableTypes.insert_or_assign(lambda->varName(),
-                                            std::make_pair(argument.typeSignature, boost::none));
-            auto lambdaArg = lambda->getBody().visit(*this);
-            _variableTypes.erase(lambda->varName());
-            if (!lambdaArg.expr.has_value()) {
-                return lambdaArg;
+            if (lambda->varNames().size() == 1) {
+                // Reuse the variable name of the lambda so that we don't have to manipulate the
+                // code inside the lambda (and to avoid problems if the expression we are going to
+                // iterate over has side effects and the lambda references it multiple times, as
+                // replacing it directly in code would imply executing more than once). Don't
+                // propagate the reference to the cell slot, as we are going to fold the result and
+                // we don't want that the lambda does it too.
+                _variableTypes.insert_or_assign(
+                    lambda->varNames()[0], std::make_pair(argument.typeSignature, boost::none));
+                auto lambdaArg = lambda->getBody().visit(*this);
+                _variableTypes.erase(lambda->varNames()[0]);
+                if (!lambdaArg.expr.has_value()) {
+                    return lambdaArg;
+                }
+                // If the body of the lambda is just a scalar constant, create a block
+                // of the same size of the block argument filled with that value.
+                if (!TypeSignature::kBlockType.isSubset(lambdaArg.typeSignature)) {
+                    lambdaArg.expr = makeABTFunction(
+                        "valueBlockNewFill"_sd,
+                        std::move(*lambdaArg.expr),
+                        makeABTFunction("valueBlockSize"_sd, makeVariable(lambda->varNames()[0])));
+                    lambdaArg.typeSignature =
+                        TypeSignature::kBlockType.include(lambdaArg.typeSignature);
+                    lambdaArg.sourceCell = boost::none;
+                }
+                return {makeLet(lambda->varNames()[0],
+                                std::move(*argument.expr),
+                                makeABTFunction("cellFoldValues_F"_sd,
+                                                std::move(*lambdaArg.expr),
+                                                makeVariable(*argument.sourceCell))),
+                        TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
+                            .include(argument.typeSignature.intersect(TypeSignature::kNothingType)),
+                        {}};
             }
-            // If the body of the lambda is just a scalar constant, create a block
-            // of the same size of the block argument filled with that value.
-            if (!TypeSignature::kBlockType.isSubset(lambdaArg.typeSignature)) {
-                lambdaArg.expr = makeABTFunction(
-                    "valueBlockNewFill"_sd,
-                    std::move(*lambdaArg.expr),
-                    makeABTFunction("valueBlockSize"_sd, makeVariable(lambda->varName())));
-                lambdaArg.typeSignature =
-                    TypeSignature::kBlockType.include(lambdaArg.typeSignature);
-                lambdaArg.sourceCell = boost::none;
-            }
-            return {makeLet(lambda->varName(),
-                            std::move(*argument.expr),
-                            makeABTFunction("cellFoldValues_F"_sd,
-                                            std::move(*lambdaArg.expr),
-                                            makeVariable(*argument.sourceCell))),
-                    TypeSignature::kBlockType.include(TypeSignature::kBooleanType)
-                        .include(argument.typeSignature.intersect(TypeSignature::kNothingType)),
-                    {}};
         }
     }
 

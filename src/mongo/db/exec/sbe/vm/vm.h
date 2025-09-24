@@ -559,16 +559,27 @@ private:
                                                                      value::Value fieldValue);
 
     void traverseP(const CodeFragment* code);
-    void traverseP(const CodeFragment* code, int64_t position, int64_t maxDepth);
+    void traverseP(const CodeFragment* code,
+                   int64_t position,
+                   bool providePosition,
+                   int64_t maxDepth);
     void traverseP_nested(const CodeFragment* code,
                           int64_t position,
                           value::TypeTags tag,
                           value::Value val,
-                          int64_t maxDepth);
+                          bool providePosition,
+                          int64_t maxDepth,
+                          int64_t curDepth);
 
     void traverseF(const CodeFragment* code);
-    void traverseF(const CodeFragment* code, int64_t position, bool compareArray);
-    void traverseFInArray(const CodeFragment* code, int64_t position, bool compareArray);
+    void traverseF(const CodeFragment* code,
+                   int64_t position,
+                   bool providePosition,
+                   bool compareArray);
+    void traverseFInArray(const CodeFragment* code,
+                          int64_t position,
+                          bool providePosition,
+                          bool compareArray);
     void magicTraverseF(const CodeFragment* code);
 
     bool runLambdaPredicate(const CodeFragment* code, int64_t position);

@@ -420,32 +420,56 @@ TypeSignature TypeChecker::operator()(abt::ABT& n, abt::FunctionCall& op, bool s
 
         TypeSignature argType = op.nodes()[0].visit(*this, false);
 
+        auto lambda = op.nodes()[1].cast<abt::LambdaAbstraction>();
+
         // A traverseF/traverseP invoked with the first argument that is not an array will just
         // invoke the lambda expression on it, so we can remove it if we are assured that it
         // cannot possibly contain an array.
         if (!argType.containsAny(TypeSignature::kArrayType)) {
-            auto lambda = op.nodes()[1].cast<abt::LambdaAbstraction>();
             // Define the lambda variable with the type of the 'bind' expression type.
-            bind(lambda->varName(), argType);
+            bind(lambda->varNames()[0], argType);
+            if (lambda->varNames().size() > 1) {
+                bind(lambda->varNames()[1], TypeSignature::kNumericType);
+            }
             // Process the lambda knowing that its argument will be exactly the type we got from
             // processing the first argument.
             TypeSignature lambdaType = op.nodes()[1].visit(*this, false);
             // The current binding must be the one where we defined the variable.
-            invariant(_bindings.back().contains(lambda->varName()));
-            _bindings.back().erase(lambda->varName());
+            invariant(_bindings.back().contains(lambda->varNames()[0]));
+            _bindings.back().erase(lambda->varNames()[0]);
+            if (lambda->varNames().size() == 1) {
+                swapAndUpdate(n,
+                              abt::make<abt::Let>(
+                                  lambda->varNames()[0],
+                                  std::exchange(op.nodes()[0], abt::make<abt::Blackhole>()),
+                                  std::exchange(lambda->getBody(), abt::make<abt::Blackhole>())));
+            } else {
+                _bindings.back().erase(lambda->varNames()[1]);
+                swapAndUpdate(
+                    n,
+                    abt::make<abt::Let>(
+                        lambda->varNames()[1],
+                        abt::Constant::int64(-1),
+                        abt::make<abt::Let>(
+                            lambda->varNames()[0],
+                            std::exchange(op.nodes()[0], abt::make<abt::Blackhole>()),
+                            std::exchange(lambda->getBody(), abt::make<abt::Blackhole>()))));
+            }
 
-            swapAndUpdate(
-                n,
-                abt::make<abt::Let>(lambda->varName(),
-                                    std::exchange(op.nodes()[0], abt::make<abt::Blackhole>()),
-                                    std::exchange(lambda->getBody(), abt::make<abt::Blackhole>())));
             return lambdaType.include(argType.intersect(TypeSignature::kNothingType));
         }
 
         // The first argument could be an array, so the lambda will be invoked on multiple array
         // items of unknown type.
+        if (lambda->varNames().size() > 1) {
+            bind(lambda->varNames()[1], TypeSignature::kNumericType);
+        }
+
         op.nodes()[1].visit(*this, false);
 
+        if (lambda->varNames().size() > 1) {
+            _bindings.back().erase(lambda->varNames()[1]);
+        }
         // Nothing can be inferred about the return type of traverseF()/traverseP() in this case.
         return TypeSignature::kAnyScalarType;
     }

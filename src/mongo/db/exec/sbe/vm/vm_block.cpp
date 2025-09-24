@@ -2178,7 +2178,7 @@ void ByteCode::valueBlockApplyLambda(const CodeFragment* code) {
     popAndReleaseStack();
     value::ValueGuard maskGuard(maskOwn, maskTag, maskVal);
 
-    if (lamTag != value::TypeTags::LocalLambda) {
+    if (lamTag != value::TypeTags::LocalOneArgLambda) {
         pushStack(false, value::TypeTags::Nothing, 0);
         return;
     }

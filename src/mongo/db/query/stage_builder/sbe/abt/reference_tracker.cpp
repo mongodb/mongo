@@ -130,7 +130,9 @@ public:
     }
 
     void transport(const LambdaAbstraction& op, const ABT& /*bind*/) {
-        _variableDefinitionCallback(op.varName());
+        for (auto& var : op.varNames()) {
+            _variableDefinitionCallback(var);
+        }
     }
 
     void transport(const Let& op, const ABT& /*bind*/, const ABT& /*expr*/) {
@@ -208,7 +210,9 @@ struct Collector {
         CollectedInfo result{collectorState};
 
         // resolve any free variables manually.
-        inResult.resolveFreeVars(lam.varName(), Definition{n.ref(), ABT::reference_type{}});
+        for (auto& var : lam.varNames()) {
+            inResult.resolveFreeVars(var, Definition{n.ref(), ABT::reference_type{}});
+        }
         result.merge(std::move(inResult));
 
         return result;
@@ -378,7 +382,9 @@ struct LastRefsTransporter {
 
     Result transport(const ABT& n, const LambdaAbstraction& lam, Result inResult) {
         // As in the Let case, we can finalize the last ref for the local variable.
-        finalizeLastRefs(inResult, lam.varName());
+        for (auto& var : lam.varNames()) {
+            finalizeLastRefs(inResult, var);
+        }
 
         return inResult;
     }

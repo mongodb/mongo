@@ -257,10 +257,6 @@ inline auto _lambda(StringData pn, ExprHolder body) {
     return ExprHolder{make<LambdaAbstraction>(ProjectionName{pn}, std::move(body._n))};
 }
 
-inline auto _lambdaApp(ExprHolder lambda, ExprHolder arg) {
-    return ExprHolder{make<LambdaApplication>(std::move(lambda._n), std::move(arg._n))};
-}
-
 template <typename... Ts>
 inline auto _fn(StringData name, Ts&&... pack) {
     std::vector<ExprHolder> v;

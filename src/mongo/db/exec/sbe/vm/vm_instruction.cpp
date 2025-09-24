@@ -86,7 +86,8 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     1,   // pushMoveVal
     1,   // pushLocalVal
     1,   // pushMoveLocalVal
-    1,   // pushLocalLambda
+    1,   // pushOneArgLambda
+    1,   // pushTwoArgLambda
     -1,  // pop
     0,   // swap
     0,   // makeOwn
@@ -322,13 +323,22 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 pushStack(owned, tag, val);
                 break;
             }
-            case Instruction::pushLocalLambda: {
+            case Instruction::pushOneArgLambda: {
                 auto offset = readFromMemory<int>(pcPointer);
                 pcPointer += sizeof(offset);
                 auto newPosition = pcPointer - code->instrs().data() + offset;
-
-                pushStack(
-                    false, value::TypeTags::LocalLambda, value::bitcastFrom<int64_t>(newPosition));
+                pushStack(false,
+                          value::TypeTags::LocalOneArgLambda,
+                          value::bitcastFrom<int64_t>(newPosition));
+                break;
+            }
+            case Instruction::pushTwoArgLambda: {
+                auto offset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(offset);
+                auto newPosition = pcPointer - code->instrs().data() + offset;
+                pushStack(false,
+                          value::TypeTags::LocalTwoArgLambda,
+                          value::bitcastFrom<int64_t>(newPosition));
                 break;
             }
             case Instruction::pop: {
@@ -965,6 +975,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::traversePImm: {
+                auto providePosition = readFromMemory<Instruction::Constants>(pcPointer);
+                pcPointer += sizeof(providePosition);
                 auto k = readFromMemory<Instruction::Constants>(pcPointer);
                 pcPointer += sizeof(k);
 
@@ -974,6 +986,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                 traverseP(code,
                           codePosition,
+                          providePosition == Instruction::True ? true : false,
                           k == Instruction::Nothing ? std::numeric_limits<int64_t>::max() : 1);
 
                 break;
@@ -983,6 +996,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 break;
             }
             case Instruction::traverseFImm: {
+                auto providePosition = readFromMemory<Instruction::Constants>(pcPointer);
+                pcPointer += sizeof(providePosition);
                 auto k = readFromMemory<Instruction::Constants>(pcPointer);
                 pcPointer += sizeof(k);
 
@@ -990,7 +1005,10 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 pcPointer += sizeof(offset);
                 auto codePosition = pcPointer - code->instrs().data() + offset;
 
-                traverseF(code, codePosition, k == Instruction::True ? true : false);
+                traverseF(code,
+                          codePosition,
+                          providePosition == Instruction::True ? true : false,
+                          k == Instruction::True ? true : false);
 
                 break;
             }
@@ -1474,8 +1492,10 @@ const char* Instruction::toString() const {
             return "pushLocalVal";
         case pushMoveLocalVal:
             return "pushMoveLocalVal";
-        case pushLocalLambda:
-            return "pushLocalLambda";
+        case pushOneArgLambda:
+            return "pushOneArgLambda";
+        case pushTwoArgLambda:
+            return "pushTwoArgLambda";
         case pop:
             return "pop";
         case swap:

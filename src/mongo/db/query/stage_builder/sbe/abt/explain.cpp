@@ -912,28 +912,21 @@ public:
                              const LambdaAbstraction& expr,
                              ExplainPrinter inResult) {
         ExplainPrinter printer("LambdaAbstraction");
-        printer.separator(" [")
-            .fieldName("variable", ExplainVersion::V3)
-            .print(expr.varName())
-            .separator("]")
+        printer.separator(" [");
+        auto numVars = expr.varNames().size();
+        for (size_t idx = 0; idx < numVars; ++idx) {
+            std::stringstream ss;
+            ss << "variable" << idx;
+            printer.fieldName(ss.str(), ExplainVersion::V3).print(expr.varNames()[idx]);
+            if (idx < numVars - 1) {
+                printer.separator(", ");
+            }
+        }
+
+        printer.separator("]")
             .setChildCount(1)
             .fieldName("input", ExplainVersion::V3)
             .print(inResult);
-        return printer;
-    }
-
-    ExplainPrinter transport(const ABT::reference_type /*n*/,
-                             const LambdaApplication& expr,
-                             ExplainPrinter lambdaResult,
-                             ExplainPrinter argumentResult) {
-        ExplainPrinter printer("LambdaApplication");
-        printer.separator(" []")
-            .setChildCount(2)
-            .maybeReverse()
-            .fieldName("lambda", ExplainVersion::V3)
-            .print(lambdaResult)
-            .fieldName("argument", ExplainVersion::V3)
-            .print(argumentResult);
         return printer;
     }
 

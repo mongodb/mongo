@@ -31,7 +31,6 @@
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/util/print_options.h"
@@ -41,10 +40,10 @@
 #include "mongo/db/exec/sbe/vm/vm_instruction.h"
 #include "mongo/db/exec/sbe/vm/vm_types.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+#include <algorithm>
 #include <functional>
 #include <sstream>
 #include <vector>
@@ -1263,6 +1262,7 @@ vm::CodeFragment generateTraverseP(CompileCtx& ctx, const EExpression::Vector& n
                 code.appendLabel(afterBodyLabel);
                 code.append(nodes[0]->compileDirect(ctx));
                 code.appendTraverseP(bodyPosition,
+                                     lambda->numArguments(),
                                      tag == value::TypeTags::Nothing ? vm::Instruction::Nothing
                                                                      : vm::Instruction::Int32One);
                 return code;
@@ -1291,6 +1291,7 @@ vm::CodeFragment generateTraverseF(CompileCtx& ctx, const EExpression::Vector& n
             code.appendLabel(afterBodyLabel);
             code.append(nodes[0]->compileDirect(ctx));
             code.appendTraverseF(bodyPosition,
+                                 lambda->numArguments(),
                                  value::bitcastTo<bool>(val) ? vm::Instruction::True
                                                              : vm::Instruction::False);
             return code;
@@ -1707,18 +1708,17 @@ size_t ELocalBind::estimateSize() const {
 }
 
 std::unique_ptr<EExpression> ELocalLambda::clone() const {
-    return std::make_unique<ELocalLambda>(_frameId, _nodes.back()->clone());
+    return std::make_unique<ELocalLambda>(_frameId, _nodes.back()->clone(), _numArguments);
 }
 
 vm::CodeFragment ELocalLambda::compileBodyDirect(CompileCtx& ctx) const {
     // Compile the body first so we know its size.
     auto inner = _nodes.back()->compileDirect(ctx);
     vm::CodeFragment body;
-
     // Declare the frame containing lambda variable.
-    // The variable is expected to be already on the stack so declare the frame just below the
+    // The variables are expected to be already on the stack so declare the frame just below the
     // current top of the stack.
-    body.declareFrame(_frameId, -1);
+    body.declareFrame(_frameId, -(int)_numArguments);
 
     // Make sure the stack is sufficiently large.
     body.appendAllocStack(inner.maxStackSize());
@@ -1750,7 +1750,7 @@ vm::CodeFragment ELocalLambda::compileDirect(CompileCtx& ctx) const {
 
         // Push the lambda value on the stack
         code.appendLabel(afterBodyLabel);
-        code.appendLocalLambda(bodyPosition);
+        code.appendLocalLambda(bodyPosition, _numArguments);
 
         return code;
     });
@@ -1761,7 +1761,9 @@ std::vector<DebugPrinter::Block> ELocalLambda::debugPrint() const {
 
     DebugPrinter::addKeyword(ret, "lambda");
     ret.emplace_back("`(`");
-    DebugPrinter::addIdentifier(ret, _frameId, 0);
+    for (size_t i = 0; i < _numArguments; i++) {
+        DebugPrinter::addIdentifier(ret, _frameId, i);
+    }
     ret.emplace_back("`)");
     ret.emplace_back("{");
     DebugPrinter::addBlocks(ret, _nodes.back()->debugPrint());

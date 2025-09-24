@@ -119,9 +119,9 @@ runTests({
 })();
 
 /**
- * Other miscelaneous tests for INLJ.
+ * Other miscellaneous tests for INLJ.
  */
-(function runMiscelaneousInljTests() {
+(function runMiscellaneousInljTests() {
     const testConfig = {
         localColl: db.lookup_arrays_semantics_local_inlj,
         foreignColl: db.lookup_arrays_semantics_foreign_inlj,

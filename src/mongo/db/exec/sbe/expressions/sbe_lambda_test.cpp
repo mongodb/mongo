@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/values/slot.h"
@@ -37,7 +34,6 @@
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
-#include <memory>
 #include <utility>
 
 namespace mongo::sbe {
@@ -56,6 +52,37 @@ TEST_F(SBELambdaTest, TraverseP_AddOneToArray) {
                                         makeE<EPrimBinary>(EPrimBinary::Op::add,
                                                            makeE<EVariable>(frame, 0),
                                                            makeC(makeInt32(1)))),
+                    makeC(makeNothing())));
+    printInputExpression(os, *expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+
+    auto bsonArr = BSON_ARRAY(1 << 2 << 3);
+
+    slotAccessor.reset(value::TypeTags::bsonArray,
+                       value::bitcastFrom<const char*>(bsonArr.objdata()));
+    executeAndPrintVariation(os, *compiledExpr);
+}
+
+TEST_F(SBELambdaTest, TraverseP_AddOneToFirstArrayItem) {
+    auto& os = gctx->outStream();
+
+    value::ViewOfValueAccessor slotAccessor;
+    auto argSlot = bindAccessor(&slotAccessor);
+    FrameId frame = 10;
+    auto expr = sbe::makeE<sbe::EFunction>(
+        "traverseP",
+        sbe::makeEs(makeE<EVariable>(argSlot),
+                    makeE<ELocalLambda>(frame,
+                                        makeE<EIf>(makeE<EPrimBinary>(EPrimBinary::Op::eq,
+                                                                      makeE<EVariable>(frame, 1),
+                                                                      makeC(makeInt64(0))),
+                                                   makeE<EPrimBinary>(EPrimBinary::Op::add,
+                                                                      makeE<EVariable>(frame, 0),
+                                                                      makeC(makeInt32(1))),
+                                                   makeE<EVariable>(frame, 0)),
+                                        2),
                     makeC(makeNothing())));
     printInputExpression(os, *expr);
 
@@ -95,6 +122,37 @@ TEST_F(SBELambdaTest, TraverseF_OpEq) {
     executeAndPrintVariation(os, *compiledExpr);
 }
 
+TEST_F(SBELambdaTest, TraverseF_OpEqFirstArrayItem) {
+    auto& os = gctx->outStream();
+
+    value::ViewOfValueAccessor slotAccessor;
+    auto argSlot = bindAccessor(&slotAccessor);
+    FrameId frame = 10;
+    auto expr = sbe::makeE<sbe::EFunction>(
+        "traverseF",
+        sbe::makeEs(
+            makeE<EVariable>(argSlot),
+            makeE<ELocalLambda>(frame,
+                                makeE<EPrimBinary>(EPrimBinary::Op::logicAnd,
+                                                   makeE<EPrimBinary>(EPrimBinary::Op::eq,
+                                                                      makeE<EVariable>(frame, 1),
+                                                                      makeC(makeInt64(0))),
+                                                   makeE<EPrimBinary>(EPrimBinary::Op::eq,
+                                                                      makeE<EVariable>(frame, 0),
+                                                                      makeC(makeInt32(3)))),
+                                2),
+            makeC(makeNothing())));
+    printInputExpression(os, *expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+
+    auto bsonArr = BSON_ARRAY(1 << 2 << 3 << 4);
+
+    slotAccessor.reset(value::TypeTags::bsonArray,
+                       value::bitcastFrom<const char*>(bsonArr.objdata()));
+    executeAndPrintVariation(os, *compiledExpr);
+}
 
 TEST_F(SBELambdaTest, TraverseF_WithLocalBind) {
     auto& os = gctx->outStream();

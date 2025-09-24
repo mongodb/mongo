@@ -380,7 +380,7 @@ class DatabaseNamePrinter(object):
         tenant = data[0] & TENANT_ID_MASK
 
         if tenant:
-            return f"{extract_tenant_id(data)}_{data[1+OBJECT_ID_WIDTH:].decode()}"
+            return f"{extract_tenant_id(data)}_{data[1 + OBJECT_ID_WIDTH :].decode()}"
         else:
             return data[1:].decode()
 
@@ -1027,7 +1027,12 @@ class SbeCodeFragmentPrinter(object):
 
             # Some instructions have extra arguments, embedded into the ops stream.
             args = ""
-            if op_name in ["pushLocalVal", "pushMoveLocalVal", "pushLocalLambda"]:
+            if op_name in [
+                "pushLocalVal",
+                "pushMoveLocalVal",
+                "pushOneArgLambda",
+                "pushTwoArgLambda",
+            ]:
                 args = "arg: " + str(read_as_integer(cur_op, int_size))
                 cur_op += int_size
             elif op_name in ["jmp", "jmpTrue", "jmpFalse", "jmpNothing", "jmpNotNothing"]:
@@ -1068,10 +1073,14 @@ class SbeCodeFragmentPrinter(object):
                 args = "Instruction::Constants: " + str(read_as_integer(cur_op, uint8_size))
                 cur_op += uint8_size
             elif op_name in ["traverseFImm", "traversePImm"]:
+                position = read_as_integer(cur_op, uint8_size)
+                cur_op += uint8_size
                 const_enum = read_as_integer(cur_op, uint8_size)
                 cur_op += uint8_size
                 args = (
-                    "Instruction::Constants: "
+                    "providePosition: "
+                    + str(position)
+                    + ", Instruction::Constants: "
                     + str(const_enum)
                     + ", offset: "
                     + str(read_as_integer_signed(cur_op, int_size))

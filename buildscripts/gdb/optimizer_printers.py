@@ -286,15 +286,12 @@ class LambdaAbstractionPrinter(FixedArityNodePrinter):
         super().__init__(val, 1, "LambdaAbstraction")
 
     def to_string(self):
-        return "LambdaAbstraction[{}]".format(self.val["_varName"])
-
-
-class LambdaApplicationPrinter(FixedArityNodePrinter):
-    """Pretty-printer for LambdaApplication."""
-
-    def __init__(self, val):
-        """Initialize LambdaApplicationPrinter."""
-        super().__init__(val, 2, "LambdaApplication")
+        res = "LambdaAbstraction[{"
+        bindings = Vector(self.val["_varNames"])
+        for name in bindings:
+            res += str(name) + " "
+        res += "}]"
+        return res
 
 
 class SourcePrinter(FixedArityNodePrinter):
@@ -408,7 +405,6 @@ def register_optimizer_printers(pp):
         "Let",
         "MultiLet",
         "LambdaAbstraction",
-        "LambdaApplication",
         "FunctionCall",
         "Source",
         "Switch",

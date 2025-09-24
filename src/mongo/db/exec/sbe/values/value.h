@@ -197,7 +197,8 @@ enum class TypeTags : uint8_t {
     bsonCodeWScope,
 
     // Local lambda value
-    LocalLambda,
+    LocalOneArgLambda,
+    LocalTwoArgLambda,
 
     // The index key string.
     keyString,

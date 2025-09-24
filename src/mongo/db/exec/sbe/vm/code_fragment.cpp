@@ -409,7 +409,7 @@ void CodeFragment::appendLocalVal(FrameId frameId, int variable, bool moveFrom) 
     // Compute the absolute variable stack offset based on the current stack depth
     int stackOffset = varToOffset(variable) + _stackSize;
 
-    // If frame has stackPositiion defined, then compute the final relative stack offset.
+    // If frame has stackPosition defined, then compute the final relative stack offset.
     // Otherwise, register a fixup to compute the relative stack offset later.
     if (frame.stackPosition != FrameInfo::kPositionNotSet) {
         stackOffset -= frame.stackPosition;
@@ -426,9 +426,10 @@ void CodeFragment::appendLocalVal(FrameId frameId, int variable, bool moveFrom) 
     adjustStackSimple(i);
 }
 
-void CodeFragment::appendLocalLambda(int codePosition) {
+void CodeFragment::appendLocalLambda(int codePosition, size_t numArgs) {
+    invariant(numArgs == 1 || numArgs == 2);
     Instruction i;
-    i.tag = Instruction::pushLocalLambda;
+    i.tag = numArgs == 1 ? Instruction::pushOneArgLambda : Instruction::pushTwoArgLambda;
 
     auto size = sizeof(Instruction) + sizeof(codePosition);
     auto offset = allocateSpace(size);
@@ -744,16 +745,19 @@ void CodeFragment::appendTraverseP() {
     appendSimpleInstruction(Instruction::traverseP);
 }
 
-void CodeFragment::appendTraverseP(int codePosition, Instruction::Constants k) {
+void CodeFragment::appendTraverseP(int codePosition, size_t numArgs, Instruction::Constants k) {
     Instruction i;
     i.tag = Instruction::traversePImm;
 
-    auto size = sizeof(Instruction) + sizeof(codePosition) + sizeof(k);
+    auto size =
+        sizeof(Instruction) + sizeof(codePosition) + sizeof(Instruction::Constants) + sizeof(k);
     auto offset = allocateSpace(size);
 
     int codeOffset = codePosition - _instrs.size();
 
     offset += writeToMemory(offset, i);
+    offset += writeToMemory(
+        offset, numArgs == 2 ? Instruction::Constants::True : Instruction::Constants::False);
     offset += writeToMemory(offset, k);
     offset += writeToMemory(offset, codeOffset);
 
@@ -767,16 +771,19 @@ void CodeFragment::appendTraverseF() {
     appendSimpleInstruction(Instruction::traverseF);
 }
 
-void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
+void CodeFragment::appendTraverseF(int codePosition, size_t numArgs, Instruction::Constants k) {
     Instruction i;
     i.tag = Instruction::traverseFImm;
 
-    auto size = sizeof(Instruction) + sizeof(codePosition) + sizeof(k);
+    auto size =
+        sizeof(Instruction) + sizeof(codePosition) + sizeof(Instruction::Constants) + sizeof(k);
     auto offset = allocateSpace(size);
 
     int codeOffset = codePosition - _instrs.size();
 
     offset += writeToMemory(offset, i);
+    offset += writeToMemory(
+        offset, numArgs == 2 ? Instruction::Constants::True : Instruction::Constants::False);
     offset += writeToMemory(offset, k);
     offset += writeToMemory(offset, codeOffset);
 

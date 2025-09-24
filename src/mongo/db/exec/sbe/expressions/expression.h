@@ -599,13 +599,17 @@ private:
  */
 class ELocalLambda final : public EExpression {
 public:
-    ELocalLambda(FrameId frameId, std::unique_ptr<EExpression> body) : _frameId(frameId) {
+    ELocalLambda(FrameId frameId, std::unique_ptr<EExpression> body, size_t numArguments = 1)
+        : _frameId(frameId), _numArguments(numArguments) {
         _nodes.emplace_back(std::move(body));
         validateNodes();
     }
 
     std::unique_ptr<EExpression> clone() const override;
 
+    size_t numArguments() const {
+        return _numArguments;
+    }
     vm::CodeFragment compileDirect(CompileCtx& ctx) const override;
     vm::CodeFragment compileBodyDirect(CompileCtx& ctx) const;
     std::vector<DebugPrinter::Block> debugPrint() const override;
@@ -614,6 +618,7 @@ public:
 
 private:
     FrameId _frameId;
+    size_t _numArguments;
 };
 
 /**

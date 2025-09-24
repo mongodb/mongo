@@ -213,23 +213,6 @@ void ExpressionConstEval::transport(abt::ABT& n,
     }
 }
 
-void ExpressionConstEval::transport(abt::ABT& n,
-                                    const abt::LambdaApplication& app,
-                                    abt::ABT& lam,
-                                    abt::ABT& arg) {
-    // If the 'lam' expression is abt::LambdaAbstraction then we can do the inplace beta
-    // reduction.
-    // TODO - missing alpha conversion so for now assume globally unique names.
-    if (auto lambda = lam.cast<abt::LambdaAbstraction>(); lambda) {
-        auto result =
-            abt::make<abt::Let>(lambda->varName(),
-                                std::exchange(arg, abt::make<abt::Blackhole>()),
-                                std::exchange(lambda->getBody(), abt::make<abt::Blackhole>()));
-
-        swapAndUpdate(n, std::move(result));
-    }
-}
-
 void ExpressionConstEval::transport(abt::ABT& n, const abt::UnaryOp& op, abt::ABT& child) {
     switch (op.op()) {
         case abt::Operations::Not: {
@@ -741,13 +724,16 @@ void ExpressionConstEval::transport(abt::ABT& n,
 
 void ExpressionConstEval::prepare(abt::ABT& n, const abt::LambdaAbstraction& lam) {
     ++_inCostlyCtx;
-    _variableDefinitions.emplace(lam.varName(),
-                                 abt::Definition{n.ref(), abt::ABT::reference_type{}});
+    for (auto& var : lam.varNames()) {
+        _variableDefinitions.emplace(var, abt::Definition{n.ref(), abt::ABT::reference_type{}});
+    }
 }
 
 void ExpressionConstEval::transport(abt::ABT&, const abt::LambdaAbstraction& lam, abt::ABT&) {
     --_inCostlyCtx;
-    _variableDefinitions.erase(lam.varName());
+    for (auto& var : lam.varNames()) {
+        _variableDefinitions.erase(var);
+    }
 }
 
 void ExpressionConstEval::prepare(abt::ABT&, const abt::References& refs) {

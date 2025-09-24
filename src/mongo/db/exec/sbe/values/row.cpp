@@ -729,7 +729,8 @@ int getApproximateSize(TypeTags tag, Value val) {
         case TypeTags::MinKey:
         case TypeTags::MaxKey:
         case TypeTags::bsonUndefined:
-        case TypeTags::LocalLambda:
+        case TypeTags::LocalOneArgLambda:
+        case TypeTags::LocalTwoArgLambda:
             break;
         // There are deep types.
         case TypeTags::RecordId:

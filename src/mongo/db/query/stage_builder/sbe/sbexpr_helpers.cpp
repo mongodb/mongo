@@ -268,6 +268,12 @@ SbExpr SbExprBuilder::makeLocalLambda(sbe::FrameId frameId, SbExpr expr) {
                                              extractABT(expr));
 }
 
+SbExpr SbExprBuilder::makeLocalLambda2(sbe::FrameId frameId, SbExpr expr) {
+    return abt::make<abt::LambdaAbstraction>(SbVar(frameId, 0).toProjectionName(),
+                                             SbVar(frameId, 1).toProjectionName(),
+                                             extractABT(expr));
+}
+
 SbExpr SbExprBuilder::makeNumericConvert(SbExpr expr, sbe::value::TypeTags tag) {
     return makeFunction(
         "convert"_sd, std::move(expr), makeInt32Constant(static_cast<int32_t>(tag)));
