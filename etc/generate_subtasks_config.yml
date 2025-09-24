@@ -39,7 +39,6 @@ build_variant_large_distro_exceptions:
   - hot_backups-rhel-8-64-bit
   - linux-debug-aubsan-compile-required
   - linux-x86-dynamic-compile
-  - linux-x86-dynamic-compile-observable-mutex
   - linux-arm64-debug-compile-required
   - macos
   - macos-arm64

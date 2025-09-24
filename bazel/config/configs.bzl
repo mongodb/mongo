@@ -258,20 +258,6 @@ build_otel = rule(
 )
 
 # =========
-# build with mutex observation
-# =========
-
-mutex_observation_provider = provider(
-    doc = """Enable builds with mutex observation.""",
-    fields = ["enabled"],
-)
-
-mutex_observation = rule(
-    implementation = lambda ctx: mutex_observation_provider(enabled = ctx.build_setting_value),
-    build_setting = config.bool(flag = True),
-)
-
-# =========
 # sanitize
 # =========
 

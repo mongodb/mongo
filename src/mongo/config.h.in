@@ -127,6 +127,3 @@
 
 // Defined if the build includes disaggregated storage
 @mongo_config_disagg_storage@
-
-// Defined if the build includes mutex observation
-@mongo_config_mutex_observation@

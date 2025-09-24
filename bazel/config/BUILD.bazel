@@ -35,7 +35,6 @@ load(
     "lsan",
     "mongo_toolchain_version",
     "msan",
-    "mutex_observation",
     "opt",
     "pgo_profile_generate",
     "pgo_profile_use",
@@ -1329,22 +1328,6 @@ config_setting(
     ],
     flag_values = {
         "//bazel/config:build_otel": "True",
-    },
-)
-
-# --------------------------------------
-# build with ObservableMutex options
-# --------------------------------------
-
-mutex_observation(
-    name = "mutex_observation",
-    build_setting_default = False,
-)
-
-config_setting(
-    name = "mutex_observation_enabled",
-    flag_values = {
-        "//bazel/config:mutex_observation": "True",
     },
 )
 

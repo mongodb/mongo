@@ -1071,9 +1071,10 @@ mongo_cc_unit_test(
         "mongo_unittest_eighth_group",
         "networking-and-observability",
     ],
+    # TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
     target_compatible_with = select({
-        "//bazel/config:mutex_observation_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
     }),
 )
 
@@ -1096,9 +1097,10 @@ mongo_cc_unit_test(
         "mongo_unittest_fifth_group",
         "networking-and-observability",
     ],
+    # TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
     target_compatible_with = select({
-        "//bazel/config:mutex_observation_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
+        "//bazel/config:tsan_enabled": ["@platforms//:incompatible"],
+        "//conditions:default": [],
     }),
     deps = [
         ":observable_mutex_registry",
@@ -1358,10 +1360,6 @@ mongo_cc_benchmark(
     tags = [
         "first_half_bm",
     ],
-    target_compatible_with = select({
-        "//bazel/config:mutex_observation_enabled": [],
-        "//conditions:default": ["@platforms//:incompatible"],
-    }),
     deps = [
         "processinfo",
         "//src/mongo/unittest:benchmark_util",

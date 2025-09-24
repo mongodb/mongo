@@ -66,7 +66,8 @@ public:
 
     template <typename MutexType>
     void add(StringData tag, const MutexType& mutex) {
-#ifdef MONGO_CONFIG_MUTEX_OBSERVATION
+// TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
+#if !__has_feature(thread_sanitizer)
         std::list<NewMutexEntry> newNode;
         newNode.push_back({.tag = std::string(tag),
                            .registrationTime = _clockSource->now(),

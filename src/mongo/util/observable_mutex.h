@@ -156,6 +156,8 @@ private:
     bool _isValid = true;
 };
 
+// TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
+#if !__has_feature(thread_sanitizer)
 /**
  * The wrapper for mutex objects, ObservableMutex, collects contention metrics for the wrapped mutex
  * type, including total acquisitions, number of contentions, and total wait time for contended
@@ -165,7 +167,6 @@ private:
  * invalidated when the wrapper's destructor runs. The token is provided with a callback function
  * that collects contention stats for the wrapped mutex and returns it to the collector.
  */
-#ifdef MONGO_CONFIG_MUTEX_OBSERVATION
 template <typename MutexType>
 class ObservableMutex {
 public:

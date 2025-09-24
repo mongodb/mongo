@@ -140,7 +140,6 @@ common --flag_alias=use_wiredtiger=//bazel/config:use_wiredtiger
 common --flag_alias=use_glibcxx_debug=//bazel/config:use_glibcxx_debug
 common --flag_alias=use_tracing_profiler=//bazel/config:use_tracing_profiler
 common --flag_alias=build_otel=//bazel/config:build_otel
-common --flag_alias=mutex_observation=//bazel/config:mutex_observation
 common --flag_alias=detect_odr_violations=//bazel/config:detect_odr_violations
 common --flag_alias=shared_archive=//bazel/config:shared_archive
 common --flag_alias=skip_archive=//bazel/config:skip_archive

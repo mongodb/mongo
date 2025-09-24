@@ -1,5 +1,10 @@
 /**
  * Tests the behavior of lockContentionMetrics in the ServerStatus command.
+ *
+ * @tags: [
+ *      # TODO(SERVER-110898): Remove once TSAN works with ObservableMutex.
+ *      tsan_incompatible,
+ * ]
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";

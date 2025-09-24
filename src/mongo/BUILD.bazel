@@ -27,11 +27,6 @@ generate_config_header(
         },
         "//conditions:default": {},
     }) | select({
-        "//bazel/config:mutex_observation_enabled": {
-            "MONGO_CONFIG_MUTEX_OBSERVATION": "1",
-        },
-        "//conditions:default": {},
-    }) | select({
         "//bazel/config:tcmalloc_google_enabled": {
             "MONGO_CONFIG_TCMALLOC_GOOGLE": "1",
         },

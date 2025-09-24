@@ -13,9 +13,6 @@ selector:
     # TODO: SERVER-95548 remove these special cases once the tests are owned by us.
     - jstests/noPassthrough/replication/awaitable_hello_metrics.js
     - jstests/noPassthrough/replication/awaitable_hello.js
-  exclude_files:
-    # TODO(SERVER-106634): Remove
-    - jstests/noPassthrough/network/lock_contention_metrics_server_status.js
 
 # noPassthrough tests start their own mongod's.
 executor:
