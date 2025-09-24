@@ -993,12 +993,19 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/multiVersion/**/rs_endpoint* @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/OWNERS.yml
-/jstests/multiVersion/genericBinVersion/**/*query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
-/jstests/multiVersion/genericBinVersion/**/keystring_index.js @10gen/query-execution-write-exec @svc-auto-approve-bot
-/jstests/multiVersion/genericBinVersion/**/example_fcv_upgrade_downgrade_test.js @10gen/server-fcv @svc-auto-approve-bot
-/jstests/multiVersion/genericBinVersion/**/minor_version* @10gen/server-fcv @svc-auto-approve-bot
-/jstests/multiVersion/genericBinVersion/**/mixed_replica_set_with_latest_primary.js @10gen/server-fcv @svc-auto-approve-bot
-/jstests/multiVersion/genericBinVersion/**/remove_invalid_index_options.js @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/authz_schema_version.js @10gen/server-security @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/auto_bootstrap_upgrade_behavior.js @10gen/server-cluster-scalability @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/command_registration_startup_behavior_fcv.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/*query_stats* @10gen/query-integration-observability @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/example_fcv_upgrade_downgrade_test.js @10gen/server-fcv @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/ident_suffix_compatability.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/keystring_index.js @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/minor_version* @10gen/server-fcv @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/mixed_cluster_roles.js @10gen/server-replication @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/mixed_replica_set_with_latest_primary.js @10gen/server-fcv @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/register_query_feature_flag.js @10gen/query @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/remove_invalid_index_options.js @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/jstests/multiVersion/genericBinVersion/upgrade_during_vectored_insert.js @10gen/server-replication @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/capped_collections/OWNERS.yml
 /jstests/multiVersion/genericBinVersion/capped_collections/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
@@ -1008,6 +1015,33 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/index_builds/OWNERS.yml
 /jstests/multiVersion/genericBinVersion/index_builds/**/* @10gen/server-index-builds @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-execution/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/query-execution/ @10gen/query-execution @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-execution-classic/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/query-execution-classic/ @10gen/query-execution-classic @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-execution-query-settings/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/query-execution-query-settings/ @10gen/query-execution-query-settings @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-integration-observability/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/query-integration-observability/ @10gen/query-integration-observability @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-integration-search/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/query-integration-search/ @10gen/query-integration-search @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/query-optimization/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/query-optimization/ @10gen/query-optimization @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/server-catalog-and-routing/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/server-catalog-and-routing/ @10gen/server-catalog-and-routing @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/server-security/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/server-security/ @10gen/server-security @svc-auto-approve-bot
+
+# The following patterns are parsed from ./jstests/multiVersion/genericBinVersion/storage_engine/OWNERS.yml
+/jstests/multiVersion/genericBinVersion/storage_engine/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/multiVersion/genericChangeStreams/OWNERS.yml
 /jstests/multiVersion/genericChangeStreams/**/* @10gen/query-execution-change-streams @svc-auto-approve-bot
@@ -1057,33 +1091,6 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/multiVersion/libs/**/mixed_version_fixture_test.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/libs/**/multi_rs.js @10gen/server-fcv @svc-auto-approve-bot
 /jstests/multiVersion/libs/**/multiversion_rollback.js @10gen/server-fcv @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/query-execution/OWNERS.yml
-/jstests/multiVersion/targetedTestsLastLtsFeatures/query-execution/ @10gen/query-execution @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/query-execution-classic/OWNERS.yml
-/jstests/multiVersion/targetedTestsLastLtsFeatures/query-execution-classic/ @10gen/query-execution-classic @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/query-execution-query-settings/OWNERS.yml
-/jstests/multiVersion/targetedTestsLastLtsFeatures/query-execution-query-settings/ @10gen/query-execution-query-settings @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-observability/OWNERS.yml
-/jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-observability/ @10gen/query-integration-observability @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-search/OWNERS.yml
-/jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-search/ @10gen/query-integration-search @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/query-optimization/OWNERS.yml
-/jstests/multiVersion/targetedTestsLastLtsFeatures/query-optimization/ @10gen/query-optimization @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/server-catalog-and-routing/OWNERS.yml
-/jstests/multiVersion/targetedTestsLastLtsFeatures/server-catalog-and-routing/ @10gen/server-catalog-and-routing @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/server-security/OWNERS.yml
-/jstests/multiVersion/targetedTestsLastLtsFeatures/server-security/ @10gen/server-security @svc-auto-approve-bot
-
-# The following patterns are parsed from ./jstests/multiVersion/targetedTestsLastLtsFeatures/storage_engine/OWNERS.yml
-/jstests/multiVersion/targetedTestsLastLtsFeatures/storage_engine/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/noPassthrough/OWNERS.yml
 /jstests/noPassthrough/**/*reproducible_initializer* @10gen/server-programmability @svc-auto-approve-bot

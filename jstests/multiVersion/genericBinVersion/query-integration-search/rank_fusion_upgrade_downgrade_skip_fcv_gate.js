@@ -12,7 +12,7 @@ import {
     getDB,
     setupCollection,
     assertRankFusionAggregateAccepted,
-} from "jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-search/libs/rank_fusion_upgrade_downgrade_utils.js";
+} from "jstests/multiVersion/genericBinVersion/query-integration-search/libs/rank_fusion_upgrade_downgrade_utils.js";
 
 function assertRankFusionFeaturesAccepted(primaryConn) {
     const db = getDB(primaryConn);

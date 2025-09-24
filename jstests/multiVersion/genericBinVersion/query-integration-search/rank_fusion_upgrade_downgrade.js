@@ -10,7 +10,7 @@ import {
     rankFusionPipelineWithScoreDetails,
     setupCollection,
     assertRankFusionAggregateAccepted,
-} from "jstests/multiVersion/targetedTestsLastLtsFeatures/query-integration-search/libs/rank_fusion_upgrade_downgrade_utils.js";
+} from "jstests/multiVersion/genericBinVersion/query-integration-search/libs/rank_fusion_upgrade_downgrade_utils.js";
 
 const viewName = "rank_fusion_view";
 
