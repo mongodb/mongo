@@ -296,6 +296,9 @@ structs:
                 forward_to_shards: false
                 optional: true
                 stability: "internal"
+            # Specifies an array of strings treated as names of collections; on return, the reply
+            # will contain an extra field 'routingCacheGossip' holding the collection version number
+            # for each of the requested collections, taken from the catalog cache of the server.
             requestGossipRoutingCache:
                 type: array<IDLAnyTypeOwned>
                 forward_to_shards: false
