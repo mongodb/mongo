@@ -720,7 +720,7 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersSupportedEvents) {
         BSON("$changeStream" << BSON("version" << "v2")),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     auto transformStage = getStageFromPipeline<DocumentSourceChangeStreamTransform>(pipeline.get());
     ASSERT_NE(nullptr, transformStage);
@@ -770,7 +770,7 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersOplogMatchFilterFor
         BSON("$changeStream" << BSON("version" << "v2")),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     auto oplogMatchStage =
         getStageFromPipeline<DocumentSourceChangeStreamOplogMatch>(pipeline.get());
@@ -817,7 +817,7 @@ TEST_F(ChangeStreamStageTest, CreatingV2ChangeStreamRegistersUnwindFilterForData
         BSON("$changeStream" << BSON("version" << "v2")),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     auto unwindTransactionStage =
         getStageFromPipeline<DocumentSourceChangeStreamUnwindTransaction>(pipeline.get());
@@ -3972,7 +3972,7 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShard) {
         BSON("$changeStream" << BSON("version" << "v2")),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     auto injectControlEvents =
         getStageFromPipeline<DocumentSourceChangeStreamInjectControlEvents>(pipeline.get());
@@ -4007,7 +4007,7 @@ TEST_F(ChangeStreamStageTest, InjectControlEventsBuildForDataShardShowSystemEven
         BSON("$changeStream" << BSON("showSystemEvents" << true << "version" << "v2")),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     auto injectControlEvents =
         getStageFromPipeline<DocumentSourceChangeStreamInjectControlEvents>(pipeline.get());
@@ -5008,16 +5008,18 @@ TEST_F(ChangeStreamStageDBTest, StartAfterSucceedsEvenIfResumeTokenDoesNotContai
 }
 
 //
-// Tests the stages in a basic change stream without any additional pipeline steps.
+// Tests the stages in a basic collection-level change stream without any additional pipeline steps.
 //
-TEST_F(ChangeStreamStageTest, BasicChangeStreamStagesOrder) {
+TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamStagesOrder) {
     // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
     // filters out newly added events.
     const std::vector<BSONObj> rawPipeline = {
         change_stream_test_helper::kShowExpandedEventsSpec,
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
+    ASSERT_TRUE(getExpCtx()->isSingleNamespaceAggregation());
+    ASSERT_FALSE(getExpCtx()->isClusterAggregation());
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5030,9 +5032,59 @@ TEST_F(ChangeStreamStageTest, BasicChangeStreamStagesOrder) {
 }
 
 //
-// Tests the stages in a basic v2 change stream without any additional pipeline steps.
+// Tests the stages in a basic database-level change stream without any additional pipeline steps.
 //
-TEST_F(ChangeStreamStageTest, BasicChangeStreamV2StagesOrder) {
+TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamStagesOrder) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        change_stream_test_helper::kShowExpandedEventsSpec,
+    };
+
+    auto pipeline = buildTestPipelineForDatabase(rawPipeline);
+    ASSERT_FALSE(getExpCtx()->isSingleNamespaceAggregation());
+    ASSERT_FALSE(getExpCtx()->isClusterAggregation());
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests the stages in a basic all-cluster change stream without any additional pipeline steps.
+// Notably in this case the pipeline will not contain the 'checkInvalidate' stage.
+//
+TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamStagesOrder) {
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "allChangesForCluster"
+                                                          << true)),
+    };
+
+    auto pipeline = buildTestPipelineForCluster(rawPipeline);
+    ASSERT_FALSE(getExpCtx()->isSingleNamespaceAggregation());
+    ASSERT_TRUE(getExpCtx()->isClusterAggregation());
+
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests the stages in a basic collection-level v2 change stream without any additional pipeline
+// steps.
+//
+TEST_F(ChangeStreamStageTest, BasicCollectionChangeStreamV2StagesOrder) {
     RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
         "featureFlagChangeStreamPreciseShardTargeting", true);
 
@@ -5046,7 +5098,7 @@ TEST_F(ChangeStreamStageTest, BasicChangeStreamV2StagesOrder) {
         BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5056,6 +5108,69 @@ TEST_F(ChangeStreamStageTest, BasicChangeStreamV2StagesOrder) {
                            "$_internalChangeStreamCheckResumability",
                            "$_internalChangeStreamInjectControlEvents",
                            "$_internalChangeStreamHandleTopologyChangeV2"});
+}
+
+//
+// Tests the stages in a basic database-level v2 change stream without any additional pipeline
+// steps.
+//
+TEST_F(ChangeStreamStageTest, BasicDatabaseChangeStreamV2StagesOrder) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
+    };
+
+    auto pipeline = buildTestPipelineForDatabase(rawPipeline);
+
+    // TODO SERVER-111325: adjust the following pipeline once database-level change streams are
+    // supported by V2 change stream readers.
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckInvalidate",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
+}
+
+//
+// Tests the stages in a basic all-cluster v2 change stream without any additional pipeline steps.
+//
+TEST_F(ChangeStreamStageTest, BasicAllClusterChangeStreamV2StagesOrder) {
+    RAIIServerParameterControllerForTest preciseShardTargetingEnabler(
+        "featureFlagChangeStreamPreciseShardTargeting", true);
+
+    ScopedDataToShardsAllocationQueryServiceMock queryServiceMock;
+    ScopedChangeStreamReaderBuilderMock readerBuilder(
+        std::make_unique<ChangeStreamReaderBuilderMock>());
+
+    // We enable the 'showExpandedEvents' flag to avoid injecting an additional $match stage which
+    // filters out newly added events.
+    const std::vector<BSONObj> rawPipeline = {
+        BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2"
+                                                          << "allChangesForCluster" << true)),
+    };
+
+    auto pipeline = buildTestPipelineForCluster(rawPipeline);
+
+    // TODO SERVER-111381: adjust the following pipeline once all-cluster change streams are
+    // supported by V2 change stream readers.
+    assertStagesNameOrder(std::move(pipeline),
+                          {"$_internalChangeStreamOplogMatch",
+                           "$_internalChangeStreamUnwindTransaction",
+                           "$_internalChangeStreamTransform",
+                           "$_internalChangeStreamCheckResumability",
+                           "$_internalChangeStreamCheckTopologyChange",
+                           "$_internalChangeStreamHandleTopologyChange"});
 }
 
 //
@@ -5070,7 +5185,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleMatch) {
         fromjson("{$match: {operationType: 'insert'}}"),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5102,7 +5217,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleMatch) {
         fromjson("{$match: {operationType: 'insert'}}"),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5126,7 +5241,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatch) {
                                               fromjson("{$match: {operationType: 'insert'}}"),
                                               fromjson("{$match: {operationType: 'delete'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5158,7 +5273,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatch) {
         fromjson("{$match: {operationType: 'insert'}}"),
         fromjson("{$match: {operationType: 'delete'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5187,7 +5302,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleMatchAndResumeToken) {
         BSON("$match" << BSON("operationType" << "insert")),
         BSON("$match" << BSON("operationType" << "insert"))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5225,7 +5340,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleMatchAndResumeToken) {
         BSON("$match" << BSON("operationType" << "insert")),
         BSON("$match" << BSON("operationType" << "insert"))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5249,7 +5364,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleProject) {
     const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$project: {operationType: 1}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5280,7 +5395,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamV2WithSingleProject) {
         BSON("$changeStream" << BSON("showExpandedEvents" << true << "version" << "v2")),
         fromjson("{$project: {operationType: 1}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5304,7 +5419,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProject) {
                                               fromjson("{$project: {operationType: 1}}"),
                                               fromjson("{$project: {fullDocument: 1}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5337,7 +5452,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamV2WithMultipleProject) {
         fromjson("{$project: {operationType: 1}}"),
         fromjson("{$project: {fullDocument: 1}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5367,7 +5482,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleProjectAndResumeToken) {
         BSON("$project" << BSON("operationType" << 1)),
         BSON("$project" << BSON("fullDocument" << 1))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5398,7 +5513,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithProjectMatchAndResumeToken) {
         BSON("$project" << BSON("operationType" << 1)),
         BSON("$match" << BSON("operationType" << "insert"))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5424,7 +5539,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleUnset) {
     const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$unset: 'operationType'}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5448,7 +5563,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleUnset) {
                                               fromjson("{$unset: 'operationType'}"),
                                               fromjson("{$unset: 'fullDocument'}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5477,7 +5592,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithUnsetAndResumeToken) {
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$unset" << "operationType")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5501,7 +5616,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleAddFields) {
     const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$addFields: {stockPrice: 100}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5525,7 +5640,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleAddFields) {
                                               fromjson("{$addFields: {stockPrice: 100}}"),
                                               fromjson("{$addFields: {quarter: 'Q1'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5554,7 +5669,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithAddFieldsAndResumeToken) {
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$addFields" << BSON("stockPrice" << 100))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5578,7 +5693,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleSet) {
     const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$set: {stockPrice: 100}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5601,7 +5716,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithMultipleSet) {
                                               fromjson("{$set: {stockPrice: 100}}"),
                                               fromjson("{$set: {quarter: 'Q1'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5630,7 +5745,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSetAndResumeToken) {
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$set" << BSON("stockPrice" << 100))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5654,7 +5769,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceRoot) {
     const std::vector<BSONObj> rawPipeline = {
         kShowExpandedEventsSpec, fromjson("{$replaceRoot: {newRoot: '$fullDocument'}}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5682,7 +5797,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceRootAndResumeToken) {
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$replaceRoot" << BSON("newRoot" << "$fullDocument"))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5707,7 +5822,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithSingleReplaceWith) {
     const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec,
                                               fromjson("{$replaceWith: '$fullDocument'}")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5735,7 +5850,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceWithAndResumeToken) {
                      << DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName << true)),
         BSON("$replaceWith" << "$fullDocument")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5755,7 +5870,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithReplaceWithAndResumeToken) {
 TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsTrueDoesNotInjectMatchStage) {
     const std::vector<BSONObj> rawPipeline = {kShowExpandedEventsSpec};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5774,7 +5889,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsTrueDoesNotInjec
 TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseInjectsMatchStage) {
     const std::vector<BSONObj> rawPipeline = {kDefaultSpec};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5796,7 +5911,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseAndUserMatc
         fromjson("{$changeStream: {showExpandedEvents: false}}"),
         BSON("$match" << BSON("operationType" << "insert"))};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5821,7 +5936,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithShowExpandedEventsFalseAndUserProj
         BSON("$match" << BSON("operationType" << "insert")),
     };
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",
@@ -5856,7 +5971,7 @@ TEST_F(ChangeStreamStageTest, ChangeStreamWithAllStagesAndResumeToken) {
         BSON("$replaceRoot" << BSON("newRoot" << "$fullDocument")),
         BSON("$replaceWith" << "fullDocument.stockPrice")};
 
-    auto pipeline = buildTestPipeline(rawPipeline);
+    auto pipeline = buildTestPipelineForCollection(rawPipeline);
 
     assertStagesNameOrder(std::move(pipeline),
                           {"$_internalChangeStreamOplogMatch",

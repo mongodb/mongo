@@ -44,6 +44,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -364,20 +365,36 @@ void ChangeStreamStageTest::runUpdateV2OplogTest(BSONObj diff, Document updateMo
     checkTransformation(deltaOplog, expectedUpdateField);
 }
 
-/**
- * Helper to create change stream pipeline for testing.
- */
 std::unique_ptr<Pipeline> ChangeStreamStageTest::buildTestPipeline(
     const std::vector<BSONObj>& rawPipeline) {
     auto expCtx = getExpCtx();
-    expCtx->setNamespaceString(
-        NamespaceString::createNamespaceString_forTest(boost::none, "a.collection"));
     expCtx->setInRouter(true);
 
     auto pipeline = Pipeline::parse(rawPipeline, expCtx);
     pipeline->optimizePipeline();
 
     return pipeline;
+}
+
+std::unique_ptr<Pipeline> ChangeStreamStageTest::buildTestPipelineForCollection(
+    const std::vector<BSONObj>& rawPipeline, StringData ns) {
+    getExpCtx()->setNamespaceString(
+        NamespaceString::createNamespaceString_forTest(boost::none, ns));
+    return buildTestPipeline(rawPipeline);
+}
+
+std::unique_ptr<Pipeline> ChangeStreamStageTest::buildTestPipelineForDatabase(
+    const std::vector<BSONObj>& rawPipeline, StringData ns) {
+    getExpCtx()->setNamespaceString(NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, ns)));
+    return buildTestPipeline(rawPipeline);
+}
+
+std::unique_ptr<Pipeline> ChangeStreamStageTest::buildTestPipelineForCluster(
+    const std::vector<BSONObj>& rawPipeline) {
+    getExpCtx()->setNamespaceString(
+        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin));
+    return buildTestPipeline(rawPipeline);
 }
 
 /**

@@ -163,9 +163,36 @@ public:
     void runUpdateV2OplogTest(BSONObj diff, Document updateModificationEntry);
 
     /**
-     * Helper to create change stream pipeline for testing.
+     * Helper to create a change stream pipeline for testing.
+     * A side-effect of calling this function is that the 'inRouter' flag in the ExpressionContext
+     * will be set.
      */
     std::unique_ptr<Pipeline> buildTestPipeline(const std::vector<BSONObj>& rawPipeline);
+
+    /**
+     * Helper to create a collection-level change stream pipeline for testing.
+     * Side-effect of calling this function are that the 'inRouter' flag in the ExpressionContext
+     * will be set, and the namespace in the ExpressionContext will be set to the specified
+     * namespace.
+     */
+    std::unique_ptr<Pipeline> buildTestPipelineForCollection(
+        const std::vector<BSONObj>& rawPipeline, StringData ns = "a.collection");
+
+    /**
+     * Helper to create a database-level change stream pipeline for testing.
+     * Side-effect of calling this function are that the 'inRouter' flag in the ExpressionContext
+     * will be set, and the namespace in the ExpressionContext will be set to the specified
+     * namespace.
+     */
+    std::unique_ptr<Pipeline> buildTestPipelineForDatabase(const std::vector<BSONObj>& rawPipeline,
+                                                           StringData ns = "test");
+
+    /**
+     * Helper to create change stream pipeline for testing.
+     * Side-effect of calling this function are that the 'inRouter' flag in the ExpressionContext
+     * will be set, and the namespace in the ExpressionContext will be set to 'admin'.
+     */
+    std::unique_ptr<Pipeline> buildTestPipelineForCluster(const std::vector<BSONObj>& rawPipeline);
 
     /**
      * Helper to verify if the change stream pipeline contains expected stages.

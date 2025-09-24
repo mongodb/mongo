@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -46,9 +47,27 @@ boost::intrusive_ptr<exec::agg::Stage> documentSourceChangeStreamCheckInvalidate
             "expected 'DocumentSourceChangeStreamCheckInvalidate' type",
             changeStreamCheckInvalidateDS);
 
+    const auto& expCtx = changeStreamCheckInvalidateDS->getExpCtx();
+
+    // The following assert verifies that the '$_internalChangeStreamCheckInvalidate' stage is
+    // only present in change stream pipelines that actually need it, i.e. collection-level and
+    // database-level change streams. Versions before v8.3 still create the invalidate stage for
+    // all types of change streams unconditionally. A mongos from an old version can still send
+    // a pipeline containing an invalidate stage even though it is not needed since v8.3 and
+    // higher. To make multiversion setups and upgrades work, we restrict the check to the
+    // router.
+    tassert(11073200,
+            str::stream()
+                << "expecting 'DocumentSourceChangeStreamCheckInvalidate' to be built only for "
+                   "collection-level or database-level change stream pipeline on the router, "
+                   "got nss: '"
+                << expCtx->getNamespaceString().toStringForErrorMsg() << "'",
+            !expCtx->getInRouter() ||
+                DocumentSourceChangeStreamCheckInvalidate::canInvalidateEventOccur(expCtx));
+
     return make_intrusive<exec::agg::ChangeStreamCheckInvalidateStage>(
         changeStreamCheckInvalidateDS->kStageName,
-        changeStreamCheckInvalidateDS->getExpCtx(),
+        expCtx,
         changeStreamCheckInvalidateDS->_startAfterInvalidate);
 }
 
@@ -64,18 +83,17 @@ namespace {
 
 // Returns true if the given 'operationType' should invalidate the change stream based on the
 // namespace in 'pExpCtx'.
-bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+bool isInvalidatingCommand(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                            StringData operationType) {
-    if (pExpCtx->isSingleNamespaceAggregation()) {
+    if (expCtx->isSingleNamespaceAggregation()) {
         return operationType == DSCS::kDropCollectionOpType ||
             operationType == DSCS::kRenameCollectionOpType ||
             operationType == DSCS::kDropDatabaseOpType;
-    } else if (!pExpCtx->isClusterAggregation()) {
+    } else if (!expCtx->isClusterAggregation()) {
         return operationType == DSCS::kDropDatabaseOpType;
-    } else {
-        return false;
     }
-};
+    return false;
+}
 
 }  // namespace
 

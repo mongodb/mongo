@@ -189,7 +189,11 @@ std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
 
     // The resume stage must come after the check invalidate stage so that the former can determine
     // whether the event that matches the resume token should be followed by an "invalidate" event.
-    stages.push_back(DocumentSourceChangeStreamCheckInvalidate::create(expCtx, spec));
+    if (DocumentSourceChangeStreamCheckInvalidate::canInvalidateEventOccur(expCtx)) {
+        // Invalidate events can only occur in collection-level and database-level change streams,
+        // but not in all-cluster change streams.
+        stages.push_back(DocumentSourceChangeStreamCheckInvalidate::create(expCtx, spec));
+    }
 
     // Always include a DSCSCheckResumability stage, both to verify that there is enough history to
     // cover the change stream's starting point, and to swallow all events up to the resume point.

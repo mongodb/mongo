@@ -103,6 +103,13 @@ public:
         return id;
     }
 
+    /**
+     * Whether the current aggregation command in the 'ExpressionContext' can lead to change stream
+     * invalidate events being issued. Currently, invalidate events can only occur in
+     * collection-level and database-level change streams, but not in all-cluster change streams.
+     */
+    static bool canInvalidateEventOccur(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 private:
     friend boost::intrusive_ptr<exec::agg::Stage>
     documentSourceChangeStreamCheckInvalidateToStageFn(

@@ -95,4 +95,9 @@ Value DocumentSourceChangeStreamCheckInvalidate::doSerialize(
     return Value(builder.obj());
 }
 
+bool DocumentSourceChangeStreamCheckInvalidate::canInvalidateEventOccur(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    return !expCtx->isClusterAggregation();
+}
+
 }  // namespace mongo
