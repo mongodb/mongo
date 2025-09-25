@@ -171,9 +171,9 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        enableElectionHandoff: 0
     all_nodes_electable: true
     num_nodes: 5
     replset_config_options:
       settings:
-        electionTimeoutMillis: 5000 # Allow secondaries to step up if we end up without a primary
         catchUpTimeoutMillis: 0
