@@ -235,8 +235,7 @@ WiredTigerKVEngineBase::WiredTigerConfig getSpillWiredTigerConfigFromStartupOpti
                                                                gSpillWiredTigerCacheSizePercentage,
                                                                gSpillWiredTigerCacheSizeMinMB,
                                                                gSpillWiredTigerCacheSizeMaxMB);
-    wtConfig.sessionMax = gSpillWiredTigerSessionMax ? gSpillWiredTigerSessionMax
-                                                     : wiredTigerGlobalOptions.sessionMax;
+    wtConfig.sessionMax = gSpillWiredTigerSessionMax;
     wtConfig.evictionThreadsMin = gSpillWiredTigerEvictionThreadsMin;
     wtConfig.evictionThreadsMax = gSpillWiredTigerEvictionThreadsMax;
     wtConfig.evictionDirtyTargetMB =
