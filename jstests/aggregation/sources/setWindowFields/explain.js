@@ -7,6 +7,7 @@
  * @tags: [assumes_against_mongod_not_mongos]
  */
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {getTotalMemoryUsageFromStageExplainOutput} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -56,19 +57,14 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
                     );
                 }
             }
-            assert.gt(
-                stage["maxTotalMemoryUsageBytes"],
-                expectedTotalMemUsage * 0.9,
-                "Incorrect total mem usage: " + tojson(stage),
-            );
-            assert.lt(
-                stage["maxTotalMemoryUsageBytes"],
-                2.2 * expectedTotalMemUsage,
-                "Incorrect total mem usage: " + tojson(stage),
-            );
+
+            const totalMemoryUsage = getTotalMemoryUsageFromStageExplainOutput(stage);
+            assert.gt(totalMemoryUsage, expectedTotalMemUsage * 0.9, "Incorrect total mem usage: " + tojson(stage));
+            assert.lt(totalMemoryUsage, 2.2 * expectedTotalMemUsage, "Incorrect total mem usage: " + tojson(stage));
         } else {
             assert(!stage.hasOwnProperty("maxFunctionMemoryUsageBytes"), stage);
             assert(!stage.hasOwnProperty("maxTotalMemoryUsageBytes"), stage);
+            assert(!stage.hasOwnProperty("peakTrackedMemBytes"), stage);
         }
     }
 }

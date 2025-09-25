@@ -187,12 +187,6 @@ Document InternalSetWindowFieldsStage::getExplainOutput(const SerializationOptio
     }
 
     out["maxFunctionMemoryUsageBytes"] = Value(md.freezeToValue());
-
-    // TODO SERVER-111011 'maxTotalMemoryUsageBytes' is redundant with 'peakTrackedMemBytes', added
-    // below. We should avoid the duplication and decide the field name here based on the value of
-    // the QueryMemoryTracking feature flag.
-    out["maxTotalMemoryUsageBytes"] =
-        opts.serializeLiteral(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
     out["usedDisk"] = opts.serializeLiteral(_iterator.usedDisk());
     out["spills"] = opts.serializeLiteral(static_cast<long long>(_stats.spillingStats.getSpills()));
     out["spilledDataStorageSize"] = opts.serializeLiteral(
@@ -204,6 +198,9 @@ Document InternalSetWindowFieldsStage::getExplainOutput(const SerializationOptio
     if (feature_flags::gFeatureFlagQueryMemoryTracking.isEnabled()) {
         out["peakTrackedMemBytes"] =
             opts.serializeLiteral(static_cast<long long>(_stats.peakTrackedMemBytes));
+    } else {
+        out["maxMemoryUsageBytes"] =
+            opts.serializeLiteral(static_cast<long long>(_memoryTracker.peakTrackedMemoryBytes()));
     }
 
     return out.freeze();

@@ -1,5 +1,6 @@
 import {arrayEq} from "jstests/aggregation/extras/utils.js";
 import {getAggPlanStages} from "jstests/libs/query/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 /**
  * Create a collection of tickers and prices.
@@ -198,15 +199,46 @@ export function assertExplainResult(explainResult) {
         for (let field of Object.keys(maxFunctionMemUsages)) {
             assert.gte(maxFunctionMemUsages[field], 0, "invalid memory usage for '" + field + "': " + tojson(stage));
         }
-        assert.gt(stage["maxTotalMemoryUsageBytes"], 0, "Incorrect total mem usage: " + tojson(stage));
+
+        let totalMemoryUsage = getTotalMemoryUsageFromStageExplainOutput(stage);
+        assert.gt(totalMemoryUsage, 0, "Incorrect total mem usage: " + tojson(stage));
+
         // No test should be using more than 1GB of memory. This is mostly a sanity check that
         // integer underflow doesn't occur.
-        assert.lt(
-            stage["maxTotalMemoryUsageBytes"],
-            1 * 1024 * 1024 * 1024,
-            "Incorrect total mem usage: " + tojson(stage),
-        );
+        assert.lt(totalMemoryUsage, 1 * 1024 * 1024 * 1024, "Incorrect total mem usage: " + tojson(stage));
     }
+}
+
+export function getTotalMemoryUsageFromStageExplainOutput(stage) {
+    let totalMemoryUsage = null;
+
+    // Only maxTotalMemoryUsageBytes or peakTrackedMemBytes could be present, not both.
+    const queryMemoryTrackingEnabled = FeatureFlagUtil.isPresentAndEnabled(db, "QueryMemoryTracking");
+    const maxTotalMemoryUsageBytesProp = "maxTotalMemoryUsageBytes";
+    const peakTrackedMemBytesProp = "peakTrackedMemBytes";
+    if (stage.hasOwnProperty(maxTotalMemoryUsageBytesProp)) {
+        assert(
+            !queryMemoryTrackingEnabled,
+            maxTotalMemoryUsageBytesProp +
+                " should not appear in explain output when query memory tracking is enabled: " +
+                tojson(stage),
+        );
+        assert(!stage.hasOwnProperty(peakTrackedMemBytesProp), stage);
+
+        totalMemoryUsage = stage[maxTotalMemoryUsageBytesProp];
+    } else {
+        assert(stage.hasOwnProperty(peakTrackedMemBytesProp), stage);
+        assert(
+            queryMemoryTrackingEnabled,
+            peakTrackedMemBytesProp +
+                " should appear in explain output when query memory tracking is enabled: " +
+                tojson(stage),
+        );
+
+        totalMemoryUsage = stage[peakTrackedMemBytesProp];
+    }
+
+    return totalMemoryUsage;
 }
 
 /**
