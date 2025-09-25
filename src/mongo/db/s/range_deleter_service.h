@@ -136,7 +136,8 @@ private:
      */
     class ReadyRangeDeletionsProcessor {
     public:
-        ReadyRangeDeletionsProcessor(OperationContext* opCtx);
+        ReadyRangeDeletionsProcessor(OperationContext* opCtx,
+                                     std::shared_ptr<executor::TaskExecutor> executor);
         ~ReadyRangeDeletionsProcessor();
 
         /*
@@ -189,6 +190,12 @@ private:
 
         /* Thread consuming the range deletions queue */
         stdx::thread _thread;
+
+        /*
+         * An executor that is managed (startup & shutdown) by the RangeDeleterService. An example
+         * use of this is to schedule a retry of task that errored at a later time.
+         */
+        std::shared_ptr<executor::TaskExecutor> _executor;
     };
 
     // Keeping track of per-collection registered range deletion tasks
