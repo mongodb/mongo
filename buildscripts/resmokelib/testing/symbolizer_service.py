@@ -277,6 +277,12 @@ class ResmokeSymbolizer:
             )
             return
 
+        if not os.path.exists(expansions_file):
+            test.logger.info(
+                f"Skipping local symbolization instructions because {expansions_file} does not exist."
+            )
+            return
+
         expansions = read_config_file(expansions_file)
         compile_variant = expansions.get("compile_variant")
         build_variant = expansions.get("build_variant")
