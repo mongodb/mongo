@@ -2436,7 +2436,8 @@ tasks:
           local_file: src/bazel-bin/query_bm.${ext|tgz}
           remote_file: ${project}/${compile_variant}/${version_id}/binaries/query_bm-${revision_order_id}.${ext|tgz}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Benchmarks
 

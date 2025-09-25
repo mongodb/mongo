@@ -27,6 +27,8 @@ npm_command: jstestfuzz
 tar: tar
 cmake_path: /opt/cmake/bin/cmake
 content_type: application/x-gzip
+mciuploads_binary_permissions: public-read
+mciuploads_binary_visibility: public
 jstestfuzz_concurrent_num_files: "10"
 curator_release: "latest"
 ext: tgz

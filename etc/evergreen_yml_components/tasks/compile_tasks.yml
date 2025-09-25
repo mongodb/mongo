@@ -375,7 +375,8 @@ tasks:
           local_file: src/bazel-bin/mongo_benchmark-stripped.${ext|tgz}
           remote_file: ${mongo_benchmarks}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Benchmarks
 
@@ -402,7 +403,8 @@ tasks:
           local_file: src/bazel-bin/mongo_benchmark-debug.${ext|tgz}
           remote_file: ${mongo_benchmarks_debugsymbols}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Benchmarks Debug
 
@@ -577,7 +579,8 @@ tasks:
           local_file: src/bazel-bin/dbtest.${ext|tgz}
           remote_file: ${project}/${build_variant}/${revision}/dbtest/dbtest-${build_id}-${task_name}-${execution}.tgz
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: dbtest binary - Execution ${execution}
           optional: true
@@ -638,7 +641,8 @@ tasks:
           local_file: src/bazel-bin/mongo-stripped.${ext|tgz}
           remote_file: ${mongo_jstestshell}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/gzip}
           display_name: Jstestshell
       - command: s3.put
@@ -648,7 +652,8 @@ tasks:
           local_file: src/bazel-bin/mongo-stripped.${ext|tgz}.sha256
           remote_file: ${mongo_jstestshell}.sha256
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: text/plain
           display_name: Jstestshell SHA256
 
@@ -669,7 +674,8 @@ tasks:
           local_file: src/bazel-bin/mongo-debug.${ext|tgz}
           remote_file: ${mongo_jstestshell_debugsymbols}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/gzip}
           display_name: Jstestshell Debugsymbols
 
@@ -703,7 +709,8 @@ tasks:
           local_file: "src/bazel-bin/stitch_support.${ext|tgz}"
           remote_file: "${project}/stitch-support/${build_variant}/${revision}/stitch-support-${version}.tgz"
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: "Stitch Support Library"
 
@@ -758,7 +765,8 @@ tasks:
           local_file: "src/bazel-bin/mongo_crypt-stripped.${ext|tgz}"
           remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1_dev-${version}.${ext|tgz}"
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/tar}
           display_name: "Mongo Crypt Library dev"
       - command: s3.put
@@ -768,7 +776,8 @@ tasks:
           local_file: "src/bazel-bin/mongo_crypt-debug.${ext|tgz}"
           remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1_debug-${version}.${ext|tgz}"
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/tar}
           display_name: "Mongo Crypt Library debug"
 
@@ -791,7 +800,8 @@ tasks:
           local_file: "src/bazel-bin/mongo_crypt_shlib_test-stripped.${ext|tgz}"
           remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shlib_test-${version}.${ext|tgz}"
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/tar}
           display_name: "Mongo Crypt Shared Library Test"
 
@@ -1073,7 +1083,8 @@ tasks:
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}
           skip_existing: ${is_release}
@@ -1084,7 +1095,8 @@ tasks:
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/gzip}
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
           skip_existing: ${is_release}
@@ -1094,7 +1106,8 @@ tasks:
           aws_secret: ${aws_secret}
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
           aws_key: ${aws_key}
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           bucket: ${push_bucket}
           content_type: text/plain
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
@@ -1104,7 +1117,8 @@ tasks:
         params:
           aws_secret: ${aws_secret}
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           aws_key: ${aws_key}
           bucket: ${push_bucket}
           content_type: text/plain
@@ -1117,7 +1131,8 @@ tasks:
           local_file: src/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           aws_key: ${aws_key}
           bucket: ${push_bucket}
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: text/plain
           remote_file: ${push_path}/mongo_crypt_shared_v1-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
           skip_existing: ${is_release}

@@ -317,6 +317,27 @@ functions:
       local_file: src/mongo-binaries.zst
       optional: true
 
+  "fetch binary tgz shas": &fetch_tgz_binary_shas
+    command: s3.get
+    display_name: "fetch binary tgz shas"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_binaries}.sha256
+      bucket: mciuploads
+      local_file: src/mongo-binaries.tgz.sha256
+
+  "fetch binary zstd shas": &fetch_zstd_binary_shas
+    command: s3.get
+    display_name: "fetch binary zstd shas"
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      remote_file: ${mongo_binaries}.zst.sha256
+      bucket: mciuploads
+      local_file: src/mongo-binaries.zst.sha256
+      optional: true
+
   "fetch and verify binaries sha": &fetch_and_verify_binaries_sha
     command: subprocess.exec
     params:
@@ -604,7 +625,8 @@ functions:
       local_file: src/bazel-bin/dist-test-debug.${ext|tgz}
       remote_file: ${mongo_debugsymbols}
       bucket: mciuploads
-      permissions: public-read
+      permissions: ${mciuploads_binary_permissions|public-read}
+      visibility: ${mciuploads_binary_visibility|public}
       content_type: ${content_type|application/gzip}
       display_name: mongo-debugsymbols.${ext|tgz}
 
@@ -838,6 +860,9 @@ functions:
     - *cleanup_environment
     - *fetch_venv
     - *adjust_venv
+    - *fetch_binaries
+    - *fetch_binaries_zstd
+    - *fetch_tgz_binary_shas
     - *fetch_and_verify_binaries_sha
     - *fetch_and_verify_binaries_sha_zstd
     - *fetch_jstestshell
@@ -2852,7 +2877,8 @@ functions:
       local_file: mongo-unittests.tgz
       remote_file: ${project}/${build_variant}/${revision}/unittests/mongo-unittests-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
-      permissions: public-read
+      permissions: ${mciuploads_binary_permissions|public-read}
+      visibility: ${mciuploads_binary_visibility|public}
       content_type: application/gzip
       display_name: Unit tests - Execution ${execution}
       optional: true
@@ -2934,7 +2960,8 @@ functions:
       local_file: src/mongo-hanganalyzer.tgz
       remote_file: ${project}/${build_variant}/${revision}/hanganalyzer/mongo-hanganalyzer-${build_id}-${task_name}-${execution}.tgz
       bucket: mciuploads
-      permissions: public-read
+      permissions: ${mciuploads_binary_permissions|public-read}
+      visibility: ${mciuploads_binary_visibility|public}
       content_type: application/gzip
       display_name: Hang Analyzer Output - Execution ${execution}
       optional: true

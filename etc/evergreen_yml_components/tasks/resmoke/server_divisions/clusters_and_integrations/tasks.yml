@@ -251,7 +251,8 @@ tasks:
           local_file: src/bazel-bin/first_half_bm.${ext|tgz}
           remote_file: ${project}/${compile_variant}/${version_id}/binaries/first_half_bm-${revision_order_id}.${ext|tgz}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Benchmarks
 
@@ -287,7 +288,8 @@ tasks:
           local_file: src/bazel-bin/second_half_bm.${ext|tgz}
           remote_file: ${project}/${compile_variant}/${version_id}/binaries/second_half_bm-${revision_order_id}.${ext|tgz}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Benchmarks
 
@@ -323,7 +325,8 @@ tasks:
           local_file: src/bazel-bin/sep_bm.${ext|tgz}
           remote_file: ${project}/${compile_variant}/${version_id}/binaries/sep_bm-${revision_order_id}.${ext|tgz}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Benchmarks
 
@@ -1212,7 +1215,8 @@ tasks:
           local_file: src/bazel-bin/sharding_bm.${ext|tgz}
           remote_file: ${project}/${compile_variant}/${version_id}/binaries/sharding_bm-${revision_order_id}.${ext|tgz}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Benchmarks
 
@@ -1247,7 +1251,8 @@ tasks:
           local_file: src/bazel-bin/bsoncolumn_bm.${ext|tgz}
           remote_file: ${project}/${compile_variant}/${version_id}/binaries/bsoncolumn_bm-${revision_order_id}.${ext|tgz}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Benchmarks
 

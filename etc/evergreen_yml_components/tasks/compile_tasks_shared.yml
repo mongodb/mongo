@@ -153,7 +153,8 @@ tasks:
           local_file: src/bazel-bin/dist-test-stripped.${ext|tgz}
           remote_file: ${mongo_binaries}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/gzip
           # Sys-perf relies on this display name, please reach out before changing it.
           display_name: Binaries
@@ -165,7 +166,8 @@ tasks:
           local_file: src/bazel-bin/dist-test-stripped.${ext|tgz}.sha256
           remote_file: ${mongo_binaries}.sha256
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: text/plain
           display_name: Binaries SHA256
       - command: subprocess.exec
@@ -345,7 +347,8 @@ tasks:
           local_file: src/version_info_mongod.txt
           remote_file: ${project}/${build_variant}/${version_id}/version-info-mongod-${task_id}.txt
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: text/plain
           display_name: mongod --version output
 
@@ -399,7 +402,8 @@ tasks:
           local_file: "src/bazel-bin/mongo_crypt-stripped.${ext|tgz}"
           remote_file: "${project}/mongo_crypt/${build_variant}/${revision}/mongo_crypt_shared_v1-${version}.${ext|tgz}"
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/tar}
           display_name: "Mongo crypt Library"
 
@@ -445,7 +449,8 @@ tasks:
           local_file: packages.tgz
           remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Packages
 
@@ -488,7 +493,8 @@ tasks:
           local_file: src/bazel-bin/dist-stripped.${ext|tgz}
           remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}.${ext|tgz}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Dist Tarball
       - command: s3.put
@@ -499,7 +505,8 @@ tasks:
           local_file: src/bazel-bin/dist-debug.${ext|tgz}
           remote_file: ${project}/${build_variant}/${revision}/dist/mongo-${build_id}-debugsymbols.${ext|tgz}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Dist Debugsymbols
       - command: subprocess.exec
@@ -517,7 +524,8 @@ tasks:
           local_file: src/bazel-bin/mongo-stripped.${ext|tgz}
           remote_file: ${mongo_jstestshell}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/gzip}
           display_name: Jstestshell
       - command: s3.put
@@ -527,7 +535,8 @@ tasks:
           local_file: src/bazel-bin/mongo-stripped.${ext|tgz}.sha256
           remote_file: ${mongo_jstestshell}.sha256
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: text/plain
           display_name: Jstestshell SHA256
       - command: s3.put
@@ -537,7 +546,8 @@ tasks:
           local_file: src/bazel-bin/mongo-debug.${ext|tgz}
           remote_file: ${mongo_jstestshell_debugsymbols}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/gzip}
           display_name: Jstestshell Debugsymbols
       - command: s3.put
@@ -548,7 +558,8 @@ tasks:
           local_file: src/bazel-bin/mongocryptd-stripped.${ext|tgz}
           remote_file: ${mongo_cryptd}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/gzip}
           display_name: CryptD Binaries
       - command: s3.put
@@ -559,7 +570,8 @@ tasks:
           local_file: src/bazel-bin/mongocryptd-debug.${ext|tgz}
           remote_file: ${mongo_cryptd_debugsymbols}
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: ${content_type|application/gzip}
           display_name: CryptD Debugsymbols
       - func: "run packager.py"
@@ -578,7 +590,8 @@ tasks:
           local_file: packages.tgz
           remote_file: ${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
           bucket: mciuploads
-          permissions: public-read
+          permissions: ${mciuploads_binary_permissions|public-read}
+          visibility: ${mciuploads_binary_visibility|public}
           content_type: application/tar
           display_name: Packages
       # We perform package task generally in the middle of larger task groups running

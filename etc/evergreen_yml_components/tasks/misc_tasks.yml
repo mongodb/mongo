@@ -1563,6 +1563,9 @@ tasks:
       - func: "set up venv"
       - func: "fetch packages"
       - func: "fetch binaries"
+      - func: "fetch binaries zstd"
+      - func: "fetch binary zstd shas"
+      - func: "fetch binary tgz shas"
       - func: "extract binaries"
       - func: "run selinux tests"
         vars:
@@ -1581,6 +1584,9 @@ tasks:
       - func: "set up venv"
       - func: "fetch packages"
       - func: "fetch binaries"
+      - func: "fetch binaries zstd"
+      - func: "fetch binary zstd shas"
+      - func: "fetch binary tgz shas"
       - func: "extract binaries"
       - func: "run selinux tests"
         vars:
@@ -1599,6 +1605,9 @@ tasks:
       - func: "set up venv"
       - func: "fetch packages"
       - func: "fetch binaries"
+      - func: "fetch binaries zstd"
+      - func: "fetch binary zstd shas"
+      - func: "fetch binary tgz shas"
       - func: "extract binaries"
       - func: "run selinux tests"
         vars:
@@ -1617,6 +1626,9 @@ tasks:
       - func: "set up venv"
       - func: "fetch packages"
       - func: "fetch binaries"
+      - func: "fetch binaries zstd"
+      - func: "fetch binary zstd shas"
+      - func: "fetch binary tgz shas"
       - func: "extract binaries"
       - func: "run selinux tests"
         vars:
