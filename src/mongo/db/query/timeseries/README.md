@@ -234,7 +234,7 @@ aggregate([{$count: 'foo'}])
           {$gte: ["$control.version, 2]},
           '$control.count',
           {$size: [{$objectToArray: ['$data.time']}]
-      }]}}}}
+      }]}}
   }},
   { $project: { foo: true, _id: false }}
 ]
@@ -276,11 +276,11 @@ is a filter on measurements or time.
 
 Last-point/first-point queries return the most recent or the earliest measurement per meta value. Last-point queries
 must contain both a `$sort` and a `$group` stage with `$first` or `$last` accumulators, or only a `$group` stage with `$top`, `$topN`,
-`$bottom`, or `$bottomN` accumulators. A last-point queries could look like:
+`$bottom`, or `$bottomN` accumulators. A last-point query could look like:
 
 ```
 {$sort: {"meta": 1, “time”: 1}},
-{$group: {_id: “meta.a”, “last”: {$last: “$time"}}}])
+{$group: {_id: “meta.a”, “last”: {$last: “$time"}}}
 ```
 
 In 6.0+, there are two optimizations:
@@ -299,7 +299,7 @@ For example, for a time-series collections where the `metaField = tags`:
 // Query issued by the user:
 aggregate([
   {$sort: {'tags.a': 1, time: -1}},
-  {$group: {_id: '$tags.a', b: {$first: '$b'}}
+  {$group: {_id: '$tags.a', b: {$first: '$b'}}}
 ])
 
 // Pipeline on the buckets collection right after the rewrite (optimization 1):
@@ -462,6 +462,52 @@ aggregate(
     _id: "$time",
     average_price:  {$avg: {$multiply: ["$price", "$amount"]}},
     monotonicIdFields: ["_id"]
+  }}
+]
+```
+
+## Top-k Sort Optimization
+
+See `DocumentSourceGroup::tryToAbsorbTopKSort()`
+
+In 8.0+, if a `$sort` is followed by `$group` with `$first`/`$last`, the `$sort` is removed from the pipeline and
+`$first`/`$last` are rewritten as `$top`/`$bottom`, using the same sort key as the `$sort`. This avoids the blocking
+top-level sort and instead only sorts for the first and last elements within each group.
+
+The optimization is possible as long as:
+
+1. There is no limit on the `$sort`.
+2. The `$sort` is not sorted on the meta field (the [sort reorder](#sort-reorder) is applied instead).
+3. There aren't any other accumulators on the `$group` that depend on the ordered input from the sort. Specifically,
+   `$firstN` and `$lastN` are unsupported. Accumulators that don't rely on the sort order are allowed.
+4. `$_internalUnpackBucket` is directly followed by a `$sort` and a `$group` (this is not a logical limitation but is
+   done to reduce complexity).
+
+The optimization still works with compound group keys and compound sort keys.
+
+If the query is also a last-point query, this optimization may be made along with the
+[last-point optimization](#last-point-queries), if there is a `$sort` and `$group` that meet the requirements.
+
+For example:
+
+```
+// Query issued by the user:
+aggregate([
+  {$sort: {time: 1}},
+  {$group: {
+    _id: "$meta",
+    first: {$first: "$measurement"},
+    last: {$last: "$measurement"}
+  }}
+])
+
+// Pipeline on the buckets collection after the rewrite:
+[
+  {$_internalUnpackBucket: {...}},
+  {$group: {
+    _id: "$meta",
+    first: {$top: {sortBy: {time: 1}, output: "$measurement"}},
+    last: {$bottom: {sortBy: {time: 1}, output: "$measurement"}}
   }}
 ]
 ```
