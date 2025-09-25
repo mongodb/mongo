@@ -232,10 +232,6 @@ ShardingCatalogClient* ShardingTestFixture::catalogClient() const {
     return Grid::get(operationContext())->catalogClient();
 }
 
-ShardRegistry* ShardingTestFixture::shardRegistry() const {
-    return Grid::get(operationContext())->shardRegistry();
-}
-
 std::shared_ptr<executor::TaskExecutor> ShardingTestFixture::executor() const {
     invariant(_fixedExecutor);
 
@@ -244,28 +240,6 @@ std::shared_ptr<executor::TaskExecutor> ShardingTestFixture::executor() const {
 
 void ShardingTestFixture::onCommandForPoolExecutor(NetworkTestEnv::OnCommandFunction func) {
     _networkTestEnvForPool->onCommand(func);
-}
-
-void ShardingTestFixture::addRemoteShards(
-    const std::vector<std::tuple<ShardId, HostAndPort>>& shardInfos) {
-    std::vector<ShardType> shards;
-
-    for (auto shard : shardInfos) {
-        ShardType shardType;
-        shardType.setName(std::get<0>(shard).toString());
-        shardType.setHost(std::get<1>(shard).toString());
-        shards.push_back(shardType);
-
-        std::unique_ptr<RemoteCommandTargeterMock> targeter(
-            std::make_unique<RemoteCommandTargeterMock>());
-        targeter->setConnectionStringReturnValue(ConnectionString(std::get<1>(shard)));
-        targeter->setFindHostReturnValue(std::get<1>(shard));
-
-        targeterFactory()->addTargeterToReturn(ConnectionString(std::get<1>(shard)),
-                                               std::move(targeter));
-    }
-
-    setupShards(shards);
 }
 
 void ShardingTestFixture::setupShards(const std::vector<ShardType>& shards) {

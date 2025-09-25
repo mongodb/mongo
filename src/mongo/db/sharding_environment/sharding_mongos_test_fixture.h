@@ -83,7 +83,6 @@ protected:
     // Syntactic sugar for getting sharding components off the Grid, if they have been initialized.
 
     ShardingCatalogClient* catalogClient() const;
-    ShardRegistry* shardRegistry() const;
     std::shared_ptr<executor::TaskExecutor> executor() const;
 
     /**
@@ -96,11 +95,6 @@ protected:
      * Setup the shard registry to contain the given shards until the next reload.
      */
     void setupShards(const std::vector<ShardType>& shards);
-
-    /**
-     * Adds ShardRemote shards to the shard registry.
-     */
-    void addRemoteShards(const std::vector<std::tuple<ShardId, HostAndPort>>& shards);
 
     /**
      * Wait for the shards listing command to be run and returns the specified set of shards.

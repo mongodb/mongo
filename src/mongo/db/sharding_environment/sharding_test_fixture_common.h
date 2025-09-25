@@ -91,6 +91,8 @@ protected:
 
     OperationContext* operationContext() const;
 
+    ShardRegistry* shardRegistry() const;
+
     /**
      * Returns the NetworkInterfaceMock associated with the fixed TaskExecutor.
      */
@@ -133,6 +135,11 @@ protected:
     virtual std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() {
         return nullptr;
     }
+
+    /**
+     * Adds ShardRemote shards to the shard registry.
+     */
+    void addRemoteShards(const std::vector<std::tuple<ShardId, HostAndPort>>& shards);
 
     // Since a NetworkInterface is a private member of a TaskExecutor, we store a raw pointer to the
     // fixed and arbitrary TaskExecutors NetworkInterfaces here.

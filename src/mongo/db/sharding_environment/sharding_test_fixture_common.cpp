@@ -39,9 +39,11 @@
 #include "mongo/db/local_catalog/shard_role_api/resource_yielders.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/write_ops/write_ops_gen.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/vector_clock/vector_clock.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/op_msg.h"
@@ -102,6 +104,10 @@ OperationContext* ShardingTestFixtureCommon::operationContext() const {
     return _opCtxHolder.get();
 }
 
+ShardRegistry* ShardingTestFixtureCommon::shardRegistry() const {
+    return Grid::get(operationContext())->shardRegistry();
+}
+
 RoutingTableHistoryValueHandle ShardingTestFixtureCommon::makeStandaloneRoutingTableHistory(
     RoutingTableHistory rt) {
     const auto version = rt.getVersion();
@@ -158,5 +164,59 @@ Milliseconds ShardingTestFixtureCommon::advanceUntilReadyRequest() const {
     return totalWaited;
 }
 
+void ShardingTestFixtureCommon::addRemoteShards(
+    const std::vector<std::tuple<ShardId, HostAndPort>>& shardInfos) {
+    std::vector<ShardType> shards;
+
+    for (auto shard : shardInfos) {
+        ShardType shardType;
+        shardType.setName(std::get<0>(shard).toString());
+        shardType.setHost(std::get<1>(shard).toString());
+        shards.push_back(shardType);
+
+        std::unique_ptr<RemoteCommandTargeterMock> targeter(
+            std::make_unique<RemoteCommandTargeterMock>());
+        targeter->setConnectionStringReturnValue(ConnectionString(std::get<1>(shard)));
+        targeter->setFindHostReturnValue(std::get<1>(shard));
+
+        targeterFactory()->addTargeterToReturn(ConnectionString(std::get<1>(shard)),
+                                               std::move(targeter));
+    }
+
+    auto future = launchAsync([this] { shardRegistry()->reload(operationContext()); });
+
+    onFindWithMetadataCommand([this, &shards](const executor::RemoteCommandRequest& request) {
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            request.dbname, request.cmdObj.firstElement().String());
+        ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
+
+        // If there is no '$db', append it.
+        auto cmd = static_cast<OpMsgRequest>(request).body;
+        auto query = query_request_helper::makeFromFindCommandForTests(cmd, nss);
+
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
+        ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
+        ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
+        ASSERT_FALSE(query->getLimit().has_value());
+
+        std::vector<BSONObj> shardsToReturn;
+
+        Timestamp maxTopologyTime;
+        std::transform(shards.begin(),
+                       shards.end(),
+                       std::back_inserter(shardsToReturn),
+                       [&maxTopologyTime](const ShardType& shard) {
+                           maxTopologyTime = std::max(shard.getTopologyTime(), maxTopologyTime);
+                           return shard.toBSON();
+                       });
+
+        BSONObjBuilder bob;
+        bob.append(VectorClock::kTopologyTimeFieldName, maxTopologyTime);
+
+        return std::make_tuple(shardsToReturn, bob.obj());
+    });
+
+    future.default_timed_get();
+}
 
 }  // namespace mongo

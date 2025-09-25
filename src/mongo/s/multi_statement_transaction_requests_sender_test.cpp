@@ -65,8 +65,9 @@ namespace {
 
 const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("test.bar");
 const ShardId kTestRemoteShardId1 = ShardId("FakeShard1");
-const HostAndPort kTestRemoteHostAndPort = HostAndPort("FakeShard1Host", 12345);
+const HostAndPort kTestRemoteHostAndPort1 = HostAndPort("FakeShard1Host", 12345);
 const ShardId kTestRemoteShardId2 = ShardId("FakeShard2");
+const HostAndPort kTestRemoteHostAndPort2 = HostAndPort("FakeShard2Host", 12345);
 
 class RouterMultiStatementTransactionRequestsSenderTest
     : public virtual service_context_test::RouterRoleOverride,
@@ -79,21 +80,10 @@ public:
 
         configTargeter()->setFindHostReturnValue(HostAndPort("FakeConfigHost", 12345));
 
-        std::vector<ShardType> shards;
-        ShardType shardType;
-        shardType.setName(kTestRemoteShardId1.toString());
-        shardType.setHost(kTestRemoteHostAndPort.toString());
-        shards.push_back(shardType);
-
-        std::unique_ptr<RemoteCommandTargeterMock> targeter(
-            std::make_unique<RemoteCommandTargeterMock>());
-        _targeters.push_back(targeter.get());
-        targeter->setConnectionStringReturnValue(ConnectionString(kTestRemoteHostAndPort));
-        targeter->setFindHostReturnValue(kTestRemoteHostAndPort);
-        targeterFactory()->addTargeterToReturn(ConnectionString(kTestRemoteHostAndPort),
-                                               std::move(targeter));
-
-        setupShards(shards);
+        // Populate the shardRegistry
+        std::vector<std::tuple<ShardId, HostAndPort>> shardInfos;
+        shardInfos.emplace_back(std::make_tuple(kTestRemoteShardId1, kTestRemoteHostAndPort1));
+        addRemoteShards(shardInfos);
     }
 
 protected:
@@ -118,8 +108,6 @@ protected:
         ASSERT(!request.cmdObj.hasField("autocommit"));
         ASSERT(!request.cmdObj.hasField("txnNumber"));
     }
-
-    std::vector<RemoteCommandTargeterMock*> _targeters;  // Targeters are owned by the factory.
 };
 
 TEST_F(RouterMultiStatementTransactionRequestsSenderTest, TxnDetailsNotAppendedIfNoTxnRouter) {
@@ -247,35 +235,11 @@ public:
     void setUp() override {
         ShardServerTestFixture::setUp();
 
-        std::unique_ptr<RemoteCommandTargeterMock> targeter(
-            std::make_unique<RemoteCommandTargeterMock>());
-        targeter->setConnectionStringReturnValue(ConnectionString(kTestRemoteHostAndPort));
-        targeter->setFindHostReturnValue(kTestRemoteHostAndPort);
-        targeterFactory()->addTargeterToReturn(ConnectionString(kTestRemoteHostAndPort),
-                                               std::move(targeter));
-
-        auto future = launchAsync([this] { shardRegistry()->reload(operationContext()); });
-        onCommand([&](const auto& request) {
-            ASSERT(request.cmdObj["find"]);
-            const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
-                request.dbname, request.cmdObj.firstElement().String());
-            ASSERT_EQ(nss, NamespaceString::kConfigsvrShardsNamespace);
-
-            ShardType shardType1;
-            shardType1.setName(kTestRemoteShardId1.toString());
-            shardType1.setHost(kTestRemoteHostAndPort.toString());
-
-            ShardType shardType2;
-            shardType2.setName(kTestRemoteShardId1.toString());
-            shardType2.setHost(kTestRemoteHostAndPort.toString());
-
-            return CursorResponse(NamespaceString::kConfigsvrShardsNamespace,
-                                  0LL,
-                                  {shardType1.toBSON(), shardType2.toBSON()})
-                .toBSON(CursorResponse::ResponseType::InitialResponse);
-        });
-
-        future.default_timed_get();
+        // Populate the shardRegistry
+        std::vector<std::tuple<ShardId, HostAndPort>> shardInfos;
+        shardInfos.emplace_back(std::make_tuple(kTestRemoteShardId1, kTestRemoteHostAndPort1));
+        shardInfos.emplace_back(std::make_tuple(kTestRemoteShardId2, kTestRemoteHostAndPort2));
+        addRemoteShards(shardInfos);
     }
 
 protected:
@@ -286,7 +250,6 @@ protected:
         auto originalStatus = originalErrorInfo->getOriginalError();
         ASSERT_EQ(originalStatus.code(), expectedOriginalCode);
     }
-    std::vector<RemoteCommandTargeterMock*> _targeters;  // Targeters are owned by the factory.
 };
 
 TEST_F(ShardsvrMultiStatementTransactionRequestsSenderTest,
