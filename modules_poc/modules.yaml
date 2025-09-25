@@ -247,9 +247,8 @@ query:
 catalog_and_routing:
   meta:
     description: >-
-      Core catalog and routing machinery, shared among shard_catalog, ddl and routing_and_topology
-      modules.
-    # TODO SERVER-105529: reorganize car_common content so that each file falls in one modules
+      Core catalog and routing machinery, shared among local_catalog, global_catalog and
+      routing_and_topology modules.
     slack: server-catalog-and-routing
     jira: Catalog and Routing
   files:
