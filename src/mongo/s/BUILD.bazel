@@ -772,6 +772,9 @@ mongo_cc_library(
         "sharding_initialization",
         "sharding_router_api",
     ] + select({
+        "@platforms//os:linux": ["//src/mongo/util:pin_code_segments"],
+        "//conditions:default": [],
+    }) + select({
         "@platforms//os:windows": ["//src/mongo/db:windows_options"],
         "//conditions:default": [],
     }) + select({
