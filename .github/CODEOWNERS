@@ -350,7 +350,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/generate_evergreen_bazelrc.sh @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/get_custom_build_promotion_expansions.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 /evergreen/get_custom_build_promotion_expansions_debug.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
-/evergreen/upload_custom_build_to_cloud_dev.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
+/evergreen/upload_custom_build_to_cloud_env.sh @10gen/devprod-release-infrastructure @svc-auto-approve-bot
 /evergreen/package* @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/validate_compile_commands.py @10gen/devprod-build @svc-auto-approve-bot
 /evergreen/packager_crypt_py_run.sh @10gen/devprod-build @svc-auto-approve-bot

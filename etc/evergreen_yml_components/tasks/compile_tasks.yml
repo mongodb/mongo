@@ -941,15 +941,16 @@ tasks:
         params:
           binary: bash
           env:
-            PROMOTE_TO_CLOUD_DEV: ${promote_to_cloud_dev}
+            PROMOTE_TO_CLOUD_ENV: ${promote_to_cloud_dev}
+            CLOUD_ENV: "cloud-dev"
             PROMOTE_BUILD_VARIANT: ${promote_build_variant}
             PROMOTE_MONGO_VERSION: ${version}
             PROMOTE_REVISION: ${promote_revision}
             PROMOTE_CDN_ADDRESS: ${promote_cdn_address}
-            CLOUD_DEV_API_PUBLIC_KEY: ${cloud_dev_api_public_key}
-            CLOUD_DEV_API_PRIVATE_KEY: ${cloud_dev_api_private_key}
+            CLOUD_ENV_API_PUBLIC_KEY: ${cloud_dev_api_public_key}
+            CLOUD_ENV_API_PRIVATE_KEY: ${cloud_dev_api_private_key}
           args:
-            - "./src/evergreen/upload_custom_build_to_cloud_dev.sh"
+            - "./src/evergreen/upload_custom_build_to_cloud_env.sh"
 
   - name: promote_sys_perf_build
     run_on: amazon2023-small
@@ -1006,15 +1007,16 @@ tasks:
         params:
           binary: bash
           env:
-            PROMOTE_TO_CLOUD_DEV: ${promote_to_cloud_dev}
+            PROMOTE_TO_CLOUD_ENV: ${promote_to_cloud_dev}
+            CLOUD_ENV: "cloud-dev"
             PROMOTE_BUILD_VARIANT: ${promote_build_variant}
             PROMOTE_MONGO_VERSION: ${version}
             PROMOTE_REVISION: ${promote_revision}
             PROMOTE_CDN_ADDRESS: ${promote_cdn_address}
-            CLOUD_DEV_API_PUBLIC_KEY: ${cloud_dev_api_public_key}
-            CLOUD_DEV_API_PRIVATE_KEY: ${cloud_dev_api_private_key}
+            CLOUD_ENV_API_PUBLIC_KEY: ${cloud_dev_api_public_key}
+            CLOUD_ENV_API_PRIVATE_KEY: ${cloud_dev_api_private_key}
           args:
-            - "./src/evergreen/upload_custom_build_to_cloud_dev.sh"
+            - "./src/evergreen/upload_custom_build_to_cloud_env.sh"
 
   - name: crypt_push
     run_on: rhel8.7-small
