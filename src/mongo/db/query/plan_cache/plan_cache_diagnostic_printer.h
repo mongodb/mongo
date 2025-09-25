@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
+#include "mongo/util/modules.h"
 
 #include <fmt/format.h>
 

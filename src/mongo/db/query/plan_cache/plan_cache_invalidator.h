@@ -31,6 +31,7 @@
 
 #include "mongo/db/local_catalog/collection.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>

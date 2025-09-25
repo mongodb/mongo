@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/util/modules.h"
 
 // The logging facility enforces the rule that logging should not be done in a header file. Since
 // template classes and functions below must be defined in the header file and since they use the

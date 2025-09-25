@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/string_data.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <functional>

@@ -33,6 +33,7 @@
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_cache/classic_plan_cache.h"
 #include "mongo/db/query/plan_ranking_decision.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 /**

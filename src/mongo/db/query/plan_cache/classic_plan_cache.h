@@ -36,6 +36,7 @@
 #include "mongo/db/query/plan_cache/plan_cache_key_info.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <cstdint>

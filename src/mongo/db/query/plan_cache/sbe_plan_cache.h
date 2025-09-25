@@ -42,6 +42,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/container_size_helper.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -64,7 +65,7 @@ namespace sbe {
  * sharding epoch is not updated on operations like chunk splits and moves but rather on sharding
  * and refine shard key operations.
  */
-struct PlanCacheKeyShardingEpoch {
+struct MONGO_MOD_PUB PlanCacheKeyShardingEpoch {
     bool operator==(const PlanCacheKeyShardingEpoch& other) const {
         return epoch == other.epoch && ts == other.ts;
     }
@@ -73,7 +74,7 @@ struct PlanCacheKeyShardingEpoch {
     Timestamp ts;
 };
 
-struct PlanCacheKeyCollectionState {
+struct MONGO_MOD_PUB PlanCacheKeyCollectionState {
     bool operator==(const PlanCacheKeyCollectionState& other) const {
         return other.uuid == uuid && other.version == version &&
             other.collectionGeneration == collectionGeneration;
@@ -111,7 +112,7 @@ struct PlanCacheKeyCollectionState {
 /**
  * Represents the "key" used in the PlanCache mapping from query shape -> query plan.
  */
-class PlanCacheKey {
+class MONGO_MOD_PUB PlanCacheKey {
 public:
     PlanCacheKey(PlanCacheKeyInfo&& info,
                  PlanCacheKeyCollectionState mainCollectionState,
@@ -230,7 +231,8 @@ struct CachedSbePlan {
     size_t solutionHash;
 };
 
-using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
+using PlanCacheEntry MONGO_MOD_PUB =
+    PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
 using CachedPlanHolder =
     mongo::CachedPlanHolder<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
 
@@ -255,12 +257,12 @@ using PlanCache = PlanCacheBase<PlanCacheKey,
 /**
  * A helper method to get the global SBE plan cache decorated in 'serviceCtx'.
  */
-PlanCache& getPlanCache(ServiceContext* serviceCtx);
+MONGO_MOD_PUB PlanCache& getPlanCache(ServiceContext* serviceCtx);
 
 /**
  * A wrapper for the helper above. 'opCtx' cannot be null.
  */
-PlanCache& getPlanCache(OperationContext* opCtx);
+MONGO_MOD_PUB PlanCache& getPlanCache(OperationContext* opCtx);
 
 /**
  * Removes cached plan entries with the given collection UUID and collection version number.
