@@ -525,6 +525,12 @@ def download_task_artifacts(
             version_id = skip_download["evg_urls_info"]["evg_version_id"]
             variant = skip_download["evg_urls_info"]["evg_build_variant"]
 
+    if variant == "enterprise-rhel-8-64-bit-future-git-tag-multiversion":
+        # Tasks on this variant depend on multiple archive_dist_test tasks from the same version, so
+        # it is ambiguous which binaries/debug symbols to download. We want "-latest" for the "new" binaries,
+        # and -last-lts/-last-continuous will come from the multiversion download list for the "old".
+        variant = "linux-x86-dynamic-compile-future-tag-multiversion-latest"
+
     all_downloaded = True
     multiversion_versions = set()
     with OtelThreadPoolExecutor() as executor:
