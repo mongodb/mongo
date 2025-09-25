@@ -373,3 +373,29 @@ py_binary(
         ),
     ],
 )
+
+py_library(
+    name = "local_rbe_container_url",
+    srcs = ["local_rbe_container_url.py"],
+    data = [
+        "//bazel/platforms:remote_execution_containers.bzl",
+    ],
+)
+
+py_binary(
+    name = "print_local_rbe_container_url",
+    srcs = ["print_local_rbe_container_url.py"],
+    deps = [
+        "local_rbe_container_url",
+    ],
+)
+
+py_binary(
+    name = "create_rbe_sysroot",
+    srcs = [
+        "create_rbe_sysroot.py",
+    ],
+    deps = [
+        "local_rbe_container_url",
+    ],
+)

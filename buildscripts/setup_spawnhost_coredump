@@ -259,6 +259,13 @@ fi' >> .bash_profile
         archive_fail "src"
     fi
 
+    RBE_SYSROOT_SCRIPT="${SRC_DIR}/buildscripts/create_rbe_sysroot.py"
+    if [[ -f "${RBE_SYSROOT_SCRIPT}" ]]; then
+        echo "Setting up RBE sysroot for unit test debugging..."
+        $python $RBE_SYSROOT_SCRIPT
+    else
+        echo "Failed to find RBE sysroot setup script."
+    fi
 
     set -x
 
@@ -398,4 +405,5 @@ fi
 # to error.
 if [[ -n "${slack_user}" ]]; then
     "$evg_binary_pathname" --config "$evg_credentials_pathname" notify slack -t "@$slack_user" -m "$slack_message"
+    "$evg_binary_pathname" --config "$evg_credentials_pathname" notify slack -t "@$slack_user" -m "If you run into unresolved system library symbols when debugging unit tests, please add -ex 'set sysroot $HOME_DIR/rbe_sysroot/' to your gdb command."
 fi

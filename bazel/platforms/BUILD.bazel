@@ -152,3 +152,7 @@ py_binary(
     srcs = ["remote_execution_containers_generator.py"],
     visibility = ["//visibility:public"],
 )
+
+exports_files([
+    "remote_execution_containers.bzl",
+])
