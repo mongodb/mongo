@@ -12,6 +12,7 @@ set(default_enable_iaa OFF)
 set(default_enable_debug_info ON)
 set(default_enable_static OFF)
 set(default_enable_shared ON)
+set(default_internal_sqlite3 ON)
 
 if("${CMAKE_BUILD_TYPE}" MATCHES "^(Release|RelWithDebInfo)$")
     set(default_have_diagnostics OFF)
@@ -47,6 +48,13 @@ endif()
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     set(default_enable_debug_info OFF)
+endif()
+
+# Use system provided sqlite3 if available.
+find_package(SQLite3 QUIET)
+
+if(SQLite3_FOUND)
+    set(default_internal_sqlite3 OFF)
 endif()
 
 if(WT_WIN)
@@ -351,7 +359,7 @@ config_bool(
 config_bool(
     ENABLE_INTERNAL_SQLITE3
     "Enable internal SQLite3 library. If disabled, the system SQLite3 library will be used."
-    DEFAULT ON
+    DEFAULT ${default_internal_sqlite3}
 )
 
 set(default_optimize_level "-Og")
