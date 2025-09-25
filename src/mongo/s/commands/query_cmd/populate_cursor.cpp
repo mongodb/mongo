@@ -118,12 +118,11 @@ BulkWriteCommandReply populateCursorReply(OperationContext* opCtx,
             break;
         }
 
-        auto nextObj = *next.getResult();
+        const auto& nextObj = *next.getResult();
         if (!responseSizeTracker.haveSpaceForNext(nextObj)) {
-            ccc->queueResult(nextObj);
+            ccc->queueResult(std::move(next));
             break;
         }
-
         numRepliesInFirstBatch++;
         responseSizeTracker.add(nextObj);
     }

@@ -551,14 +551,13 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
 
         // If this result will fit into the current batch, add it. Otherwise, stash it in the cursor
         // to be returned on the next getMore.
-        auto nextObj = *next.getResult();
+        const auto& nextObj = *next.getResult();
 
         if (!FindCommon::haveSpaceForNext(nextObj, objCount, responseBuilder.bytesUsed())) {
-            ccc->queueResult(nextObj);
+            ccc->queueResult(std::move(next));
             stashedResult = true;
             break;
         }
-
         // Set the postBatchResumeToken. For non-$changeStream aggregations, this will be empty.
         responseBuilder.setPostBatchResumeToken(ccc->getPostBatchResumeToken());
         responseBuilder.append(nextObj);

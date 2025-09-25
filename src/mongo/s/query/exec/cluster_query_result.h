@@ -46,17 +46,17 @@ public:
     ClusterQueryResult() = default;
 
     ClusterQueryResult(BSONObj resObj, boost::optional<ShardId> shardId = boost::none)
-        : _resultObj(resObj), _shardId(shardId) {}
+        : _resultObj(std::move(resObj)), _shardId(std::move(shardId)) {}
 
     bool isEOF() const {
         return !_resultObj;
     }
 
-    boost::optional<BSONObj> getResult() const {
+    const boost::optional<BSONObj>& getResult() const {
         return _resultObj;
     }
 
-    boost::optional<ShardId> getShardId() const {
+    const boost::optional<ShardId>& getShardId() const {
         return _shardId;
     }
 

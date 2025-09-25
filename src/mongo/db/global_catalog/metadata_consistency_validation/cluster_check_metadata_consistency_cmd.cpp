@@ -307,16 +307,16 @@ public:
                     break;
                 }
 
-                auto nextObj = *next.getResult();
+                const auto& nextObj = *next.getResult();
 
                 // If adding this object will cause us to exceed the message size limit, then we
                 // stash it for later.
                 if (!responseSizeTracker.haveSpaceForNext(nextObj)) {
-                    ccc->queueResult(nextObj);
+                    ccc->queueResult(std::move(next));
                     break;
                 }
                 responseSizeTracker.add(nextObj);
-                firstBatch.push_back(std::move(nextObj));
+                firstBatch.push_back(nextObj);
             }
 
             ccc->detachFromOperationContext();

@@ -41,7 +41,7 @@
 namespace mongo {
 
 void RouterStageQueuedData::queueResult(ClusterQueryResult&& result) {
-    auto resultObj = result.getResult();
+    const auto& resultObj = result.getResult();
     if (resultObj) {
         invariant(resultObj->isOwned());
     }

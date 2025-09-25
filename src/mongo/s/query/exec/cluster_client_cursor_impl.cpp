@@ -230,7 +230,7 @@ long long ClusterClientCursorImpl::getNumReturnedSoFar() const {
 }
 
 void ClusterClientCursorImpl::queueResult(ClusterQueryResult&& result) {
-    auto resultObj = result.getResult();
+    const auto& resultObj = result.getResult();
     if (resultObj) {
         invariant(resultObj->isOwned());
     }
