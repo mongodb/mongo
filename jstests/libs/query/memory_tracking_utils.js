@@ -7,7 +7,7 @@
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {iterateMatchingLogLines} from "jstests/libs/log.js";
-import {getAggPlanStages, getExecutionStages} from "jstests/libs/query/analyze_plan.js";
+import {getAggPlanStages, getExecutionStages, getPlanStage} from "jstests/libs/query/analyze_plan.js";
 
 /******************************************************************************************************
  * Constants for the regexes used to extract memory tracking metrics from the slow query log.
@@ -301,13 +301,23 @@ export function verifyProfilerMetrics({profilerEntries, verifyOptions}) {
     }
 }
 
-function verifyExplainMetrics({db, collName, pipeline, stageName, expectMemoryMetrics, numStages, options = {}}) {
+function verifyExplainMetrics({
+    db,
+    collName,
+    pipeline,
+    stageName,
+    expectMemoryMetrics,
+    numStages,
+    options = {},
+    skipStageCheck = false,
+    subpipelinePath = {},
+}) {
     const explainRes = db[collName].explain("executionStats").aggregate(pipeline, options);
 
     // If a query uses sbe, the explain version will be 2.
     const isSbeExplain = explainRes.explainVersion === "2";
 
-    function getStagesFromExplain(explainRes, stageName) {
+    function getStagesFromExplainFlat(explainRes, stageName) {
         let stages = getAggPlanStages(explainRes, stageName);
         // Even if SBE is enabled, there are some stages that are not supported in SBE and will
         // still run on classic. We should also check for the classic pipeline stage name.
@@ -328,6 +338,29 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, expectMemoryMe
                 tojson(explainRes),
         );
         return stages;
+    }
+
+    function getStagesFromExplain(explainRes, stageName) {
+        if (Object.entries(subpipelinePath).length == 0) {
+            return getStagesFromExplainFlat(explainRes, stageName);
+        }
+
+        // There was a non-empty subpipeline path, meaning that one of the stages contains a
+        // subpipeline with a nested stage that should report memory usage.
+        const wrapperStageName = Object.keys(subpipelinePath)[0];
+        const subpipelineFieldName = Object.keys(Object.values(subpipelinePath)[0])[0];
+
+        // Find the stage in the explain output that contains a subpipeline.
+        const wrapperStage = getStagesFromExplainFlat(explainRes, wrapperStageName);
+        const subpipeline = wrapperStage[0][wrapperStageName][subpipelineFieldName][0];
+        if (!subpipeline.hasOwnProperty("executionStats")) {
+            // If we are not explaining with executionStats verbosity, there won't be anything to
+            // find.
+            return [];
+        }
+        const execStages = getExecutionStages(subpipeline.$cursor)[0];
+        const stage = getPlanStage(execStages, stageName);
+        return [stage];
     }
 
     function assertNoMemoryMetricsInStages(explainRes, stageName) {
@@ -385,8 +418,10 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, expectMemoryMe
         );
     }
 
-    // Memory usage metrics appear within the stage's statistics.
-    assertHasMemoryMetricsInStages(explainRes, stageName);
+    if (!skipStageCheck) {
+        // Memory usage metrics appear within the stage's statistics.
+        assertHasMemoryMetricsInStages(explainRes, stageName);
+    }
 
     jsTest.log.info(
         "Test that memory usage metrics do not appear in the explain output when the verbosity is lower than executionStats.",
@@ -398,7 +433,7 @@ function verifyExplainMetrics({db, collName, pipeline, stageName, expectMemoryMe
     );
     // SBE stage metrics aren't outputted in queryPlanner explain, so checking
     // the stageName may result in no stages.
-    if (!isSbeExplain) {
+    if (!isSbeExplain && !skipStageCheck) {
         assertNoMemoryMetricsInStages(explainQueryPlannerRes, stageName);
     }
 }
@@ -415,6 +450,8 @@ export function runMemoryStatsTest({
     expectedNumGetMores,
     skipInUseTrackedMemBytesCheck = false,
     checkInUseTrackedMemBytesResets = true,
+    skipExplainStageCheck = false,
+    explainStageSubpipelinePath = {},
 }) {
     assert("pipeline" in commandObj, "Command object must include a pipeline field.");
     assert("comment" in commandObj, "Command object must include a comment field.");
@@ -463,6 +500,8 @@ export function runMemoryStatsTest({
         expectMemoryMetrics: featureFlagEnabled,
         numStages: 1,
         options: commandObj.allowDiskUse !== undefined ? {allowDiskUse: commandObj.allowDiskUse} : {},
+        skipStageCheck: skipExplainStageCheck,
+        subpipelinePath: explainStageSubpipelinePath,
     });
 }
 
