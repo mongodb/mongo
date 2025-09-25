@@ -1,8 +1,10 @@
 import base64
 import hashlib
 import json
+import multiprocessing
 import os
 import pathlib
+import platform
 import socket
 import sys
 
@@ -75,6 +77,51 @@ def write_workstation_bazelrc(args):
     except Exception:
         pass
 
+    # Collect system resource information
+    cpu_count = "Unknown"
+    total_memory_gb = "Unknown"
+    available_memory_gb = "Unknown"
+    filesystem_type = "Unknown"
+
+    # CPU count - works on all platforms
+    try:
+        cpu_count = str(os.cpu_count() or multiprocessing.cpu_count())
+    except Exception:
+        pass
+
+    # Memory - Linux only
+    try:
+        if platform.system() == "Linux":
+            with open("/proc/meminfo", "r") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        kb = int(line.split()[1])
+                        total_memory_gb = str(round(kb / (1024 * 1024), 2))
+                    elif line.startswith("MemAvailable:"):
+                        kb = int(line.split()[1])
+                        available_memory_gb = str(round(kb / (1024 * 1024), 2))
+    except Exception:
+        pass
+
+    # Filesystem type - Linux only
+    try:
+        if platform.system() == "Linux":
+            repo_path = str(repo_root)
+            with open("/proc/mounts", "r") as f:
+                best_mountpoint_len = 0
+                for line in f:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        mountpoint, fstype = parts[1], parts[2]
+                        if (
+                            repo_path.startswith(mountpoint)
+                            and len(mountpoint) > best_mountpoint_len
+                        ):
+                            filesystem_type = fstype
+                            best_mountpoint_len = len(mountpoint)
+    except Exception:
+        pass
+
     filtered_args = args[1:]
     if "--" in filtered_args:
         filtered_args = filtered_args[: filtered_args.index("--")] + ["--", "(REDACTED)"]
@@ -93,6 +140,10 @@ common --bes_keywords=engflow:BuildScmRevision={commit}
 common --bes_keywords=engflow:BuildScmStatus={status}
 common --bes_keywords=rawCommandLineBase64={b64_cmd_line}
 common --bes_keywords=base_branch={base_branch}
+common --bes_keywords=client_system:cpu_count={cpu_count}
+common --bes_keywords=client_system:total_memory_gb={total_memory_gb}
+common --bes_keywords=client_system:available_memory_gb={available_memory_gb}
+common --bes_keywords=client_system:filesystem_type={filesystem_type}
 """
 
     otel_parent_id = os.environ.get("otel_parent_id")
