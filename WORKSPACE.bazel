@@ -210,6 +210,9 @@ poetry(
     name = "poetry_bazel_rules_mongo",
     lockfile = "@bazel_rules_mongo//:poetry.lock",
     pyproject = "@bazel_rules_mongo//:pyproject.toml",
+    python_interpreter_target_default = "@py_host//:dist/bin/python3",
+    python_interpreter_target_mac = "@py_host//:dist/bin/python3",
+    python_interpreter_target_win = "@py_host//:dist/python.exe",
 )
 
 load("//bazel/format:shfmt.bzl", "shfmt")
