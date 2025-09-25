@@ -244,9 +244,6 @@ class ReplSetBuilder(FixtureBuilder):
                     disagg_base_config
                 )
                 opts["set_parameters"]["disaggregatedStorageEnabled"] = True
-                opts["set_parameters"]["logComponentVerbosity"] = json.dumps(
-                    {"disaggregatedStorage": 5}
-                )
                 node.set_mongod_options(opts)
 
         if replset.start_initial_sync_node:

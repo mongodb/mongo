@@ -181,6 +181,18 @@ class ReplicaSetFixture(interface.ReplFixture, interface._DockerComposeInterface
 
     def setup(self):
         """Set up the replica set."""
+
+        if self.disagg_base_config:
+            # Wait for primary (first node) to get elected first before
+            # starting other nodes, otherwise the election can race.
+            self.nodes[0].setup()
+            self.nodes[0].await_ready()
+            self._await_primary()
+            for i in range(1, self.num_nodes):
+                self.nodes[i].setup()
+                self.nodes[i].await_ready()
+            return
+
         start_node = 0
         if self.use_auto_bootstrap_procedure:
             # We need to wait for the first node to finish auto-bootstrapping so that we can
