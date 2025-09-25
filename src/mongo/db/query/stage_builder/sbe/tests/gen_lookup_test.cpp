@@ -46,24 +46,21 @@
 #include "mongo/db/local_catalog/collection_options.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
-#include "mongo/db/query/shard_filterer_factory_interface.h"
 #include "mongo/db/query/stage_builder/sbe/builder.h"
 #include "mongo/db/query/stage_builder/sbe/tests/sbe_builder_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/uuid.h"
 
 #include <cstddef>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -75,7 +72,7 @@ namespace {
 
 using namespace value;
 
-class LookupStageBuilderTest : public SbeStageBuilderTestFixture {
+class JoinStageBuilderTestBase : public SbeStageBuilderTestFixture {
 protected:
     // Set to "true" and recompile the tests to dump plans and skip asserts in favor of printing
     // more data. Because asserts are suppressed in this mode tests might pass while being broken.
@@ -110,57 +107,9 @@ public:
         SlotAccessor* resultSlotAccessor;
     };
 
-    // Constructs ready-to-execute SBE tree for $lookup specified by the arguments.
-    CompiledTree buildLookupSbeTree(EqLookupNode::LookupStrategy strategy,
-                                    MultipleCollectionAccessor& colls,
-                                    const std::string& localKey,
-                                    const std::string& foreignKey,
-                                    const std::string& asKey) {
-        // Documents from the local collection are provided using collection scan.
-        auto localScanNode = std::make_unique<CollectionScanNode>();
-        localScanNode->nss = _nss;
-
-        // Construct logical query solution.
-        auto lookupNode = std::make_unique<EqLookupNode>(std::move(localScanNode),
-                                                         _foreignNss,
-                                                         localKey,
-                                                         foreignKey,
-                                                         asKey,
-                                                         strategy,
-                                                         boost::none /* idxEntry */,
-                                                         true /* shouldProduceBson */);
-        auto solution = makeQuerySolution(std::move(lookupNode));
-
-        // Convert logical solution into the physical SBE plan.
-        auto [resultSlots, stage, data, _] =
-            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
-
-        if (enableDebugOutput) {
-            std::cout << std::endl << DebugPrinter{true}.print(stage->debugPrint()) << std::endl;
-        }
-
-        // Prepare the SBE tree for execution.
-        auto ctx = makeCompileCtx();
-        prepareTree(ctx.get(), stage.get());
-
-        auto resultSlot = *data.staticData->resultSlot;
-        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
-
-        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
-    }
-
-    // Check that SBE plan for '$lookup' returns expected documents.
-    void assertReturnedDocuments(EqLookupNode::LookupStrategy strategy,
-                                 const std::string& localKey,
-                                 const std::string& foreignKey,
-                                 const std::string& asKey,
-                                 const std::vector<BSONObj>& expected) {
-        if (enableDebugOutput) {
-            std::cout << std::endl
-                      << "LookupStrategy: " << EqLookupNode::serializeLookupStrategy(strategy)
-                      << std::endl;
-        }
-
+    template <class Callable>
+    void executeTestWithPlanCallbackAndExpectedResults(Callable&& buildSbePlan,
+                                                       const std::vector<BSONObj>& expected) {
         CollectionOrViewAcquisitionMap secondaryAcquisitions;
         CollectionOrViewAcquisitionRequests acquisitionRequests;
         // Emplace the main acquisition request.
@@ -180,7 +129,7 @@ public:
                                          secondaryAcquisitions,
                                          false /* isAnySecondaryNamespaceAViewOrNotFullyLocal */);
 
-        auto tree = buildLookupSbeTree(strategy, colls, localKey, foreignKey, asKey);
+        auto tree = std::invoke(buildSbePlan, colls);
         auto& stage = tree.stage;
 
         size_t i = 0;
@@ -214,6 +163,31 @@ public:
 
         ASSERT_EQ(i, expected.size());
         stage->close();
+    }
+
+protected:
+    const NamespaceString _foreignNss =
+        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+};
+
+class LookupStageBuilderTest : public JoinStageBuilderTestBase {
+public:
+    void assertReturnedDocuments(EqLookupNode::LookupStrategy strategy,
+                                 const std::string& localKey,
+                                 const std::string& foreignKey,
+                                 const std::string& asKey,
+                                 const std::vector<BSONObj>& expected) {
+        if (enableDebugOutput) {
+            std::cout << std::endl
+                      << "LookupStrategy: " << EqLookupNode::serializeLookupStrategy(strategy)
+                      << std::endl;
+        }
+
+        executeTestWithPlanCallbackAndExpectedResults(
+            [&](MultipleCollectionAccessor& colls) {
+                return buildLookupSbeTree(strategy, colls, localKey, foreignKey, asKey);
+            },
+            expected);
     }
 
     void assertReturnedDocuments(const std::string& localKey,
@@ -267,13 +241,107 @@ public:
         }
     }
 
-protected:
+private:
     std::vector<EqLookupNode::LookupStrategy> strategies = {
         EqLookupNode::LookupStrategy::kNestedLoopJoin, EqLookupNode::LookupStrategy::kHashJoin};
 
+    // Constructs ready-to-execute SBE tree for $lookup specified by the arguments.
+    CompiledTree buildLookupSbeTree(EqLookupNode::LookupStrategy strategy,
+                                    MultipleCollectionAccessor& colls,
+                                    const std::string& localKey,
+                                    const std::string& foreignKey,
+                                    const std::string& asKey) {
+        // Documents from the local collection are provided using collection scan.
+        auto localScanNode = std::make_unique<CollectionScanNode>();
+        localScanNode->nss = _nss;
+
+        // Construct logical query solution.
+        auto lookupNode = std::make_unique<EqLookupNode>(std::move(localScanNode),
+                                                         _foreignNss,
+                                                         localKey,
+                                                         foreignKey,
+                                                         asKey,
+                                                         strategy,
+                                                         boost::none /* idxEntry */,
+                                                         true /* shouldProduceBson */);
+        auto solution = makeQuerySolution(std::move(lookupNode));
+
+        // Convert logical solution into the physical SBE plan.
+        auto [resultSlots, stage, data, _] =
+            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
+
+        if (enableDebugOutput) {
+            std::cout << std::endl << DebugPrinter{true}.print(stage->debugPrint()) << std::endl;
+        }
+
+        // Prepare the SBE tree for execution.
+        auto ctx = makeCompileCtx();
+        prepareTree(ctx.get(), stage.get());
+
+        auto resultSlot = *data.staticData->resultSlot;
+        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
+
+        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
+    }
+};
+
+class NestedLoopJoinStageBuilderTest : public JoinStageBuilderTestBase {
+public:
+    void assertReturnedDocuments(FieldPath leftField,
+                                 FieldPath rightField,
+                                 boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                 boost::optional<FieldPath> rightEmbeddingFieldArg,
+                                 const std::vector<BSONObj>& expected) {
+        executeTestWithPlanCallbackAndExpectedResults(
+            [&](MultipleCollectionAccessor& colls) {
+                return buildNestedLoopJoinSbeTree(colls,
+                                                  std::move(leftField),
+                                                  std::move(rightField),
+                                                  std::move(leftEmbeddingFieldArg),
+                                                  std::move(rightEmbeddingFieldArg));
+            },
+            expected);
+    }
+
 private:
-    const NamespaceString _foreignNss =
-        NamespaceString::createNamespaceString_forTest("testdb.sbe_stage_builder_foreign");
+    CompiledTree buildNestedLoopJoinSbeTree(MultipleCollectionAccessor& colls,
+                                            FieldPath leftField,
+                                            FieldPath rightField,
+                                            boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                            boost::optional<FieldPath> rightEmbeddingFieldArg) {
+        auto outerScanNode = std::make_unique<CollectionScanNode>();
+        outerScanNode->nss = _nss;
+
+        auto innerScanNode = std::make_unique<CollectionScanNode>();
+        innerScanNode->nss = _foreignNss;
+
+        auto nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
+            std::move(outerScanNode),
+            std::move(innerScanNode),
+            std::vector<JoinPredicate>{JoinPredicate{.op = JoinPredicate::ComparisonOp::Eq,
+                                                     .leftField = std::move(leftField),
+                                                     .rightField = std::move(rightField)}},
+            std::move(leftEmbeddingFieldArg),
+            std::move(rightEmbeddingFieldArg));
+        auto solution = makeQuerySolution(std::move(nestedLoopJoinEmbeddingNode));
+
+        // Convert logical solution into the physical SBE plan.
+        auto [resultSlots, stage, data, _] =
+            buildPlanStage(std::move(solution), colls, false /*hasRecordId*/);
+
+        if (enableDebugOutput) {
+            std::cout << std::endl << DebugPrinter{true}.print(stage->debugPrint()) << std::endl;
+        }
+
+        // Prepare the SBE tree for execution.
+        auto ctx = makeCompileCtx();
+        prepareTree(ctx.get(), stage.get());
+
+        auto resultSlot = *data.staticData->resultSlot;
+        SlotAccessor* resultSlotAccessor = stage->getAccessor(*ctx, resultSlot);
+
+        return CompiledTree{std::move(stage), std::move(data), std::move(ctx), resultSlotAccessor};
+    }
 };
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_Basic) {
@@ -793,5 +861,180 @@ TEST_F(LookupStageBuilderTest, ThreeComponentAsPathDoesNotPerformArrayTraversal)
         "_id", "_id", "one.two.three", {fromjson("{_id: 0, one: {two: {three: [{_id: 0}]}}}")});
 }
 
+TEST_F(NestedLoopJoinStageBuilderTest, JoinWithSinglePredicate) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, lkey: 1}"),
+        fromjson("{_id: 1, lkey: -1}"),
+        fromjson("{_id: 2, lkey: 3}"),
+        fromjson("{_id: 3, no_lkey: -2}"),
+        fromjson("{_id: 4, lkey: null}"),
+        fromjson("{_id: 5, lkey: undefined}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 0}"),
+        fromjson("{_id: 1, fkey: 1}"),
+        fromjson("{_id: 2, fkey: 2}"),
+        fromjson("{_id: 3, fkey: 3}"),
+        fromjson("{_id: 4, no_fkey: -3}"),
+        fromjson("{_id: 5, fkey: null}"),
+        fromjson("{_id: 6, fkey: undefined}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, lkey: 1, embedding: {_id: 1, fkey: 1}}"),
+        fromjson("{_id: 2, lkey: 3, embedding: {_id: 3, fkey: 3}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 3, no_lkey: -2, embedding: {_id: 5, fkey: null}}"),
+        fromjson("{_id: 4, lkey: null, embedding: {_id: 4, no_fkey: -3}}"),
+        fromjson("{_id: 4, lkey: null, embedding: {_id: 5, fkey: null}}"),
+        fromjson("{_id: 5, lkey: undefined, embedding: {_id: 6, fkey: undefined}}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("lkey"),
+                            FieldPath("fkey"),
+                            {},
+                            boost::make_optional<FieldPath>("embedding"),
+                            expected);
+}
+
+TEST_F(NestedLoopJoinStageBuilderTest, JoinWithSinglePredicateEmbeddingLeftInRight) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, lkey: 1}"),
+        fromjson("{_id: 1, lkey: -1}"),
+        fromjson("{_id: 2, lkey: 3}"),
+        fromjson("{_id: 3, no_lkey: -2}"),
+        fromjson("{_id: 4, lkey: null}"),
+        fromjson("{_id: 5, lkey: undefined}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 0}"),
+        fromjson("{_id: 1, fkey: 1}"),
+        fromjson("{_id: 2, fkey: 2}"),
+        fromjson("{_id: 3, fkey: 3}"),
+        fromjson("{_id: 4, no_fkey: -3}"),
+        fromjson("{_id: 5, fkey: null}"),
+        fromjson("{_id: 6, fkey: undefined}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 1, fkey: 1, embedding: {_id: 0, lkey: 1}}"),
+        fromjson("{_id: 3, fkey: 3, embedding: {_id: 2, lkey: 3}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 3, no_lkey: -2}}"),
+        fromjson("{_id: 5, fkey: null, embedding: {_id: 3, no_lkey: -2}}"),
+        fromjson("{_id: 4, no_fkey: -3, embedding: {_id: 4, lkey: null}}"),
+        fromjson("{_id: 5, fkey: null, embedding: {_id: 4, lkey: null}}"),
+        fromjson("{_id: 6, fkey: undefined, embedding: {_id: 5, lkey: undefined}}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("lkey"),
+                            FieldPath("fkey"),
+                            boost::make_optional<FieldPath>("embedding"),
+                            {},
+                            expected);
+}
+
+TEST_F(NestedLoopJoinStageBuilderTest, JoinWithDottedPathPredicate) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, a: {b: 1}}"),
+        fromjson("{_id: 1, a: {b: 2}}"),
+        fromjson("{_id: 2, no_a: -1}"),
+        fromjson("{_id: 3, a: null}"),
+        fromjson("{_id: 4, a: 'str'}"),
+        fromjson("{_id: 5, a: {b: null}}"),
+        fromjson("{_id: 6, a: {no_b: -2}}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, x: {y: {z: 1}}}"),
+        fromjson("{_id: 1, no_x: -3}"),
+        fromjson("{_id: 2, x: null}"),
+        fromjson("{_id: 3, x: 'str2'}"),
+        fromjson("{_id: 4, x: {no_y: -3}}"),
+        fromjson("{_id: 5, x: {y: null}}"),
+        fromjson("{_id: 6, x: {y: {z: null}}}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, a: {b: 1}, embedding: {_id: 0, x: {y: {z: 1}}}}"),
+        fromjson("{_id: 2, no_a: -1, embedding: {_id: 1, no_x: -3}}"),
+        fromjson("{_id: 2, no_a: -1, embedding: {_id: 2, x: null}}"),
+        fromjson("{_id: 2, no_a: -1, embedding: {_id: 3, x: 'str2'}}"),
+        fromjson("{_id: 2, no_a: -1, embedding: {_id: 4, x: {no_y: -3}}}"),
+        fromjson("{_id: 2, no_a: -1, embedding: {_id: 5, x: {y: null}}}"),
+        fromjson("{_id: 2, no_a: -1, embedding: {_id: 6, x: {y: {z: null}}}}"),
+        fromjson("{_id: 3, a: null, embedding: {_id: 1, no_x: -3}}"),
+        fromjson("{_id: 3, a: null, embedding: {_id: 2, x: null}}"),
+        fromjson("{_id: 3, a: null, embedding: {_id: 3, x: 'str2'}}"),
+        fromjson("{_id: 3, a: null, embedding: {_id: 4, x: {no_y: -3}}}"),
+        fromjson("{_id: 3, a: null, embedding: {_id: 5, x: {y: null}}}"),
+        fromjson("{_id: 3, a: null, embedding: {_id: 6, x: {y: {z: null}}}}"),
+        fromjson("{_id: 4, a: 'str', embedding: {_id: 1, no_x: -3}}"),
+        fromjson("{_id: 4, a: 'str', embedding: {_id: 2, x: null}}"),
+        fromjson("{_id: 4, a: 'str', embedding: {_id: 3, x: 'str2'}}"),
+        fromjson("{_id: 4, a: 'str', embedding: {_id: 4, x: {no_y: -3}}}"),
+        fromjson("{_id: 4, a: 'str', embedding: {_id: 5, x: {y: null}}}"),
+        fromjson("{_id: 4, a: 'str', embedding: {_id: 6, x: {y: {z: null}}}}"),
+        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 1, no_x: -3}}"),
+        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 2, x: null}}"),
+        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 3, x: 'str2'}}"),
+        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 4, x: {no_y: -3}}}"),
+        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 5, x: {y: null}}}"),
+        fromjson("{_id: 5, a: {b: null}, embedding: {_id: 6, x: {y: {z: null}}}}"),
+        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 1, no_x: -3}}"),
+        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 2, x: null}}"),
+        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 3, x: 'str2'}}"),
+        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 4, x: {no_y: -3}}}"),
+        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 5, x: {y: null}}}"),
+        fromjson("{_id: 6, a: {no_b: -2}, embedding: {_id: 6, x: {y: {z: null}}}}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("a.b"),
+                            FieldPath("x.y.z"),
+                            {},
+                            boost::make_optional<FieldPath>("embedding"),
+                            expected);
+}
+
+TEST_F(NestedLoopJoinStageBuilderTest, JoinWithDottedPathEmbedding) {
+    const std::vector<BSONObj> ldocs = {
+        fromjson("{_id: 0, a: {b: {c: 1, x: 1}, y: 1}, lkey: 0}"),
+        fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: 1}, z: 1}}"),
+        fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1}, z: 1}}"),
+        fromjson("{_id: 3, lkey: 0, a: {x: 1, b: {c: null, y: 1}, z: 1}}"),
+        fromjson("{_id: 4, lkey: 0, a: {x: 1, b: {c: [{d: 2}, 3], y: 1}, z: 1}}"),
+        fromjson("{_id: 5, lkey: 0, a: {x: 1, b: [{c: 1, y: 1}, 2], z: 1}}"),
+        fromjson("{_id: 6, lkey: 0, a: {x: 1, b: 'str', z: 1}}"),
+        fromjson("{_id: 7, lkey: 0, a: [{x: 1, b: {c: null, y: 1}, z: 1}, {b: {c: 1, d: 2}}]}"),
+        fromjson("{_id: 8, lkey: 0, a: {}, b: 2}"),
+    };
+
+    const std::vector<BSONObj> fdocs = {
+        fromjson("{_id: 0, fkey: 0}"),
+    };
+
+    const std::vector<BSONObj> expected = {
+        fromjson("{_id: 0, a: {b: {c: {_id: 0, fkey: 0}, x: 1}, y: 1}, lkey: 0}"),
+        fromjson("{_id: 1, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
+        fromjson("{_id: 2, lkey: 0, a: {x: 1, b: {y: 1, c: {_id: 0, fkey: 0}}, z: 1}}"),
+        fromjson("{_id: 3, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
+        fromjson("{_id: 4, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}, y: 1}, z: 1}}"),
+        fromjson("{_id: 5, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
+        fromjson("{_id: 6, lkey: 0, a: {x: 1, b: {c: {_id: 0, fkey: 0}}, z: 1}}"),
+        fromjson("{_id: 7, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}}"),
+        fromjson("{_id: 8, lkey: 0, a: {b: {c: {_id: 0, fkey: 0}}}, b: 2}"),
+    };
+
+    insertDocuments(ldocs, fdocs);
+    assertReturnedDocuments(FieldPath("lkey"),
+                            FieldPath("fkey"),
+                            {},
+                            boost::make_optional<FieldPath>("a.b.c"),
+                            expected);
+}
 }  // namespace
 }  // namespace mongo::sbe

@@ -907,15 +907,15 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     // Currently, we assume that each query operates on at most one collection, but a rooted $or
     // queries can have more than one collscan stages with clustered collections.
     auto [node, ct] = solution.getFirstNodeByType(STAGE_COLLSCAN);
-    auto [_, orCt] = solution.getFirstNodeByType(STAGE_OR);
+    auto [_1, orCt] = solution.getFirstNodeByType(STAGE_OR);
+    auto [_2, nljCt] = solution.getFirstNodeByType(STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE);
     const unsigned long numCollscanStages = ct;
-    const unsigned long numOrStages = orCt;
+    const unsigned long numMultiScanNodes = orCt + nljCt;
     tassert(7182000,
-            str::stream() << "Found " << numCollscanStages << " nodes of type COLLSCAN, and "
-                          << numOrStages
-                          << " nodes of type OR, expected less than one COLLSCAN nodes or at "
-                             "least one OR stage.",
-            numCollscanStages <= 1 || numOrStages > 0);
+            str::stream()
+                << "Found " << numCollscanStages
+                << " nodes of type COLLSCAN but no nodes that support multiple data access paths",
+            numCollscanStages <= 1 || numMultiScanNodes);
 
     if (node) {
         auto csn = static_cast<const CollectionScanNode*>(node);
@@ -5043,7 +5043,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::build(const QuerySolut
         {STAGE_SHARDING_FILTER, &SlotBasedStageBuilder::buildShardFilter},
         {STAGE_SEARCH, &SlotBasedStageBuilder::buildSearch},
         {STAGE_WINDOW, &SlotBasedStageBuilder::buildWindow},
-        {STAGE_UNPACK_TS_BUCKET, &SlotBasedStageBuilder::buildUnpackTsBucket}};
+        {STAGE_UNPACK_TS_BUCKET, &SlotBasedStageBuilder::buildUnpackTsBucket},
+        {STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE,
+         &SlotBasedStageBuilder::buildNestedLoopJoinEmbeddingNode},
+    };
 
     tassert(4822884,
             str::stream() << "Unsupported QSN in SBE stage builder: " << root->toString(),

@@ -1986,8 +1986,8 @@ void WindowNode::appendToString(str::stream* ss, int indent) const {
 HashJoinEmbeddingNode::HashJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
                                              std::unique_ptr<QuerySolutionNode> rightChildArg,
                                              std::vector<JoinPredicate> joinPredicatesArg,
-                                             boost::optional<std::string> leftEmbeddingFieldArg,
-                                             boost::optional<std::string> rightEmbeddingFieldArg)
+                                             boost::optional<FieldPath> leftEmbeddingFieldArg,
+                                             boost::optional<FieldPath> rightEmbeddingFieldArg)
     : BinaryJoinEmbeddingNode(std::move(leftChildArg),
                               std::move(rightChildArg),
                               std::move(joinPredicatesArg),
@@ -2002,9 +2002,11 @@ HashJoinEmbeddingNode::HashJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> 
 
 void BinaryJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent + 1);
-    *ss << "leftEmbeddingField: " << leftEmbeddingField.value_or("(none)") << "\n";
+    *ss << "leftEmbeddingField: "
+        << (leftEmbeddingField ? leftEmbeddingField->fullPath() : "(none)") << "\n";
     addIndent(ss, indent + 1);
-    *ss << "rightEmbeddingField: " << rightEmbeddingField.value_or("(none)") << "\n";
+    *ss << "rightEmbeddingField: "
+        << (rightEmbeddingField ? rightEmbeddingField->fullPath() : "(none)") << "\n";
     addIndent(ss, indent + 1);
     *ss << "joinPredicates:\n";
     for (auto&& joinPred : joinPredicates) {
