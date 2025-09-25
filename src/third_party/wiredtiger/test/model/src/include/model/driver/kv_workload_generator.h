@@ -121,6 +121,7 @@ struct kv_workload_generator_spec {
     float timing_stress_hs_sweep_race;
     float timing_stress_prepare_ckpt_delay;
     float timing_stress_commit_txn_slow;
+    float timing_stress_rec_before_wrapup;
 
     /*
      * kv_workload_generator_spec::kv_workload_generator_spec --

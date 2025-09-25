@@ -37,8 +37,8 @@ class test_prepare42(test_prepare_preserve_prepare_base):
     @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
     def test_prepare_insert_rollback(self):
         # Setup: Initialize timestamps with stable < prepare timestamp
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
 
         create_params = 'key_format=i,value_format=S'
         self.session.create(self.uri, create_params)
@@ -65,7 +65,7 @@ class test_prepare42(test_prepare_preserve_prepare_base):
         # Rollback the prepared transaction
         session_prepare.rollback_transaction("rollback_timestamp=" + self.timestamp_str(45))
 
-        # Verify checkpoint writes prepared time window to disk
+        # Verify checkpoint writes nothing to disk
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
         }, self.uri)
@@ -86,26 +86,122 @@ class test_prepare42(test_prepare_preserve_prepare_base):
             evict_cursor.set_key(i)
             self.assertEqual(evict_cursor.search(), 0)
             evict_cursor.reset()
-        evict_cursor.close()
+        session_evict.rollback_transaction()
 
         # Make stable timestamp equal to rollback timestamp - this should delete the prepared update
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(45))
 
-        # Verify checkpoint writes prepared time window to disk
+        # Verify checkpoint writes nothing to disk
         self.checkpoint_and_verify_stats({
             wiredtiger.stat.dsrc.rec_time_window_prepared: False,
         }, self.uri)
 
         # Force the page to be evicted again
-        session_evict = self.conn.open_session("debug=(release_evict_page=true)")
         session_evict.begin_transaction("ignore_prepare=true")
-        evict_cursor = session_evict.open_cursor(self.uri, None, None)
         for i in range(1, 20):
             evict_cursor.set_key(i)
             self.assertEqual(evict_cursor.search(), 0)
             evict_cursor.reset()
         evict_cursor.close()
+        session_evict.rollback_transaction()
 
         # Verify the key is gone
         cursor.set_key(20)
+        self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
+
+    @wttest.skip_for_hook("disagg", "Skip test until cell packing/unpacking is supported for page delta")
+    def test_prepare_insert_rollback_with_globally_visible_stop_point(self):
+        # Setup: Initialize timestamps with stable < prepare timestamp
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(20))
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(10))
+
+        create_params = 'key_format=i,value_format=S'
+        self.session.create(self.uri, create_params)
+
+        # Insert a value and commit for keys 1-19
+        cursor = self.session.open_cursor(self.uri)
+        self.session.begin_transaction()
+        for i in range(1, 20):
+            cursor.set_key(i)
+            cursor.set_value("commit_value")
+            cursor.insert()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(21))
+
+        # Force the page to be evicted
+        session_evict = self.conn.open_session("debug=(release_evict_page=true)")
+        session_evict.begin_transaction("ignore_prepare=true")
+        evict_cursor = session_evict.open_cursor(self.uri, None, None)
+        for i in range(1, 19):
+            evict_cursor.set_key(i)
+            self.assertEqual(evict_cursor.search(), 0)
+            evict_cursor.reset()
+        session_evict.rollback_transaction()
+
+        # Delete key 19
+        self.session.begin_transaction()
+        cursor.set_key(19)
+        cursor.remove()
+        self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(25))
+
+        # Make the delete stable
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(25))
+
+        # Force the page to be evicted
+        session_evict.begin_transaction("ignore_prepare=true")
+        for i in range(1, 19):
+            evict_cursor.set_key(i)
+            self.assertEqual(evict_cursor.search(), 0)
+            evict_cursor.reset()
+        session_evict.rollback_transaction()
+
+        # Make the delete globally visible
+        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(25))
+
+        # Update key 19 with a prepared update prepared_id=1
+        session_prepare = self.conn.open_session()
+        cursor_prepare = session_prepare.open_cursor(self.uri)
+        session_prepare.begin_transaction()
+        cursor_prepare.set_key(19)
+        cursor_prepare.set_value("prepared_value_20_3")
+        cursor_prepare.insert()
+        session_prepare.prepare_transaction('prepare_timestamp=' + self.timestamp_str(35)+',prepared_id=' + self.prepared_id_str(1))
+
+        # Rollback the prepared transaction
+        session_prepare.rollback_transaction("rollback_timestamp=" + self.timestamp_str(45))
+
+        # Verify checkpoint writes nothing to disk
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: False,
+        }, self.uri)
+
+        # Make stable timestamp equal to prepare timestamp - this should allow checkpoint to reconcile prepared update
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(35))
+
+        # Verify checkpoint writes prepared time window to disk
+        self.checkpoint_and_verify_stats({
+            wiredtiger.stat.dsrc.rec_time_window_prepared: True,
+        }, self.uri)
+
+        # Force the page to be evicted to trigger update restore eviction
+        session_evict.begin_transaction("ignore_prepare=true")
+        for i in range(1, 19):
+            evict_cursor.set_key(i)
+            self.assertEqual(evict_cursor.search(), 0)
+            evict_cursor.reset()
+        session_evict.rollback_transaction()
+
+        # Make stable timestamp equal to rollback timestamp
+        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(45))
+
+        # Force the page to be evicted again
+        session_evict.begin_transaction("ignore_prepare=true")
+        for i in range(1, 19):
+            evict_cursor.set_key(i)
+            self.assertEqual(evict_cursor.search(), 0)
+            evict_cursor.reset()
+        evict_cursor.close()
+        session_evict.rollback_transaction()
+
+        # Verify the key
+        cursor.set_key(19)
         self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)

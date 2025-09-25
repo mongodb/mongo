@@ -1011,6 +1011,7 @@ err:
 static int
 __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, const char *config)
 {
+    WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(disagg_config);
     WT_DECL_ITEM(ingest_uri_buf);
@@ -1031,6 +1032,11 @@ __create_layered(WT_SESSION_IMPL *session, const char *uri, bool exclusive, cons
     constituent_cfg = NULL;
     tablecfg = NULL;
     meta_value = NULL;
+
+    ret = __wt_config_getones(session, config, "log.enabled", &cval);
+    WT_RET_NOTFOUND_OK(ret);
+    if (ret == 0 && cval.val > 0)
+        WT_RET_MSG(session, EINVAL, "Logging is not supported for layered.");
 
     WT_RET(__wt_scr_alloc(session, 0, &disagg_config));
     WT_ERR(__wt_scr_alloc(session, 0, &ingest_uri_buf));

@@ -324,7 +324,8 @@ __btree_setup_page_log(WT_SESSION_IMPL *session, WT_BTREE *btree)
     cfg = btree->dhandle->cfg;
 
     /* Setup any configured page log on the data handle */
-    WT_RET_NOTFOUND_OK(__wt_config_gets(session, cfg, "disaggregated.page_log", &page_log_item));
+    ret = __wt_config_gets(session, cfg, "disaggregated.page_log", &page_log_item);
+    WT_RET_NOTFOUND_OK(ret);
     if (ret == WT_NOTFOUND || page_log_item.len == 0) {
         npage_log = S2C(session)->disaggregated_storage.npage_log;
         if (npage_log != NULL)

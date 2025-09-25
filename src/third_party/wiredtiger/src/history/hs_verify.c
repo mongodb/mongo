@@ -228,7 +228,8 @@ __wt_hs_verify(WT_SESSION_IMPL *session)
 
     hs_id = 0;
     for (;;) {
-        WT_RET_NOTFOUND_OK(ret = __wt_curhs_next_hs_id(session, hs_id, &hs_id));
+        ret = __wt_curhs_next_hs_id(session, hs_id, &hs_id);
+        WT_RET_NOTFOUND_OK(ret);
         if (ret == WT_NOTFOUND)
             return (0);
         WT_RET(__hs_verify(session, hs_id));

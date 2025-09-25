@@ -64,15 +64,19 @@ __key_return(WT_CURSOR_BTREE *cbt)
 
 /*
  * __read_col_time_window --
- *     Retrieve the time window from a column store cell.
+ *     Retrieve the time window from a column store cell. Returns false if there is no time window.
  */
-static void
+static bool
 __read_col_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL *cell, WT_TIME_WINDOW *tw)
 {
     WT_CELL_UNPACK_KV unpack;
 
     __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
+    if (__wt_cell_type(cell) == WT_CELL_DEL)
+        return (false);
+
     WT_TIME_WINDOW_COPY(tw, &unpack.tw);
+    return (true);
 }
 
 /*
@@ -99,7 +103,8 @@ __wti_read_row_time_window(WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip,
 
 /*
  * __col_fix_get_time_window --
- *     Look for a time window on a fixed-length column page.
+ *     Look for a time window on a fixed-length column page. Returns false if there is no time
+ *     window.
  */
 static bool
 __col_fix_get_time_window(WT_SESSION_IMPL *session, WT_REF *ref, uint64_t recno, WT_TIME_WINDOW *tw)
@@ -113,8 +118,13 @@ __col_fix_get_time_window(WT_SESSION_IMPL *session, WT_REF *ref, uint64_t recno,
     page = ref->page;
     start_recno = ref->ref_recno;
 
-    if (!WT_COL_FIX_TWS_SET(page))
+    if (recno >= ref->ref_recno + ref->page->entries)
         return (false);
+
+    if (!WT_COL_FIX_TWS_SET(page)) {
+        WT_TIME_WINDOW_INIT(tw);
+        return (true);
+    }
 
     lo = 0;
     hi = page->pg_fix_numtws;
@@ -148,12 +158,14 @@ __col_fix_get_time_window(WT_SESSION_IMPL *session, WT_REF *ref, uint64_t recno,
 
         WT_ASSERT(session, lo < hi);
     }
-    return (false);
+
+    WT_TIME_WINDOW_INIT(tw);
+    return (true);
 }
 
 /*
  * __wt_read_cell_time_window --
- *     Read the time window from the cell.
+ *     Read the time window from the cell. Returns false if there is no time window.
  */
 bool
 __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
@@ -172,6 +184,10 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
     case WT_PAGE_ROW_LEAF:
         if (page->pg_row == NULL)
             return (false);
+
+        if (cbt->ins != NULL)
+            return (false);
+
         __wti_read_row_time_window(session, page, &page->pg_row[cbt->slot], tw);
         break;
     case WT_PAGE_COL_VAR:
@@ -181,8 +197,8 @@ __wt_read_cell_time_window(WT_CURSOR_BTREE *cbt, WT_TIME_WINDOW *tw)
          */
         if (page->pg_var == NULL || (cbt->ins != NULL && !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH)))
             return (false);
-        __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw);
-        break;
+        return (
+          __read_col_time_window(session, page, WT_COL_PTR(page, &page->pg_var[cbt->slot]), tw));
     case WT_PAGE_COL_FIX:
         return (__col_fix_get_time_window(session, cbt->ref, cbt->recno, tw));
     }

@@ -478,6 +478,7 @@ __wti_rec_col_fix(
     WT_BTREE *btree;
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_INSERT *ins;
     WT_PAGE *page;
@@ -488,6 +489,7 @@ __wti_rec_col_fix(
     uint8_t val;
 
     btree = S2BT(session);
+    conn = S2C(session);
     /*
      * Blank the unpack record in case we need to use it before unpacking anything into it. The
      * visibility code currently only uses the value and the time window, and asserts about the
@@ -775,6 +777,13 @@ __wti_rec_col_fix(
              * future changes, assert that there's nothing to do.
              */
             WT_ASSERT(session, WT_TIME_WINDOW_IS_EMPTY(&upd_select.tw));
+            /*
+             * If preserve prepared update is enabled, we must select an update to replace the
+             * onpage prepared update. Otherwise, we leak the prepared update.
+             */
+            WT_ASSERT_ALWAYS(session,
+              !F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) || !WT_TIME_WINDOW_HAS_PREPARE(&unpack.tw),
+              "leaked prepared update.");
             continue;
         }
 
@@ -1211,6 +1220,7 @@ __wti_rec_col_var(
     WT_CELL *cell;
     WT_CELL_UNPACK_KV *vpack, _vpack;
     WT_COL *cip;
+    WT_CONNECTION_IMPL *conn;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(orig);
     WT_DECL_RET;
@@ -1226,6 +1236,7 @@ __wti_rec_col_var(
     const void *data;
 
     btree = S2BT(session);
+    conn = S2C(session);
     vpack = &_vpack;
     page = pageref->page;
     WT_TIME_WINDOW_INIT(&clear_tw);
@@ -1367,6 +1378,13 @@ record_loop:
                     goto compare;
                 }
                 twp = &vpack->tw;
+                /*
+                 * If preserve prepared update is enabled, we must select an update to replace the
+                 * onpage prepared update. Otherwise, we leak the prepared update.
+                 */
+                WT_ASSERT_ALWAYS(session,
+                  !F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) || !WT_TIME_WINDOW_HAS_PREPARE(twp),
+                  "leaked prepared update.");
 
                 /* Clear the on-disk cell time window if it is obsolete. */
                 __wti_rec_time_window_clear_obsolete(session, NULL, vpack, r);

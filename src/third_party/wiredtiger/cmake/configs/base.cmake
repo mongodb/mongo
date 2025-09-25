@@ -348,6 +348,12 @@ config_bool(
     DEFAULT ${default_enable_debug_info}
 )
 
+config_bool(
+    ENABLE_INTERNAL_SQLITE3
+    "Enable internal SQLite3 library. If disabled, the system SQLite3 library will be used."
+    DEFAULT ON
+)
+
 set(default_optimize_level "-Og")
 if("${CMAKE_BUILD_TYPE}" MATCHES "^(Release|RelWithDebInfo)$")
     if(WT_WIN)

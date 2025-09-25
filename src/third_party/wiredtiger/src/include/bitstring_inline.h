@@ -388,7 +388,7 @@ __bit_clear_end(uint8_t *bitf, uint64_t numentries, uint8_t width)
          * We want to clear this bit and up in the byte. Convert first to the bits below this bit,
          * then flip to get the bits to clear. That is, 0b00000100 -> 0b00000011 -> 0b11111100.
          */
-        mask = ~(uint8_t)(mask - 1);
+        mask = (uint8_t)(~(mask - 1));
         bitf[byte] &= ~mask;
 }
 
@@ -409,6 +409,6 @@ __bit_end_is_clear(const uint8_t *bitf, uint64_t numentries, uint8_t width)
         if (mask == 0x01)
             return (true);
 
-        mask = ~(uint8_t)(mask - 1);
+        mask = (uint8_t)(~(mask - 1));
         return ((bitf[byte] & mask) == 0);
 }

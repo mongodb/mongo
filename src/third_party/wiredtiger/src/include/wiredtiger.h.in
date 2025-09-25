@@ -1115,8 +1115,9 @@ struct __wt_session {
      * @config{log = (, the transaction log configuration for this object.  Only valid if \c log is
      * enabled in ::wiredtiger_open., a set of related configuration options defined as follows.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has checkpoint-level
-     * durability., a boolean flag; default \c true.}
-     * @config{ ),,}
+     * durability.  Not supported for layered tables., a boolean flag; default \c true.}
+     * @config{
+     * ),,}
      * @config{os_cache_dirty_max, maximum dirty system buffer cache usage\, in bytes.  If
      * non-zero\, schedule writes for dirty blocks belonging to this object in the system buffer
      * cache after that many bytes from this object are written into the buffer cache., an integer
@@ -1305,8 +1306,9 @@ struct __wt_session {
      * @config{log = (, the transaction log configuration for this object.  Only valid if \c log is
      * enabled in ::wiredtiger_open., a set of related configuration options defined as follows.}
      * @config{&nbsp;&nbsp;&nbsp;&nbsp;enabled, if false\, this object has checkpoint-level
-     * durability., a boolean flag; default \c true.}
-     * @config{ ),,}
+     * durability.  Not supported for layered tables., a boolean flag; default \c true.}
+     * @config{
+     * ),,}
      * @config{memory_page_image_max, the maximum in-memory page image represented by a single
      * storage block.  Depending on compression efficiency\, compression can create storage blocks
      * which require significant resources to re-instantiate in the cache\, penalizing the

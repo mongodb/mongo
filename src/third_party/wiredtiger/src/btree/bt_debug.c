@@ -1105,7 +1105,8 @@ __wt_debug_cursor_tree_hs(void *cursor_arg, const char *ofile)
 
     hs_id = 0;
     for (;;) {
-        WT_RET_NOTFOUND_OK(ret = __wt_curhs_next_hs_id(session, hs_id, &hs_id));
+        ret = __wt_curhs_next_hs_id(session, hs_id, &hs_id);
+        WT_RET_NOTFOUND_OK(ret);
         if (ret == WT_NOTFOUND)
             return (0);
 

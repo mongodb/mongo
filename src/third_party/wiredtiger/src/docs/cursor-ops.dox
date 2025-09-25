@@ -98,9 +98,15 @@ the record previously exists.  When an application configures \c overwrite to
 previously exists and WT_CURSOR::update will fail with ::WT_NOTFOUND if the
 record does not previously exist.
 
+WT_CURSOR::update returns the cursor positioned on the record after a successful update,
+whereas WT_CURSOR::insert method never keeps a cursor position.
+
 To remove existing data using a cursor, use the WT_CURSOR::remove method:
 
 @snippet ex_cursor.c cursor remove
+
+WT_CURSOR::remove does not change the cursor position: if the cursor was positioned
+before, the cursor remains positioned at the removed record.
 
 @section cursor_largest Returning the largest key
 

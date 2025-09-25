@@ -43,12 +43,14 @@ typedef struct {
 } WT_VSTUFF;
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
-static int __verify_page_content_int(
-  WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
+static int __verify_compare_page_id(const void *, const void *);
 static int __verify_page_content_fix(
+  WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
+static int __verify_page_content_int(
   WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
 static int __verify_page_content_leaf(
   WT_SESSION_IMPL *, WT_REF *, WT_CELL_UNPACK_ADDR *, WT_VSTUFF *);
+static int __verify_page_discard(WT_SESSION_IMPL *, WT_BM *);
 static int __verify_row_int_key_order(
   WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
 static int __verify_row_leaf_key_order(WT_SESSION_IMPL *, WT_REF *, WT_VSTUFF *);
@@ -313,10 +315,15 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 
             /*
              * The checkpoints are in time-order, so the last one in the list is the most recent. If
-             * this is the most recent checkpoint, verify the history store against it.
+             * this is the most recent checkpoint, verify the history store against it, also verify
+             * page discard function if we're in disagg mode.
              */
-            if (ret == 0 && (ckpt + 1)->name == NULL && !skip_hs) {
-                WT_TRET(__wt_hs_verify_one(session, btree->id));
+            if (ret == 0 && (ckpt + 1)->name == NULL) {
+                if (F_ISSET(btree, WT_BTREE_DISAGGREGATED))
+                    WT_TRET(__verify_page_discard(session, bm));
+
+                if (!skip_hs)
+                    WT_TRET(__wt_hs_verify_one(session, btree->id));
                 /*
                  * We cannot error out here. If we got an error verifying the history store, we need
                  * to follow through with reacquiring the exclusive call below. We'll error out
@@ -1388,6 +1395,116 @@ __verify_page_content_leaf(
           "overflow items",
           __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(ref->page->type),
           __wti_cell_type_string(parent->raw));
+
+    return (0);
+}
+
+/*
+ * __verify_page_discard --
+ *     Verify all live pages in disagg mode, ensuring that no pages were incorrectly discarded.
+ */
+static int
+__verify_page_discard(WT_SESSION_IMPL *session, WT_BM *bm)
+{
+    WT_REF *ref = NULL;
+    uint64_t num_pages_found_in_btree = 0;
+    size_t capacity = 0;
+    uint64_t *page_ids = NULL;
+    int ret = 0;
+
+    /*
+     * Walk the btree to retrieve the page IDs for all pages in the btree at the loaded checkpoint
+     * time.
+     */
+    while ((ret = (__wt_tree_walk(session, &ref, WT_READ_VISIBLE_ALL | WT_READ_WONT_NEED))) == 0 &&
+      ref != NULL) {
+        WT_PAGE *page = ref->page;
+
+        /*
+         * Use dynamically allocated array to track page IDs as we don't know the number of pages
+         *  here. Check if the array size needs to grow.
+         */
+        if (num_pages_found_in_btree == capacity) {
+            uint64_t new_capacity = (capacity * 2 + 1) * sizeof(uint64_t);
+            WT_RET(__wt_realloc_def(session, &capacity, new_capacity, &page_ids));
+            capacity = new_capacity;
+        }
+
+        if (page != NULL) {
+            WT_ASSERT(session, page->disagg_info != NULL);
+            page_ids[num_pages_found_in_btree++] = page->disagg_info->block_meta.page_id;
+        }
+    }
+
+    WT_RET_NOTFOUND_OK(ret);
+
+    /*
+     * Track the number of pages found in the PALM walk. This value is tracked separately because
+     * WT_ITEM->size must match the allocated memory, while the actual number of pages found may be
+     * smaller than that allocation.
+     */
+    size_t num_pages_found_in_palm = 0;
+    uint64_t checkpoint_lsn;
+    checkpoint_lsn = S2C(session)->disaggregated_storage.last_checkpoint_meta_lsn;
+    WT_DECL_ITEM(item);
+    WT_RET(__wt_scr_alloc(session, num_pages_found_in_palm, &item));
+
+    WT_ASSERT(session, bm->get_page_ids != NULL);
+    /* Get page IDs from PALM. */
+    WT_RET(bm->get_page_ids(bm, session, item, &num_pages_found_in_palm, checkpoint_lsn));
+
+    if ((uint64_t)num_pages_found_in_palm != num_pages_found_in_btree) {
+        /*
+         * FIXME-WT-14700: Investigate whether we need to do anything special when freeing a root
+         * page. Change below warning to an error after root page discard is implemented, if a
+         * mismatch is found this function will return the corresponding error code.
+         */
+        __wt_verbose_level(session, WT_VERB_DISAGGREGATED_STORAGE, WT_VERBOSE_DEBUG_5,
+          "Mismatch in the number of page IDs found from PALM and btree walk: PALM %" PRIu64
+          " Btree walk %" PRIu64,
+          (uint64_t)num_pages_found_in_palm, num_pages_found_in_btree);
+    }
+
+    /*
+     * Sort the btree walk array by page ID in ascending order to match the order used in the PALM
+     * walk.
+     */
+    __wt_qsort(page_ids, num_pages_found_in_btree, sizeof(uint64_t), __verify_compare_page_id);
+
+    for (size_t i = 0; i < num_pages_found_in_palm; i++) {
+        /* FIXME-WT-15451: Print mismatch page IDs for discard verify. */
+        if (((uint64_t *)item->data)[i] != page_ids[i]) {
+            /*
+             * FIXME-WT-14700: Investigate whether we need to do anything special when freeing a
+             * root page. Change below warning to an error after root page discard is implemented,
+             * if a mismatch is found this function will return the corresponding error code.
+             */
+            __wt_verbose_level(session, WT_VERB_DISAGGREGATED_STORAGE, WT_VERBOSE_DEBUG_5,
+              "Mismatch in page IDs from PALM and btree walk: PALM %" PRIu64 " Btree walk %" PRIu64,
+              ((uint64_t *)item->data)[i], page_ids[i]);
+        }
+    }
+
+    __wt_free(session, page_ids);
+    __wt_scr_free(session, &item);
+
+    return (ret);
+}
+
+/*
+ * __verify_compare_page_id --
+ *     Compare two page IDs for qsort, sorts in ascending order.
+ */
+static int
+__verify_compare_page_id(const void *a, const void *b)
+{
+    const uint64_t *id_a = (const uint64_t *)a;
+    const uint64_t *id_b = (const uint64_t *)b;
+
+    if (*id_a < *id_b)
+        return (-1);
+    if (*id_a > *id_b)
+        return (1);
 
     return (0);
 }

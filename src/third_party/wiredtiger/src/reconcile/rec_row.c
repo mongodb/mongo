@@ -926,6 +926,7 @@ __wti_rec_row_leaf(
     WT_BTREE *btree;
     WT_CELL *cell;
     WT_CELL_UNPACK_KV *kpack, _kpack, *vpack, _vpack;
+    WT_CONNECTION_IMPL *conn;
     WT_CURSOR_BTREE *cbt;
     WT_DECL_ITEM(lastkey);
     WT_DECL_ITEM(tmpkey);
@@ -947,6 +948,7 @@ __wti_rec_row_leaf(
     const void *key_data;
 
     btree = S2BT(session);
+    conn = S2C(session);
     page = pageref->page;
     twp = NULL;
     upd = NULL;
@@ -1019,9 +1021,16 @@ __wti_rec_row_leaf(
         upd = upd_select.upd;
 
         /* Take the timestamp from the update or the cell. */
-        if (upd == NULL)
+        if (upd == NULL) {
             twp = &vpack->tw;
-        else
+            /*
+             * If preserve prepared update is enabled, we must select an update to replace the
+             * onpage prepared update. Otherwise, we leak the prepared update.
+             */
+            WT_ASSERT_ALWAYS(session,
+              !F_ISSET(conn, WT_CONN_PRESERVE_PREPARED) || !WT_TIME_WINDOW_HAS_PREPARE(twp),
+              "leaked prepared update.");
+        } else
             twp = &upd_select.tw;
 
         /*

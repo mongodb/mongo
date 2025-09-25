@@ -25,6 +25,9 @@ def all_c_files():
         yield line
     files = list()
     for (dirpath, dirnames, filenames) in os.walk('../test'):
+        # Skip test/3rdparty directory
+        if '3rdparty' in dirpath:
+            continue
         files += [os.path.join(dirpath, file) for file in filenames]
     for file in files:
         if fnmatch.fnmatch(file, '*.c'):
@@ -37,6 +40,9 @@ def all_c_files():
 def all_cpp_files():
     files = list()
     for (dirpath, dirnames, filenames) in os.walk('../test'):
+        # Skip test/3rdparty directory
+        if '3rdparty' in dirpath:
+            continue
         files += [os.path.join(dirpath, file) for file in filenames]
     for file in files:
         if fnmatch.fnmatch(file, '*.cpp'):
@@ -50,6 +56,9 @@ def all_h_files():
     yield "../src/include/wiredtiger.h.in"
     files = list()
     for (dirpath, dirnames, filenames) in os.walk('../test'):
+        # Skip test/3rdparty directory
+        if '3rdparty' in dirpath:
+            continue
         files += [os.path.join(dirpath, file) for file in filenames]
     for file in files:
         if fnmatch.fnmatch(file, '*.h'):

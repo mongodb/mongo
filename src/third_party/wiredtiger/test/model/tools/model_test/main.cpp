@@ -330,6 +330,7 @@ update_spec(model::kv_workload_generator_spec &spec, std::string &conn_config,
         UPDATE_SPEC(timing_stress_hs_sweep_race, float);
         UPDATE_SPEC(timing_stress_prepare_ckpt_delay, float);
         UPDATE_SPEC(timing_stress_commit_txn_slow, float);
+        UPDATE_SPEC(timing_stress_rec_before_wrapup, float);
 
         else if (k == "connection_config") conn_config += "," + m.get_string("connection_config");
 

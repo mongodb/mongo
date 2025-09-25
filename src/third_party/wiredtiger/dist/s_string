@@ -48,13 +48,13 @@ check() {
     }
 }
 
-# List of files to spellchk.
+# List of files to spellcheck.
 l=$(
   {
     cd ..
-    find bench examples ext src test tools/checksum_bitflip -name '*.[chsy]'
+    find bench examples ext src test tools/checksum_bitflip -name '*.[chsy]' | grep -v 'test/3rdparty'
     find src -name '*.in'
-    find test -name '*.cpp'
+    find test -name '*.cpp' | grep -v 'test/3rdparty'
   } | filter_if_fast
 )
 

@@ -104,6 +104,7 @@ main(int argc, char *argv[])
     g.sweep_stress = g.use_timestamps = false;
     g.failpoint_eviction_split = false;
     g.failpoint_hs_delete_key_from_ts = false;
+    g.failpoint_rec_before_wrapup = false;
     g.hs_checkpoint_timing_stress = false;
     g.checkpoint_slow_timing_stress = false;
     g.no_ts_deletes = false;
@@ -173,6 +174,9 @@ main(int argc, char *argv[])
                 break;
             case '7':
                 g.failpoint_eviction_split = true;
+                break;
+            case '8':
+                g.failpoint_rec_before_wrapup = true;
                 break;
             default:
                 return (usage());
@@ -412,13 +416,14 @@ wt_connect(const char *config_open)
       config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open);
 
     if (g.evict_reposition_timing_stress || g.sweep_stress || g.failpoint_eviction_split ||
-      g.failpoint_hs_delete_key_from_ts || g.hs_checkpoint_timing_stress ||
-      g.checkpoint_slow_timing_stress) {
-        testutil_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s]",
+      g.failpoint_hs_delete_key_from_ts || g.failpoint_rec_before_wrapup ||
+      g.hs_checkpoint_timing_stress || g.checkpoint_slow_timing_stress) {
+        testutil_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s%s]",
           g.checkpoint_slow_timing_stress ? "checkpoint_slow" : "",
           g.evict_reposition_timing_stress ? "evict_reposition" : "",
           g.failpoint_eviction_split ? "failpoint_eviction_split" : "",
           g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
+          g.failpoint_rec_before_wrapup ? "failpoint_rec_before_wrapup" : "",
           g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
           g.sweep_stress ? "aggressive_sweep" : "");
         strcat(config, buf);
@@ -761,6 +766,7 @@ usage(void)
       "\t\t5: checkpoint_slow_timing_stress\n"
       "\t\t6: evict_reposition_timing_stress\n"
       "\t\t7: failpoint_eviction_split\n"
+      "\t\t8: failpoint_rec_before_wrapup\n"
       "\t-T specify a table configuration\n"
       "\t-t set a file type ( col | mix | row )\n"
       "\t-v verify only\n"

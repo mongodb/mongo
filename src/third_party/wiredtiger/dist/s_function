@@ -19,10 +19,10 @@ file_parse()
         -e '{s/.*//;x;}'
 }
 
-# Parallel execution: if it's the main onvocation of the script, collect the file names
+# Parallel execution: if it's the main invocation of the script, collect the file names
 # to process and run them in subprocesses.
 is_main_run && {
-    find bench examples ext src test tools/checksum_bitflip -name '*.c' -o -name '*_inline.h' |
+    find bench examples ext src test tools/checksum_bitflip -name '*.c' -o -name '*_inline.h' | grep -v 'test/3rdparty/' |
     do_in_parallel
     exit $?
 }

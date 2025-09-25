@@ -147,3 +147,4 @@ class test_layered44(wttest.WiredTigerTestCase, DisaggConfigMixin):
                 page_number = int(line.split('page_id')[1].split(',')[0].strip())
                 self.assertNotIn(page_number, freed_pages, f"Unexpected page read: {page_number}")
         self.assertGreater(num_pages_read, 0)
+        self.session.verify(self.uri)

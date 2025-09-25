@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import argparse, os, re, subprocess, sys
+import argparse, fnmatch, os, re, subprocess, sys
 from common_functions import filter_if_fast
 
 def report_illegal_comment(file_name, line_num, line, multiline):
@@ -126,6 +126,7 @@ if __name__ == '__main__':
     # Some files aren't expected to comply with WiredTiger style. Ignore them.
     ignore_files = [
         'src/support/mtx_rw.c',
+        'test/3rdparty/*'
     ]
 
     command = "find bench examples ext src test -name \"*.[ch]\" \
@@ -136,7 +137,7 @@ if __name__ == '__main__':
     count = 0
     if result:
         for file_name in filter_if_fast(result, fast=args.fast, prefix=""):
-            if file_name in ignore_files:
+            if any(fnmatch.fnmatch(file_name, pattern) for pattern in ignore_files):
                 continue
 
             if file_is_cpp(file_name):
@@ -147,4 +148,3 @@ if __name__ == '__main__':
     if count != 0:
         print('Detected ' + str(count) +' comment format issues!')
         sys.exit(1)
-

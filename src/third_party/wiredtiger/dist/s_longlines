@@ -20,7 +20,8 @@ l=`(find bench/wtperf examples ext src test tools/checksum_bitflip -name '*.[chs
         -e '/include\/extern_posix\.h/d' \
         -e '/include\/extern_win\.h/d' \
         -e '/log\/log_auto\.c/d' \
-        -e '/support\/stat\.c/d'`
+        -e '/support\/stat\.c/d' \
+        -e '/test\/3rdparty\//d'`
 
 for f in $l ; do
     expand -t8 < $f | awk -- \

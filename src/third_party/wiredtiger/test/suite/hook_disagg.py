@@ -257,7 +257,6 @@ def session_create_replace(orig_session_create, session_self, uri, config):
 
     # Check if log table is enabled at connection level. If it is, by default session will create a log table unless explicitly disabled in session config.
     # Skip test if it is enabled
-    # FIXME-WT-15221 Should throw an error when this is set in disagg"
     conn_config = testcase.conn_config
     if hasattr(conn_config, '__call__'):
         conn_config = testcase.conn_config()

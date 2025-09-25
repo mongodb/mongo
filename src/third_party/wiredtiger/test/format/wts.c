@@ -185,6 +185,8 @@ configure_timing_stress(char **p, size_t max)
         CONFIG_APPEND(*p, ",failpoint_eviction_split");
     if (GV(STRESS_FAILPOINT_HS_DELETE_KEY_FROM_TS))
         CONFIG_APPEND(*p, ",failpoint_history_store_delete_key_from_ts");
+    if (GV(STRESS_FAILPOINT_REC_BEFORE_WRAPUP))
+        CONFIG_APPEND(*p, ",failpoint_rec_before_wrapup");
     if (GV(STRESS_HS_CHECKPOINT_DELAY))
         CONFIG_APPEND(*p, ",history_store_checkpoint_delay");
     if (GV(STRESS_HS_SEARCH))

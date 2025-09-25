@@ -311,7 +311,7 @@ __wti_txn_update_pinned_timestamp(WT_SESSION_IMPL *session, bool force)
 
     /* Scan to find the global pinned timestamp. */
     __wti_txn_get_pinned_timestamp(session, &pinned_timestamp, WT_TXN_TS_INCLUDE_OLDEST);
-    if (pinned_timestamp == 0)
+    if (pinned_timestamp == WT_TS_NONE)
         return;
 
     if (txn_global->has_pinned_timestamp && !force) {
