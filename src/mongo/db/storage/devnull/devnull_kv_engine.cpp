@@ -344,7 +344,7 @@ class DevNullSortedDataInterface : public SortedDataInterface {
 public:
     DevNullSortedDataInterface(StringData identName)
         : SortedDataInterface(
-              key_string::Version::kLatestVersion, Ordering::make(BSONObj()), KeyFormat::Long) {}
+              kDataFormatV2KeyStringV1IndexVersionV2, Ordering::make(BSONObj()), KeyFormat::Long) {}
 
     ~DevNullSortedDataInterface() override {}
 

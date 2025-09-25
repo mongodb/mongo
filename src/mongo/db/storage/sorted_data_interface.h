@@ -54,6 +54,33 @@ namespace CollectionValidation {
 class ValidationOptions;
 }
 
+/**
+ * Table of index types<->KeyString format<->Data format version:
+ *
+ * | Index Type                   | Key                             | Data Format Version        |
+ * | ---------------------------- | ------------------------------- | -------------------------- |
+ * | _id index                    | KeyString without RecordId      | index V1: 6, index V2: 8   |
+ * | non-unique index             | KeyString with RecordId         | index V1: 6, index V2: 8   |
+ * | unique secondary index (new) | KeyString with RecordId         | index V1: 13, index V2: 14 |
+ * | unique secondary index (old) | KeyString with/without RecordId | index V1: 11, index V2: 12 |
+ *
+ * Starting in 4.2, unique indexes can be in format version 11 or 12. On upgrade to 4.2, an existing
+ * format 6 unique index will upgrade to format 11 and an existing format 8 unique index will
+ * upgrade to format 12.
+ *
+ * Starting in 6.0, any new unique index will be in format 13 or 14, which guarantees that all keys
+ * are in the new format.
+ */
+
+const int kDataFormatV1KeyStringV0IndexVersionV1 = 6;
+const int kDataFormatV2KeyStringV1IndexVersionV2 = 8;
+const int kDataFormatV3KeyStringV0UniqueIndexVersionV1 = 11;
+const int kDataFormatV4KeyStringV1UniqueIndexVersionV2 = 12;
+const int kDataFormatV5KeyStringV0UniqueIndexVersionV1 = 13;
+const int kDataFormatV6KeyStringV1UniqueIndexVersionV2 = 14;
+const int kMinimumIndexVersion = kDataFormatV1KeyStringV0IndexVersionV1;
+const int kMaximumIndexVersion = kDataFormatV6KeyStringV1UniqueIndexVersionV2;
+
 struct IndexConfig {
     enum class IndexVersion { kV1 = 1, kV2 = 2 };
     static constexpr IndexVersion kLatestIndexVersion = IndexVersion::kV2;
@@ -106,10 +133,21 @@ public:
      * Constructs a SortedDataInterface. The rsKeyFormat is the RecordId key format of the related
      * RecordStore.
      */
-    SortedDataInterface(key_string::Version keyStringVersion,
-                        Ordering ordering,
-                        KeyFormat rsKeyFormat)
-        : _keyStringVersion(keyStringVersion), _ordering(ordering), _rsKeyFormat(rsKeyFormat) {}
+    SortedDataInterface(int dataFormatVersion, Ordering ordering, KeyFormat rsKeyFormat)
+        : _dataFormatVersion(dataFormatVersion),
+          _keyStringVersion([&]() {
+              /*
+               * Index data format 6, 11, and 13 correspond to KeyString version V0 and data format
+               * 8, 12, and 14 correspond to KeyString version V1.
+               */
+              return (_dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2 ||
+                      _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2 ||
+                      _dataFormatVersion == kDataFormatV6KeyStringV1UniqueIndexVersionV2)
+                  ? key_string::Version::V1
+                  : key_string::Version::V0;
+          }()),
+          _ordering(ordering),
+          _rsKeyFormat(rsKeyFormat) {}
 
     virtual ~SortedDataInterface() {}
 
@@ -263,6 +301,21 @@ public:
      * Returns the underlying container.
      */
     virtual const StringKeyedContainer& getContainer() const = 0;
+
+    /*
+     * Return the data format version for this index.
+     */
+    int getDataFormatVersion() const {
+        return _dataFormatVersion;
+    }
+
+    /*
+     * Return true if the index uses an old data format version.
+     */
+    bool hasOldFormatVersion() const {
+        return getDataFormatVersion() == kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
+            getDataFormatVersion() == kDataFormatV4KeyStringV1UniqueIndexVersionV2;
+    }
 
     /*
      * Return the KeyString version for 'this' index.
@@ -496,6 +549,7 @@ public:
     virtual Status initAsEmpty() = 0;
 
 protected:
+    const int _dataFormatVersion;
     const key_string::Version _keyStringVersion;
     const Ordering _ordering;
     const KeyFormat _rsKeyFormat;

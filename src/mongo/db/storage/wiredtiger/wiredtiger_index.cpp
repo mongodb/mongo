@@ -259,7 +259,53 @@ void dassertRecordIdAtEnd(const key_string::View& keyString, KeyFormat keyFormat
     RecordId rid = key_string::decodeRecordIdAtEnd(keyString.getKeyAndRecordIdView(), keyFormat);
     invariant(rid.isValid(), rid.toString());
 }
+
+// TODO(SERVER-1096736): Move the following key-value construction utility functions to a higher
+// layer.
+
+// Constructs key for an _id index.
+std::span<const char> makeKeyForIdIndex(const key_string::View& keyString) {
+    return keyString.getKeyView();
+}
+
+// Constructs key for a non-unique index.
+std::span<const char> makeKeyForNonUniqueIndex(const key_string::View& keyString) {
+    return keyString.getKeyAndRecordIdView();
+}
+
+// Constructs key-value pair for an _id index.
+std::pair<std::span<const char>, std::span<const char>> makeKeyValueForIdIndex(
+    const key_string::View& keyString) {
+    return std::make_pair(makeKeyForIdIndex(keyString), keyString.getRecordIdAndTypeBitsView());
+}
+
+// Constructs key-value pair for a non-unique index.
+std::pair<std::span<const char>, std::span<const char>> makeKeyValueForNonUniqueIndex(
+    const key_string::View& keyString) {
+    return std::make_pair(makeKeyForNonUniqueIndex(keyString), keyString.getTypeBitsView());
+}
+
 }  // namespace
+
+// Constructs key-value pair for a unique index.
+std::pair<std::span<const char>, std::span<const char>> WiredTigerIndex::makeKeyValueForUniqueIndex(
+    const key_string::View& keyString, bool dupsAllowed) {
+    // Prior to v4.2 unique indexes put the record id in the value field on the index entry rather
+    // than appending it to the key. Existing indexes are not rewritten when upgrading versions, so
+    // we need to be able to insert keys in the old format for testing purposes. Given the required
+    // prerequisites, the WTIndexCreateUniqueIndexesInOldFormat failpoint can be set to insert keys
+    // in the old format. We can't do this when dups are allowed (on secondaries), as this could
+    // result in concurrent writes to the same key, the very thing the new format intends to avoid.
+    // Old format keys also predated KeyFormat::String, so those cannot be inserted.
+    if (MONGO_unlikely(WTIndexInsertUniqueKeysInOldFormat.shouldFail())) {
+        bool forceOldFormat =
+            !dupsAllowed && hasOldFormatVersion() && rsKeyFormat() == KeyFormat::Long;
+        if (forceOldFormat) {
+            return makeKeyValueForIdIndex(keyString);
+        }
+    }
+    return makeKeyValueForNonUniqueIndex(keyString);
+}
 
 std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndex::insert(
     OperationContext* opCtx,
@@ -603,18 +649,19 @@ std::variant<bool, SortedDataInterface::DuplicateKey> WiredTigerIndex::_checkDup
         std::move(foundRecordId)};
 }
 
-void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
-                                               RecoveryUnit& ru,
-                                               const std::string& uri,
-                                               StringData ident,
-                                               const IndexConfig& config) {
+int WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
+                                              RecoveryUnit& ru,
+                                              const std::string& uri,
+                                              StringData ident,
+                                              const IndexConfig& config,
+                                              int dataFormatVersion) {
     auto indexVersion = config.version;
     auto isIndexVersion1 = indexVersion == IndexConfig::IndexVersion::kV1;
     auto isIndexVersion2 = indexVersion == IndexConfig::IndexVersion::kV2;
-    auto isDataFormat6 = _dataFormatVersion == kDataFormatV1KeyStringV0IndexVersionV1;
-    auto isDataFormat8 = _dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2;
-    auto isDataFormat13 = _dataFormatVersion == kDataFormatV5KeyStringV0UniqueIndexVersionV1;
-    auto isDataFormat14 = _dataFormatVersion == kDataFormatV6KeyStringV1UniqueIndexVersionV2;
+    auto isDataFormat6 = dataFormatVersion == kDataFormatV1KeyStringV0IndexVersionV1;
+    auto isDataFormat8 = dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2;
+    auto isDataFormat13 = dataFormatVersion == kDataFormatV5KeyStringV0UniqueIndexVersionV1;
+    auto isDataFormat14 = dataFormatVersion == kDataFormatV6KeyStringV1UniqueIndexVersionV2;
     // Only fixes the index data format when it could be from an edge case when converting the
     // uniqueness of the index. Specifically:
     // * The index is a secondary unique index, but the data format version is 6 (v1) or 8 (v2).
@@ -628,29 +675,30 @@ void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
                                                 ident,
                                                 config,
                                                 /* isForceUpdateMetadata */ false);
-        auto prevVersion = _dataFormatVersion;
+        auto prevVersion = dataFormatVersion;
         // The updated data format is guaranteed to be within the supported version range.
-        _dataFormatVersion = WiredTigerUtil::checkApplicationMetadataFormatVersion(
-                                 *WiredTigerRecoveryUnit::get(ru).getSessionNoTxn(),
-                                 uri,
-                                 kMinimumIndexVersion,
-                                 kMaximumIndexVersion)
-                                 .getValue();
+        dataFormatVersion = WiredTigerUtil::checkApplicationMetadataFormatVersion(
+                                *WiredTigerRecoveryUnit::get(ru).getSessionNoTxn(),
+                                uri,
+                                kMinimumIndexVersion,
+                                kMaximumIndexVersion)
+                                .getValue();
         LOGV2_WARNING(6818600,
                       "Fixing index metadata data format version",
                       logAttrs(_collectionUUID),
                       "indexName"_attr = config.indexName,
                       "prevVersion"_attr = prevVersion,
-                      "newVersion"_attr = _dataFormatVersion);
+                      "newVersion"_attr = dataFormatVersion);
     }
+    return dataFormatVersion;
 }
 
-key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
-                                                        RecoveryUnit& ru,
-                                                        const std::string& uri,
-                                                        StringData ident,
-                                                        const IndexConfig& config,
-                                                        bool isLogged) {
+int WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
+                                        RecoveryUnit& ru,
+                                        const std::string& uri,
+                                        StringData ident,
+                                        const IndexConfig& config,
+                                        bool isLogged) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     auto version = WiredTigerUtil::checkApplicationMetadataFormatVersion(
         *wtRu.getSessionNoTxn(), uri, kMinimumIndexVersion, kMaximumIndexVersion);
@@ -664,31 +712,23 @@ key_string::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         fassertFailedWithStatus(28579, indexVersionStatus);
     }
     uassertStatusOK(version);
-    _dataFormatVersion = version.getValue();
 
-    _repairDataFormatVersion(ctx, ru, uri, ident, config);
+    int dataFormatVersion =
+        _repairDataFormatVersion(ctx, ru, uri, ident, config, version.getValue());
 
     if (!config.isIdIndex && config.unique &&
-        (_dataFormatVersion < kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
-         _dataFormatVersion > kDataFormatV6KeyStringV1UniqueIndexVersionV2)) {
+        (dataFormatVersion < kDataFormatV3KeyStringV0UniqueIndexVersionV1 ||
+         dataFormatVersion > kDataFormatV6KeyStringV1UniqueIndexVersionV2)) {
         Status versionStatus(
             ErrorCodes::UnsupportedFormat,
             str::stream() << "Index: {name: " << config.indexName << ", ns: " << _collectionUUID
-                          << "} has incompatible format version: " << _dataFormatVersion);
+                          << "} has incompatible format version: " << dataFormatVersion);
         fassertFailedWithStatusNoTrace(31179, versionStatus);
     }
 
     uassertStatusOK(WiredTigerUtil::setTableLogging(*wtRu.getSession(), uri, isLogged));
 
-    /*
-     * Index data format 6, 11, and 13 correspond to KeyString version V0 and data format 8, 12, and
-     * 14 correspond to KeyString version V1.
-     */
-    return (_dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2 ||
-            _dataFormatVersion == kDataFormatV4KeyStringV1UniqueIndexVersionV2 ||
-            _dataFormatVersion == kDataFormatV6KeyStringV1UniqueIndexVersionV2)
-        ? key_string::Version::V1
-        : key_string::Version::V0;
+    return dataFormatVersion;
 }
 
 namespace {
@@ -731,7 +771,8 @@ public:
     // typebits in the value
     void addKey(RecoveryUnit& ru, const key_string::View& keyString) override {
         dassertRecordIdAtEnd(keyString, _idx->rsKeyFormat());
-        insert(ru, keyString.getKeyAndRecordIdView(), keyString.getTypeBitsView());
+        auto [key, value] = makeKeyValueForNonUniqueIndex(keyString);
+        insert(ru, key, value);
     }
 };
 
@@ -748,7 +789,8 @@ public:
     // Id indexes use only the key as the key, and the record id plus typebits go in the value
     void addKey(RecoveryUnit& ru, const key_string::View& newKeyString) override {
         dassertRecordIdAtEnd(newKeyString, KeyFormat::Long);
-        insert(ru, newKeyString.getKeyView(), newKeyString.getRecordIdAndTypeBitsView());
+        auto [key, value] = makeKeyValueForIdIndex(newKeyString);
+        insert(ru, key, value);
     }
 };
 
@@ -1336,8 +1378,8 @@ std::unique_ptr<SortedDataBuilderInterface> WiredTigerIndexUnique::makeBulkBuild
 }
 
 bool WiredTigerIndexUnique::isTimestampSafeUniqueIdx() const {
-    if (_dataFormatVersion == kDataFormatV1KeyStringV0IndexVersionV1 ||
-        _dataFormatVersion == kDataFormatV2KeyStringV1IndexVersionV2) {
+    if (getDataFormatVersion() == kDataFormatV1KeyStringV0IndexVersionV1 ||
+        getDataFormatVersion() == kDataFormatV2KeyStringV1IndexVersionV2) {
         return false;
     }
     return true;
@@ -1413,8 +1455,8 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIdIndex::_inse
     invariant(!dupsAllowed);
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
 
-    int ret =
-        _container.insert(wtRu, *c, keyString.getKeyView(), keyString.getRecordIdAndTypeBitsView());
+    auto [key, value] = makeKeyValueForIdIndex(keyString);
+    int ret = _container.insert(wtRu, *c, key, value);
     if (ret != WT_DUPLICATE_KEY) {
         return wtRCToStatus(ret, c->session, [this]() {
             return fmt::format(
@@ -1468,10 +1510,10 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexUnique::_
     // in the old format. We can't do this when dups are allowed (on secondaries), as this could
     // result in concurrent writes to the same key, the very thing the new format intends to avoid.
     // Old format keys also predated KeyFormat::String, so those cannot be inserted.
-    bool forceOldFormat = !dupsAllowed && hasOldFormatVersion() &&
-        _rsKeyFormat == KeyFormat::Long && WTIndexInsertUniqueKeysInOldFormat.shouldFail();
-    auto ret = [&] {
-        if (MONGO_unlikely(forceOldFormat)) {
+    bool forceOldFormat{false};
+    if (MONGO_unlikely(WTIndexInsertUniqueKeysInOldFormat.shouldFail())) {
+        forceOldFormat = !dupsAllowed && hasOldFormatVersion() && rsKeyFormat() == KeyFormat::Long;
+        if (forceOldFormat) {
             LOGV2_DEBUG(8596201,
                         1,
                         "Inserting old format key into unique index due to "
@@ -1479,12 +1521,11 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexUnique::_
                         "key"_attr = keyString.toString(),
                         "indexName"_attr = _indexName,
                         "collectionUUID"_attr = _collectionUUID);
-            return _container.insert(
-                wtRu, *c, keyString.getKeyView(), keyString.getRecordIdAndTypeBitsView());
         }
-        return _container.insert(
-            wtRu, *c, keyString.getKeyAndRecordIdView(), keyString.getTypeBitsView());
-    }();
+    }
+
+    auto [key, value] = makeKeyValueForUniqueIndex(keyString, dupsAllowed);
+    auto ret = _container.insert(wtRu, *c, key, value);
 
     // Unless we're forcing the old format, It is possible that this key is already present during a
     // concurrent background index build.
@@ -1704,8 +1745,8 @@ std::variant<Status, SortedDataInterface::DuplicateKey> WiredTigerIndexStandard:
         }
     }
 
-    auto ret =
-        _container.insert(wtRu, *c, keyString.getKeyAndRecordIdView(), keyString.getTypeBitsView());
+    auto [key, value] = makeKeyValueForNonUniqueIndex(keyString);
+    auto ret = _container.insert(wtRu, *c, key, value);
 
     // If the record was already in the index, we return OK. This can happen, for example, when
     // building a background index while documents are being written and reindexed.
