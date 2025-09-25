@@ -9,7 +9,7 @@ import {Thread} from "jstests/libs/parallelTester.js";
 import {ReplSetTest} from "jstests/libs/replsettest.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {ValidationTest} from "jstests/sharding/analyze_shard_key/libs/validation_common.js";
-
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 const analyzeShardKeyNumRanges = 10;
 
 function testValidationBeforeMetricsCalculation(conn, mongodConn, validationTest) {
@@ -135,8 +135,7 @@ function testValidationDuringReadWriteDistributionMetricsCalculation(cmdConn, va
 }
 
 /**
- * Ensure that CommandOnShardedViewNotSupportedOnMongod is transformed into
- * CommandNotSupportedOnView, even when it is thrown as an exception.
+ * Test that analyzeShardKey correctly fail if the collection is concurrently transformed from plain collection to timeseries.
  */
 function testValidationOnShardedTimeseriesCollections(cmdConn, validationTest, primaryShard) {
     const dbName = validationTest.dbName;
@@ -150,29 +149,31 @@ function testValidationOnShardedTimeseriesCollections(cmdConn, validationTest, p
     const shards = cmdConn.getDB("config").shards.find().toArray();
     assert.commandWorked(cmdConn.adminCommand({enableSharding: dbName, primaryShard: shards[0]._id}));
 
-    // Create a normal collection, in order to bypass the view checks for analyzeShardKey command.
+    // Create a normal collection, in order to bypass initial timeseries check for analyzeShardKey command.
     testColl.insert(docs);
     const failPoint = configureFailPoint(primaryShard, "analyzeShardKeyHangInClusterAggregate");
 
+    // TODO SERVER-111315: for viewless timeseries we should get CollectionUUIDMismatch
+    const expectedError = areViewlessTimeseriesEnabled(cmdConn) ? 7826501 : ErrorCodes.CommandNotSupportedOnView;
     // Start the analyzeShardKey command in parallel.
     const awaitResult = startParallelShell(
         funWithArgs(
-            (command) => {
-                assert.commandFailedWithCode(db.adminCommand(command), ErrorCodes.CommandNotSupportedOnView);
+            (command, expectedError) => {
+                assert.commandFailedWithCode(db.adminCommand(command), expectedError);
             },
             {analyzeShardKey: ns, key: {"_id": 1}},
+            expectedError,
         ),
         cmdConn.port,
     );
     failPoint.wait();
 
-    // Recreate the original collection as timeseries collection in the middle of the request,
-    // to trigger the CommandOnShardedViewNotSupportedOnMongod exception.
+    // Recreate the original collection as timeseries collection in the middle of the request.
     testColl.drop();
     assert.commandWorked(testDB.createCollection(collName, {timeseries: {timeField: "time", metaField: "meta"}}));
     assert.commandWorked(testDB.adminCommand({shardCollection: ns, key: {time: 1}}));
 
-    // Resume request with the collection changed to timeseries.
+    // Resume request with the collection changed to timeseries and expect the request to fail.
     failPoint.off();
     awaitResult();
 }

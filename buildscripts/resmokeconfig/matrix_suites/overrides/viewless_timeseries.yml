@@ -56,6 +56,7 @@
     selector:
       exclude_files: null
       roots:
+        - jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
         - jstests/sharding/*timeseries*/*.js
         - jstests/sharding/**/*timeseries*.js
 - name: only_validated_sharding_timeseries_tests_selector
@@ -63,6 +64,7 @@
     selector:
       exclude_files: null
       roots:
+        - jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
         - jstests/sharding/analyze_shard_key/timeseries.js
         - jstests/sharding/libs/timeseries_update_multi_util.js
         - jstests/sharding/query/sample_timeseries.js
