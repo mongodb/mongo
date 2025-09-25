@@ -42,14 +42,14 @@ namespace mongo {
  * Corresponds to flags passed to listIndexes which specify additional information to be returned
  * for each index. BuildUUID = includeBuildUUIDs flag IndexBuildInfo = includeIndexBuildInfo flag
  */
-enum ListIndexesInclude { kNothing, kBuildUUID, kIndexBuildInfo };
+enum class ListIndexesInclude { kNothing, kBuildUUID, kIndexBuildInfo };
 
-std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
-                                     const CollectionAcquisition& collectionAcquisition,
-                                     ListIndexesInclude additionalInclude);
+std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
+                                       const CollectionAcquisition& collectionAcquisition,
+                                       ListIndexesInclude additionalInclude);
 
-std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
-                                                 const NamespaceStringOrUUID& nss,
-                                                 ListIndexesInclude additionalInclude);
+std::vector<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
+                                                   const NamespaceStringOrUUID& nss,
+                                                   ListIndexesInclude additionalInclude);
 
 }  // namespace mongo

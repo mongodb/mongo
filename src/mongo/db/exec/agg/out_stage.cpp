@@ -231,10 +231,8 @@ void OutStage::initialize() {
     // Copy the indexes of the output collection to the temp collection.
     // Note that on timeseries collections, indexes are to be created on the buckets collection.
     try {
-        std::vector<BSONObj> tempNsIndexes = {std::begin(_originalIndexes),
-                                              std::end(_originalIndexes)};
         pExpCtx->getMongoProcessInterface()->createIndexesOnEmptyCollection(
-            pExpCtx->getOperationContext(), _tempNs, tempNsIndexes);
+            pExpCtx->getOperationContext(), _tempNs, _originalIndexes);
     } catch (DBException& ex) {
         ex.addContext("Copying indexes for $out failed");
         throw;

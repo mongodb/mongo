@@ -258,7 +258,7 @@ void ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     bool dropTarget,
     bool stayTemp,
     const BSONObj& originalCollectionOptions,
-    const std::list<BSONObj>& originalIndexes) {
+    const std::vector<BSONObj>& originalIndexes) {
     sharding::router::DBPrimaryRouter router(opCtx->getServiceContext(), sourceNs.dbName());
     router.route(opCtx,
                  "ShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged",
@@ -374,23 +374,21 @@ query_shape::CollectionType ShardServerProcessInterface::getCollectionType(
     MONGO_UNREACHABLE_TASSERT(9072003);
 }
 
-std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
-                                                              const NamespaceString& ns,
-                                                              bool includeBuildUUIDs) {
+std::vector<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
+                                                                const NamespaceString& ns,
+                                                                bool includeBuildUUIDs) {
     sharding::router::CollectionRouter router(opCtx->getServiceContext(), ns);
     return router.routeWithRoutingContext(
         opCtx,
         "ShardServerProcessInterface::getIndexSpecs",
-        [&](OperationContext* opCtx, RoutingContext& routingCtx) -> std::list<BSONObj> {
+        [&](OperationContext* opCtx, RoutingContext& routingCtx) -> std::vector<BSONObj> {
             StatusWith<Shard::QueryResponse> response =
                 loadIndexesFromAuthoritativeShard(opCtx, routingCtx, ns);
             if (response.getStatus().code() == ErrorCodes::NamespaceNotFound) {
                 return {};
             }
             uassertStatusOK(response);
-            std::vector<BSONObj>& indexes = response.getValue().docs;
-            return {std::make_move_iterator(indexes.begin()),
-                    std::make_move_iterator(indexes.end())};
+            return response.getValue().docs;
         });
 }
 

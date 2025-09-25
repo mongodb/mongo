@@ -984,8 +984,8 @@ Status checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
 }
 
 Status checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
-                                         const std::list<BSONObj>& expectedIndexes,
-                                         const std::list<BSONObj>& currentIndexes) {
+                                         const std::vector<BSONObj>& expectedIndexes,
+                                         const std::vector<BSONObj>& currentIndexes) {
     if (expectedIndexes.size() != currentIndexes.size()) {
         return Status(ErrorCodes::CommandFailed,
                       str::stream()
@@ -996,11 +996,13 @@ Status checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
     // every element.
     UnorderedFieldsBSONObjComparator comparator;
     auto sortedExpectedIndexes(expectedIndexes);
-    sortedExpectedIndexes.sort(
-        [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) < 0; });
+    std::sort(sortedExpectedIndexes.begin(),
+              sortedExpectedIndexes.end(),
+              [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) < 0; });
     auto sortedCurrentIndexes(currentIndexes);
-    sortedCurrentIndexes.sort(
-        [&](auto& lhs, auto& rhs) { return comparator.compare(lhs, rhs) < 0; });
+    std::sort(sortedCurrentIndexes.begin(), sortedCurrentIndexes.end(), [&](auto& lhs, auto& rhs) {
+        return comparator.compare(lhs, rhs) < 0;
+    });
     if (!std::equal(sortedExpectedIndexes.begin(),
                     sortedExpectedIndexes.end(),
                     sortedCurrentIndexes.begin(),

@@ -162,9 +162,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs) final {
+    std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       bool includeBuildUUIDs) final {
         MONGO_UNREACHABLE;
     }
 
@@ -224,13 +224,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void renameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
-                                                 const NamespaceString& sourceNs,
-                                                 const NamespaceString& targetNs,
-                                                 bool dropTarget,
-                                                 bool stayTemp,
-                                                 const BSONObj& originalCollectionOptions,
-                                                 const std::list<BSONObj>& originalIndexes) final {
+    void renameIfOptionsAndIndexesHaveNotChanged(
+        OperationContext* opCtx,
+        const NamespaceString& sourceNs,
+        const NamespaceString& targetNs,
+        bool dropTarget,
+        bool stayTemp,
+        const BSONObj& originalCollectionOptions,
+        const std::vector<BSONObj>& originalIndexes) final {
         MONGO_UNREACHABLE;
     }
 

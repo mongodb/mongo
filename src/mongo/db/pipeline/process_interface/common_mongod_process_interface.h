@@ -66,8 +66,6 @@
 #include "mongo/util/uuid.h"
 
 #include <deque>
-#include <list>
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -241,7 +239,7 @@ protected:
                                            const NamespaceString& sourceNs,
                                            const NamespaceString& targetNs,
                                            const BSONObj& originalCollectionOptions,
-                                           const std::list<BSONObj>& originalIndexes);
+                                           const std::vector<BSONObj>& originalIndexes);
 
     void _handleTimeseriesCreateError(const DBException& ex,
                                       OperationContext* opCtx,

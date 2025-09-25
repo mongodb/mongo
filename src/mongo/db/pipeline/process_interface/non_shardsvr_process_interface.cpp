@@ -108,9 +108,9 @@ std::unique_ptr<Pipeline> NonShardServerProcessInterface::preparePipelineForExec
         pipeline, aggRequest, shouldUseCollectionDefaultCollator);
 }
 
-std::list<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
-                                                                 const NamespaceString& ns,
-                                                                 bool includeBuildUUIDs) {
+std::vector<BSONObj> NonShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
+                                                                   const NamespaceString& ns,
+                                                                   bool includeBuildUUIDs) {
     return listIndexesEmptyListIfMissing(opCtx,
                                          ns,
                                          includeBuildUUIDs ? ListIndexesInclude::kBuildUUID
@@ -321,7 +321,7 @@ void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     bool dropTarget,
     bool stayTemp,
     const BSONObj& originalCollectionOptions,
-    const std::list<BSONObj>& originalIndexes) {
+    const std::vector<BSONObj>& originalIndexes) {
     RenameCollectionOptions options;
     options.dropTarget = dropTarget;
     options.stayTemp = stayTemp;

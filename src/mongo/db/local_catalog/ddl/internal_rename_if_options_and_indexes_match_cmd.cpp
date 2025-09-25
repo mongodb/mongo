@@ -78,8 +78,6 @@ public:
             const auto& fromNss = thisRequest.getFrom();
             const auto& toNss = thisRequest.getTo();
             const auto& originalIndexes = thisRequest.getIndexes();
-            const auto indexList =
-                std::list<BSONObj>(originalIndexes.begin(), originalIndexes.end());
             const auto& collectionOptions = thisRequest.getCollectionOptions();
 
             if (MONGO_unlikely(blockBeforeInternalRenameAndBeforeTakingDDLLocks.shouldFail())) {
@@ -88,7 +86,7 @@ public:
 
             if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
                 // No need to acquire additional locks in a non-sharded environment
-                _internalRun(opCtx, fromNss, toNss, indexList, collectionOptions);
+                _internalRun(opCtx, fromNss, toNss, originalIndexes, collectionOptions);
             } else {
                 // Sharded environment. Run the _shardsvrRenameCollection command, which will use
                 // the RenameCollectionCoordinator.
@@ -103,7 +101,7 @@ public:
                 ShardsvrRenameCollection shardsvrRenameCollectionRequest(fromNss);
                 shardsvrRenameCollectionRequest.setRenameCollectionRequest(renameCollectionRequest);
 
-                // _shardsvrRenameCollecion requires majority write concern.
+                // _shardsvrRenameCollection requires majority write concern.
                 generic_argument_util::setMajorityWriteConcern(shardsvrRenameCollectionRequest);
 
                 DBDirectClient client(opCtx);
@@ -118,7 +116,7 @@ public:
         static void _internalRun(OperationContext* opCtx,
                                  const NamespaceString& fromNss,
                                  const NamespaceString& toNss,
-                                 const std::list<BSONObj>& indexList,
+                                 const std::vector<BSONObj>& indexList,
                                  const BSONObj& collectionOptions) {
             RenameCollectionOptions options;
             options.dropTarget = true;

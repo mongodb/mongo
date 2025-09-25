@@ -101,7 +101,7 @@ namespace {
 /**
  * Returns index specs, with resolved namespace, from the catalog for this listIndexes request.
  */
-using IndexSpecsWithNamespaceString = std::pair<std::list<BSONObj>, NamespaceString>;
+using IndexSpecsWithNamespaceString = std::pair<std::vector<BSONObj>, NamespaceString>;
 IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext* opCtx,
                                                                const ListIndexes& cmd) {
     const auto& origNssOrUUID = cmd.getNamespaceOrUUID();
@@ -142,9 +142,8 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
     auto indexList = listIndexesInLock(opCtx, collAcq, additionalInclude);
 
     if (collectionPtr->isTimeseriesCollection() && !timeseries::isRawDataRequest(opCtx, cmd)) {
-
         indexList = timeseries::createTimeseriesIndexesFromBucketsIndexes(
-            *(collectionPtr->getTimeseriesOptions()), std::move(indexList));
+            *collectionPtr->getTimeseriesOptions(), indexList);
 
         if (!collectionPtr->isNewTimeseriesWithoutView()) {
             // For legacy timeseries collections we need to return the view namespace
@@ -287,11 +286,9 @@ public:
 
             shuffleListCommandResults.execute([&](const auto&) {
                 auto& indexList = indexSpecsWithNss.first;
-                std::vector<BSONObj> shuffledResults(indexList.begin(), indexList.end());
                 std::random_device rd;
                 std::mt19937 g(rd());
-                std::shuffle(shuffledResults.begin(), shuffledResults.end(), g);
-                indexList = std::list<BSONObj>(shuffledResults.begin(), shuffledResults.end());
+                std::shuffle(indexList.begin(), indexList.end(), g);
             });
 
             const auto& indexList = indexSpecsWithNss.first;
@@ -306,7 +303,7 @@ public:
          * or on-disk data.
          */
         ListIndexesReplyCursor _makeCursor(OperationContext* opCtx,
-                                           const std::list<BSONObj>& indexList,
+                                           const std::vector<BSONObj>& indexList,
                                            const NamespaceString& nss) {
             auto& cmd = request();
 

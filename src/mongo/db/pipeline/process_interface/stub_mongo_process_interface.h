@@ -128,9 +128,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs) override {
+    std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       bool includeBuildUUIDs) override {
         MONGO_UNREACHABLE;
     }
 
@@ -204,7 +204,7 @@ public:
         bool dropTarget,
         bool stayTemp,
         const BSONObj& originalCollectionOptions,
-        const std::list<BSONObj>& originalIndexes) override {
+        const std::vector<BSONObj>& originalIndexes) override {
         MONGO_UNREACHABLE;
     }
 

@@ -394,11 +394,7 @@ void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
 
 std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(
     const NamespaceString& nss) const {
-    std::list<BSONObj> indexes =
-        listIndexesEmptyListIfMissing(_opCtx, nss, ListIndexesInclude::kNothing);
-    // Convert std::list to a std::vector.
-    return std::vector<BSONObj>{std::make_move_iterator(std::begin(indexes)),
-                                std::make_move_iterator(std::end(indexes))};
+    return listIndexesEmptyListIfMissing(_opCtx, nss, ListIndexesInclude::kNothing);
 }
 
 void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(

@@ -182,7 +182,7 @@ void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     bool dropTarget,
     bool stayTemp,
     const BSONObj& originalCollectionOptions,
-    const std::list<BSONObj>& originalIndexes) {
+    const std::vector<BSONObj>& originalIndexes) {
     if (_canWriteLocally(opCtx, targetNs)) {
         return NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
             opCtx,

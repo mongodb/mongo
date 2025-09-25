@@ -506,9 +506,9 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
     return boost::none;
 }
 
-std::list<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
-    const TimeseriesOptions& timeseriesOptions, const std::list<BSONObj>& bucketsIndexes) {
-    std::list<BSONObj> indexSpecs;
+std::vector<BSONObj> createTimeseriesIndexesFromBucketsIndexes(
+    const TimeseriesOptions& timeseriesOptions, const std::vector<BSONObj>& bucketsIndexes) {
+    std::vector<BSONObj> indexSpecs;
     for (const auto& bucketsIndex : bucketsIndexes) {
         auto timeseriesIndex =
             createTimeseriesIndexFromBucketsIndex(timeseriesOptions, bucketsIndex);

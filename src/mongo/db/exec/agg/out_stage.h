@@ -141,7 +141,7 @@ private:
     // change during computation. For time-series collection these values will be on the buckets
     // namespace.
     BSONObj _originalOutOptions;
-    std::list<BSONObj> _originalIndexes;
+    std::vector<BSONObj> _originalIndexes;
 
     // The temporary namespace for the $out writes.
     NamespaceString _tempNs;

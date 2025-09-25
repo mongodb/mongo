@@ -87,9 +87,7 @@
 #include <vector>
 
 #include <boost/intrusive_ptr.hpp>
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
@@ -289,9 +287,9 @@ public:
                                                 StringData host,
                                                 bool addShardName) = 0;
 
-    virtual std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                             const NamespaceString& ns,
-                                             bool includeBuildUUIDs) = 0;
+    virtual std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                               const NamespaceString& ns,
+                                               bool includeBuildUUIDs) = 0;
 
     /**
      * Returns all documents in `_mdb_catalog`.
@@ -378,7 +376,7 @@ public:
         bool dropTarget,
         bool stayTemp,
         const BSONObj& originalCollectionOptions,
-        const std::list<BSONObj>& originalIndexes) = 0;
+        const std::vector<BSONObj>& originalIndexes) = 0;
 
     /**
      * Creates a collection on the given database by running the given command. On shardsvr targets

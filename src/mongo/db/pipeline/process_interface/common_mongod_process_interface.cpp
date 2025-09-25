@@ -1157,7 +1157,7 @@ BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
     const NamespaceString& sourceNs,
     const NamespaceString& targetNs,
     const BSONObj& originalCollectionOptions,
-    const std::list<BSONObj>& originalIndexes) {
+    const std::vector<BSONObj>& originalIndexes) {
 
     BSONObjBuilder newCmd;
     newCmd.append("internalRenameIfOptionsAndIndexesMatch", 1);

@@ -56,7 +56,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
 
-#include <list>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -78,9 +77,9 @@ public:
         return false;
     }
 
-    std::list<BSONObj> getIndexSpecs(OperationContext* opCtx,
-                                     const NamespaceString& ns,
-                                     bool includeBuildUUIDs) override;
+    std::vector<BSONObj> getIndexSpecs(OperationContext* opCtx,
+                                       const NamespaceString& ns,
+                                       bool includeBuildUUIDs) override;
 
     std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -162,7 +161,7 @@ public:
         bool dropTarget,
         bool stayTemp,
         const BSONObj& originalCollectionOptions,
-        const std::list<BSONObj>& originalIndexes) override;
+        const std::vector<BSONObj>& originalIndexes) override;
 
     void createCollection(OperationContext* opCtx,
                           const DatabaseName& dbName,

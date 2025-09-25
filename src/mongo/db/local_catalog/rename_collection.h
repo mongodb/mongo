@@ -39,7 +39,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/uuid.h"
 
-#include <list>
+#include <vector>
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
@@ -66,7 +66,7 @@ struct RenameCollectionOptions {
     boost::optional<UUID> expectedSourceUUID;
     boost::optional<UUID> expectedTargetUUID;
     boost::optional<UUID> newTargetCollectionUuid;
-    boost::optional<std::list<BSONObj>> originalIndexes;
+    boost::optional<std::vector<BSONObj>> originalIndexes;
     boost::optional<BSONObj> originalCollectionOptions;
 };
 
@@ -92,8 +92,8 @@ Status checkTargetCollectionOptionsMatch(const NamespaceString& targetNss,
  * match.
  */
 Status checkTargetCollectionIndexesMatch(const NamespaceString& targetNss,
-                                         const std::list<BSONObj>& expectedIndexes,
-                                         const std::list<BSONObj>& currentIndexes);
+                                         const std::vector<BSONObj>& expectedIndexes,
+                                         const std::vector<BSONObj>& currentIndexes);
 
 Status renameCollection(OperationContext* opCtx,
                         const NamespaceString& source,

@@ -67,9 +67,9 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeListIndexes);
 
 namespace mongo {
 
-std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
-                                     const CollectionAcquisition& collectionAcquisition,
-                                     ListIndexesInclude additionalInclude) {
+std::vector<BSONObj> listIndexesInLock(OperationContext* opCtx,
+                                       const CollectionAcquisition& collectionAcquisition,
+                                       ListIndexesInclude additionalInclude) {
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeListIndexes,
         opCtx,
@@ -80,7 +80,7 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
     const auto& collection = collectionAcquisition.getCollectionPtr();
 
     std::vector<std::string> indexNames;
-    std::list<BSONObj> indexSpecs;
+    std::vector<BSONObj> indexSpecs;
     collection->getAllIndexes(&indexNames);
 
     if (collection->isClustered() && !collection->isTimeseriesCollection()) {
@@ -155,9 +155,9 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
     }
     return indexSpecs;
 }
-std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
-                                                 const NamespaceStringOrUUID& nss,
-                                                 ListIndexesInclude additionalInclude) {
+std::vector<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
+                                                   const NamespaceStringOrUUID& nss,
+                                                   ListIndexesInclude additionalInclude) {
     const auto collection = acquireCollectionMaybeLockFree(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kRead));

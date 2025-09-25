@@ -640,10 +640,7 @@ void checkExpectedTargetIndexesMatch(OperationContext* opCtx,
             }
             return uassertStatusOK(response).docs;
         });
-    uassertStatusOK(checkTargetCollectionIndexesMatch(
-        targetNss,
-        std::list<BSONObj>{expectedIndexes.begin(), expectedIndexes.end()},
-        std::list<BSONObj>{currentIndexes.begin(), currentIndexes.end()}));
+    uassertStatusOK(checkTargetCollectionIndexesMatch(targetNss, expectedIndexes, currentIndexes));
 }
 }  // namespace
 
