@@ -134,8 +134,11 @@ def process_or(stage: dict[str, Any]) -> Node:
 
 def process_intersection(stage: dict[str, Any]) -> Node:
     children = [process_stage(child) for child in stage["inputStages"]]
-    n_processed = sum(child.n_processed for child in children)
-    return Node(**get_common_fields(stage), n_processed=n_processed, children=children)
+    return Node(
+        **get_common_fields(stage),
+        n_processed=sum(child.n_returned for child in children),
+        children=children,
+    )
 
 
 def process_mergesort(stage: dict[str, Any]) -> Node:

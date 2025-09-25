@@ -41,7 +41,7 @@ from calibration_settings import main_config
 from config import DataType, WriteMode
 from cost_estimator import CostModelParameters, ExecutionStats
 from data_generator import CollectionInfo, DataGenerator
-from database_instance import DatabaseInstance
+from database_instance import DatabaseInstance, get_database_parameter
 from workload_execution import Query, QueryParameters
 
 __all__ = []
@@ -65,48 +65,6 @@ def save_to_csv(parameters: Mapping[str, Sequence[CostModelParameters]], filepat
                 )
                 fields[qsn_type_name] = qsn_type
                 writer.writerow(fields)
-
-
-async def execute_index_intersections_with_requests(
-    database: DatabaseInstance, collections: Sequence[CollectionInfo], requests: Sequence[Query]
-):
-    await workload_execution.execute(
-        database, main_config.workload_execution, collections, requests
-    )
-
-    main_config.workload_execution.write_mode = WriteMode.APPEND
-    await workload_execution.execute(
-        database, main_config.workload_execution, collections, requests[::4]
-    )
-
-
-async def execute_index_intersections(
-    database: DatabaseInstance, collections: Sequence[CollectionInfo]
-):
-    collections = [ci for ci in collections if ci.name.startswith("c_int")]
-
-    requests = []
-
-    for i in range(0, 1000, 100):
-        requests.append(Query(pipeline=[{"$match": {"in1": i, "in2": i}}], keys_length_in_bytes=1))
-
-        requests.append(
-            Query(pipeline=[{"$match": {"in1": i, "in2": 1000 - i}}], keys_length_in_bytes=1)
-        )
-
-        requests.append(
-            Query(
-                pipeline=[{"$match": {"in1": {"$lte": i}, "in2": 1000 - i}}], keys_length_in_bytes=1
-            )
-        )
-
-        requests.append(
-            Query(
-                pipeline=[{"$match": {"in1": i, "in2": {"$gt": 1000 - i}}}], keys_length_in_bytes=1
-            )
-        )
-
-    await execute_index_intersections_with_requests(database, collections, requests)
 
 
 async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
@@ -306,6 +264,38 @@ async def execute_ors(database: DatabaseInstance, collections: Sequence[Collecti
     )
 
 
+async def execute_sort_intersections(
+    database: DatabaseInstance, collections: Sequence[CollectionInfo]
+):
+    collections = [ci for ci in collections if ci.name.startswith("intersection_sorted")]
+    # Values ranging from 1 to 10
+    values = collections[0].fields[0].distribution.get_values()
+
+    requests = []
+    for i in values:
+        for j in values:
+            requests.append(
+                Query(
+                    find_cmd={"filter": {"a": i, "b": j}},
+                    note="AND_SORTED",
+                )
+            )
+
+    async with (
+        get_database_parameter(
+            database, "internalQueryForceIntersectionPlans"
+        ) as force_intersection_param,
+        get_database_parameter(
+            database, "internalQueryPlannerEnableSortIndexIntersection"
+        ) as enable_sort_intersection_param,
+    ):
+        await force_intersection_param.set(True)
+        await enable_sort_intersection_param.set(True)
+        await workload_execution.execute(
+            database, main_config.workload_execution, collections, requests
+        )
+
+
 async def execute_fetches(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collection = [c for c in collections if c.name.startswith("coll_scan")][0]
 
@@ -347,6 +337,7 @@ async def main():
             execute_sorts,
             execute_merge_sorts,
             execute_ors,
+            execute_sort_intersections,
             execute_fetches,
         ]
         for execute_query in execution_query_functions:

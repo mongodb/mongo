@@ -300,6 +300,36 @@ def create_merge_sort_collection_template(
     )
 
 
+def create_intersection_collection_template(
+    name: str, cardinalities: list[int], distribution: str, value_range: int = 10
+) -> config.CollectionTemplate:
+    distribution_fn = (
+        RandomDistribution.normal if distribution == "normal" else RandomDistribution.uniform
+    )
+
+    fields = [
+        config.FieldTemplate(
+            name="a",
+            data_type=config.DataType.INTEGER,
+            distribution=distribution_fn(RangeGenerator(DataType.INTEGER, 1, value_range + 1)),
+            indexed=True,
+        ),
+        config.FieldTemplate(
+            name="b",
+            data_type=config.DataType.INTEGER,
+            distribution=distribution_fn(RangeGenerator(DataType.INTEGER, 1, value_range + 1)),
+            indexed=True,
+        ),
+    ]
+
+    return config.CollectionTemplate(
+        name=name,
+        fields=fields,
+        compound_indexes=[],
+        cardinalities=cardinalities,
+    )
+
+
 collection_cardinalities = list(range(10000, 50001, 10000))
 
 c_int_05 = config.CollectionTemplate(
@@ -373,6 +403,12 @@ or_collections = create_merge_sort_collection_template(
     cardinalities=[5, 10, 50, 75, 100, 150, 300, 400, 500, 750] + list(range(1000, 10001, 1000)),
     num_merge_fields=2,
 )
+intersection_sorted_collections = create_intersection_collection_template(
+    "intersection_sorted",
+    distribution="normal",
+    cardinalities=[5, 100, 1000, 5000],
+    value_range=10,
+)
 
 # Data Generator settings
 data_generator = config.DataGeneratorConfig(
@@ -385,6 +421,7 @@ data_generator = config.DataGeneratorConfig(
         sort_collections,
         merge_sort_collections,
         or_collections,
+        intersection_sorted_collections,
         c_int_05,
         c_arr_01,
     ],
@@ -431,7 +468,16 @@ qsn_nodes = [
     ),
     config.QsNodeCalibrationConfig(type="FETCH"),
     config.QsNodeCalibrationConfig(type="AND_HASH"),
-    config.QsNodeCalibrationConfig(type="AND_SORTED"),
+    config.QsNodeCalibrationConfig(
+        type="AND_SORTED",
+        variables_override=lambda df: pd.concat(
+            [
+                df["n_processed"],
+                df["n_returned"],
+            ],
+            axis=1,
+        ),
+    ),
     config.QsNodeCalibrationConfig(type="OR"),
     config.QsNodeCalibrationConfig(
         type="SORT_MERGE",
