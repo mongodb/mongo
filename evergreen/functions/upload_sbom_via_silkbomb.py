@@ -54,8 +54,6 @@ def upload_sbom_via_silkbomb(
     silkbomb_args = [
         "--sbom-in",
         f"/workdir/{local_repo_path}/{sbom_repo_path}",
-        "--project",
-        "tarun_test",  # kept for tests
         "--branch",
         branch_name,
         "--repo",
