@@ -58,7 +58,14 @@ Status WiredTigerIntegerKeyedContainer::insert(RecoveryUnit& ru,
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
     wtRu.assertInActiveTxn();
-    return wtRCToStatus(insert(wtRu, *cursor.get(), key, value), cursor->session);
+    int ret = insert(wtRu, *cursor.get(), key, value);
+    // TODO(SERVER-111433): Remove conditional because wtRCToStatus should convert to the
+    // correct error code.
+    if (ret == WT_DUPLICATE_KEY) {
+        return Status(ErrorCodes::DuplicateKey,
+                      "Duplicate key when performing integer-keyed container insert");
+    }
+    return wtRCToStatus(ret, cursor->session);
 }
 
 int WiredTigerIntegerKeyedContainer::insert(WiredTigerRecoveryUnit& ru,
@@ -74,7 +81,14 @@ Status WiredTigerIntegerKeyedContainer::remove(RecoveryUnit& ru, int64_t key) {
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
     wtRu.assertInActiveTxn();
-    return wtRCToStatus(remove(wtRu, *cursor.get(), key), cursor->session);
+    int ret = remove(wtRu, *cursor.get(), key);
+    // TODO(SERVER-111433): Remove conditional because wtRCToStatus should convert to the
+    // correct error code.
+    if (ret == WT_NOTFOUND) {
+        return Status(ErrorCodes::NoSuchKey,
+                      "No such key when performing integer-keyed container remove");
+    }
+    return wtRCToStatus(ret, cursor->session);
 }
 
 int WiredTigerIntegerKeyedContainer::remove(WiredTigerRecoveryUnit& ru,
@@ -95,7 +109,14 @@ Status WiredTigerStringKeyedContainer::insert(RecoveryUnit& ru,
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
     wtRu.assertInActiveTxn();
-    return wtRCToStatus(insert(wtRu, *cursor.get(), key, value), cursor->session);
+    int ret = insert(wtRu, *cursor.get(), key, value);
+    // TODO(SERVER-111433): Remove conditional because wtRCToStatus should convert to the
+    // correct error code.
+    if (ret == WT_DUPLICATE_KEY) {
+        return Status(ErrorCodes::DuplicateKey,
+                      "Duplicate key when performing integer-keyed container insert");
+    }
+    return wtRCToStatus(ret, cursor->session);
 }
 
 int WiredTigerStringKeyedContainer::insert(WiredTigerRecoveryUnit& ru,
@@ -111,7 +132,14 @@ Status WiredTigerStringKeyedContainer::remove(RecoveryUnit& ru, std::span<const 
     auto& wtRu = WiredTigerRecoveryUnit::get(ru);
     WiredTigerCursor cursor{getWiredTigerCursorParams(wtRu, tableId()), uri(), *wtRu.getSession()};
     wtRu.assertInActiveTxn();
-    return wtRCToStatus(remove(wtRu, *cursor.get(), key), cursor->session);
+    int ret = remove(wtRu, *cursor.get(), key);
+    // TODO(SERVER-111433): Remove conditional because wtRCToStatus should convert to the
+    // correct error code.
+    if (ret == WT_NOTFOUND) {
+        return Status(ErrorCodes::NoSuchKey,
+                      "No such key when performing string-keyed container remove");
+    }
+    return wtRCToStatus(ret, cursor->session);
 }
 
 int WiredTigerStringKeyedContainer::remove(WiredTigerRecoveryUnit& ru,
