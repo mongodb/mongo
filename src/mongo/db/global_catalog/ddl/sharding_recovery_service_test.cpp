@@ -397,7 +397,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnDat
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
              FailBlockingWritesTwiceOnDatabaseWithDifferentReasons,
-             "invariant") {
+             "Location7032368") {
     ///////////////////////////////////////////
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
@@ -419,7 +419,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
              FailBlockingReadsOnDatabaseWithDifferentReasons,
-             "invariant") {
+             "Location7032362") {
     ///////////////////////////////////////////
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
@@ -445,7 +445,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
              FailUnblockingOperationsOnDatabaseWithDifferentReasons,
-             "invariant") {
+             "Location7032366") {
     ///////////////////////////////////////////
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
@@ -613,7 +613,7 @@ TEST_F(ShardingRecoveryServiceTestOnPrimary, BlockAndUnblockOperationsTwiceOnCol
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
              FailBlockingWritesTwiceOnCollectionWithDifferentReasons,
-             "invariant") {
+             "Location7032368") {
     ///////////////////////////////////////////
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
@@ -635,7 +635,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
              FailBlockingReadsOnCollectionWithDifferentReasons,
-             "invariant") {
+             "Location7032362") {
     ///////////////////////////////////////////
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////
@@ -661,7 +661,7 @@ DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
 
 DEATH_TEST_F(ShardingRecoveryServiceTestOnPrimary,
              FailUnblockingOperationsOnCollectionWithDifferentReasons,
-             "invariant") {
+             "Location7032366") {
     ///////////////////////////////////////////
     // Block write operations (catch-up phase)
     ///////////////////////////////////////////

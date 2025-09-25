@@ -2665,17 +2665,15 @@ TEST_F(QueryPlannerTest, NormalOrEnumerationDoesNotPrioritizeLockstepIteration) 
         "]}}");
     // Because we did not set the 'ENUMERATE_OR_CHILDREN_LOCKSTEP' flag, we don't expect this
     // solution to be generated. This is in contrast to the next test case.
-    ASSERT_THROWS(
-        assertSolutionExists(
-            "{or: {nodes: ["
-            "{fetch: {filter: {b: {$eq: 1}, c: {$eq: 1}}, node: {ixscan: {pattern: {a: 1, d: "
-            "1}}}}}, "
-            "{fetch: {filter: {b: {$eq: 2}, c: {$eq: 2}}, node: {ixscan: {pattern: {a: 1, d: "
-            "1}}}}}, "
-            "{fetch: {filter: {b: {$eq: 3}, c: {$eq: 3}}, node: {ixscan: {pattern: {a: 1, d: "
-            "1}}}}} "
-            "]}}"),
-        unittest::TestAssertionFailureException);
+    ASSERT_EQ(numSolutionMatches("{or: {nodes: ["
+                                 "{fetch: {filter: {b: {$eq: 1}, c: {$eq: 1}}, node: {ixscan: "
+                                 "{pattern: {a: 1, d: 1}}}}}, "
+                                 "{fetch: {filter: {b: {$eq: 2}, c: {$eq: 2}}, node: {ixscan: "
+                                 "{pattern: {a: 1, d: 1}}}}}, "
+                                 "{fetch: {filter: {b: {$eq: 3}, c: {$eq: 3}}, node: {ixscan: "
+                                 "{pattern: {a: 1, d: 1}}}}} "
+                                 "]}}"),
+              0);
 
     // We still expect to generate the solutions which don't index the $or.
     assertSolutionExists(
