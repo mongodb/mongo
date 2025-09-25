@@ -104,8 +104,15 @@ std::map<NamespaceString, ListCollectionsReplyItem> getCollectionsFromShard(
     for (auto&& replyItemBson : listCollResponse.docs) {
         auto replyItem =
             ListCollectionsReplyItem::parse(replyItemBson, IDLParserContext("ListCollectionReply"));
-        if (replyItem.getType() != "collection") {
-            // This entry is not a collection (e.g. view)
+        if (replyItem.getType() == "view") {
+            // Do not try to move views
+            continue;
+        }
+        // TODO SERVER-111320: remove the following condition after 9.0 becomes last LTS.
+        // Only viewless timeseries will exists by then.
+        if (replyItem.getType() == "timeseries" &&
+            !(replyItem.getInfo() && replyItem.getInfo()->getUuid())) {
+            // Do not try to move legacy timeseries view
             continue;
         }
         auto nss = NamespaceStringUtil::deserialize(dbName, replyItem.getName());

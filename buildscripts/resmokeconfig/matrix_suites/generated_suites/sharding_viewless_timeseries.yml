@@ -27,6 +27,7 @@ selector:
   roots:
     - jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
     - jstests/sharding/analyze_shard_key/timeseries.js
+    - jstests/sharding/balancer_should_return_random_migrations_failpoint.js
     - jstests/sharding/libs/timeseries_update_multi_util.js
     - jstests/sharding/query/sample_timeseries.js
     - jstests/sharding/resharding_timeseries/move_timeseries.js
