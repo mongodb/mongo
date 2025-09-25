@@ -284,6 +284,20 @@ private:
                                            const BSONObj& newMeasurement,
                                            const BSONObj& oldMeasurement);
 
+    void _checkDeleteChangesExistingShardKey(const BSONObj& newBucket, const BSONObj& oldBucket);
+
+    // Helper used by delete and update paths to enforce shard key change invariants and throw
+    // WouldChangeOwningShard when the operation would move ownership. When
+    // 'checkUpdateRestrictions' is true, update-specific restrictions (e.g., multi=false,
+    // retryable/txn requirements) are enforced. pre/post
+    // images are for error reporting; when absent, we fall back to the extracted shard keys.
+    void _checkShardKeyChangeAndThrowIfMovesShard(const BSONObj& newBucket,
+                                                  const BSONObj& oldBucket,
+                                                  boost::optional<BSONObj> preImage,
+                                                  boost::optional<BSONObj> postImage,
+                                                  bool checkUpdateRestrictions,
+                                                  const char* errorMsg);
+
     WorkingSet* _ws;
 
     //

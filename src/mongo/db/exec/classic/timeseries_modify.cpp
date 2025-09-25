@@ -30,7 +30,6 @@
 #include "mongo/db/exec/classic/timeseries_modify.h"
 
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -60,7 +59,6 @@
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/timeseries/write_ops/timeseries_write_ops_utils.h"
-#include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/db/versioning_protocol/shard_version.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
@@ -316,19 +314,50 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     }
 }
 
+void TimeseriesModifyStage::_checkDeleteChangesExistingShardKey(const BSONObj& newBucket,
+                                                                const BSONObj& oldBucket) {
+    _checkShardKeyChangeAndThrowIfMovesShard(
+        newBucket,
+        oldBucket,
+        boost::none,
+        boost::none,
+        false,
+        "This delete would cause the doc to change owning shards");
+}
+
 void TimeseriesModifyStage::_checkUpdateChangesExistingShardKey(const BSONObj& newBucket,
                                                                 const BSONObj& oldBucket,
                                                                 const BSONObj& newMeasurement,
                                                                 const BSONObj& oldMeasurement) {
+    _checkShardKeyChangeAndThrowIfMovesShard(
+        newBucket,
+        oldBucket,
+        oldMeasurement,
+        newMeasurement,
+        true,
+        "This update would cause the doc to change owning shards");
+}
+
+void TimeseriesModifyStage::_checkShardKeyChangeAndThrowIfMovesShard(
+    const BSONObj& newBucket,
+    const BSONObj& oldBucket,
+    boost::optional<BSONObj> preImage,
+    boost::optional<BSONObj> postImage,
+    bool checkUpdateRestrictions,
+    const char* errorMsg) {
     const auto& collDesc = collectionAcquisition().getShardingDescription();
+    if (!collDesc.isSharded()) {
+        return;
+    }
+
     const auto& shardKeyPattern = collDesc.getShardKeyPattern();
 
     auto oldShardKey = shardKeyPattern.extractShardKeyFromDoc(oldBucket);
     auto newShardKey = shardKeyPattern.extractShardKeyFromDoc(newBucket);
 
-    // If the shard key fields remain unchanged by this update we can skip the rest of the checks.
-    // Using BSONObj::binaryEqual() still allows a missing shard key field to be filled in with an
-    // explicit null value.
+    // If the shard key fields remain unchanged by this operation we can skip the rest of the
+    // checks. Using BSONObj::binaryEqual() still allows a missing shard key field to be filled in
+    // with an explicit null value.
     if (newShardKey.binaryEqual(oldShardKey)) {
         return;
     }
@@ -338,7 +367,8 @@ void TimeseriesModifyStage::_checkUpdateChangesExistingShardKey(const BSONObj& n
     // Assert that the updated doc has no arrays or array descendants for the shard key fields.
     update::assertPathsNotArray(mutablebson::Document{oldBucket}, shardKeyPaths);
 
-    _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
+    if (checkUpdateRestrictions)
+        _checkRestrictionsOnUpdatingShardKeyAreNotViolated(collDesc, shardKeyPaths);
 
     // At this point we already asserted that the complete shardKey have been specified in the
     // query, this implies that mongos is not doing a broadcast update and that it attached a
@@ -351,15 +381,13 @@ void TimeseriesModifyStage::_checkUpdateChangesExistingShardKey(const BSONObj& n
     invariant(collFilter->keyBelongsToMe(oldShardKey));
 
     if (!collFilter->keyBelongsToMe(newShardKey)) {
-        // We send the 'oldMeasurement' instead of the old bucket document to leverage timeseries
-        // deleteOne because the delete can run inside an internal transaction.
-        uasserted(WouldChangeOwningShardInfo(oldMeasurement,
+        uasserted(WouldChangeOwningShardInfo(preImage ? *preImage : oldShardKey,
                                              newBucket,
                                              false,
                                              collectionPtr()->ns(),
                                              collectionPtr()->uuid(),
-                                             newMeasurement),
-                  "This update would cause the doc to change owning shards");
+                                             postImage ? *postImage : newShardKey),
+                  errorMsg);
     }
 }
 
@@ -450,6 +478,18 @@ TimeseriesModifyStage::_writeToTimeseriesBuckets(ScopeGuard<F>& bucketFreer,
             _bucketUnpacker.bucket(),
             modifiedMeasurements[0],
             matchedMeasurements[0]);
+    }
+
+    if (!isUpdate && !unchangedMeasurements.empty()) {
+        // If this is a delete, we need to ensure that
+        // deleting a value does not change the shard key value of the bucket.
+        _checkDeleteChangesExistingShardKey(
+            timeseries::write_ops::makeBucketDocument(unchangedMeasurements,
+                                                      collectionPtr()->ns(),
+                                                      collectionPtr()->uuid(),
+                                                      *collectionPtr()->getTimeseriesOptions(),
+                                                      collectionPtr()->getDefaultCollator()),
+            _bucketUnpacker.bucket());
     }
 
     auto getMeasurementToReturn = [&] {
