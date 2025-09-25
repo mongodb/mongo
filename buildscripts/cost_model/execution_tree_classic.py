@@ -42,7 +42,6 @@ class Node:
     execution_time_nanoseconds: int
     n_returned: int
     n_processed: int
-    n_input_stages: int
     seeks: Optional[int]
     children: list[Node]
 
@@ -55,7 +54,7 @@ class Node:
     def print(self, level=0):
         """Pretty print the execution tree"""
         print(
-            f'{"| " * level}{self.stage}, totalExecutionTime: {self.execution_time_nanoseconds:,}ns, seeks: {self.seeks}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}, nInputStages: {self.n_input_stages}'
+            f'{"| " * level}{self.stage}, totalExecutionTime: {self.execution_time_nanoseconds:,}ns, seeks: {self.seeks}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}'
         )
         for child in self.children:
             child.print(level + 1)
@@ -166,8 +165,5 @@ def get_common_fields(json_stage: dict[str, Any]) -> dict[str, Any]:
         "stage": json_stage["stage"],
         "execution_time_nanoseconds": json_stage["executionTimeNanos"],
         "n_returned": json_stage["nReturned"],
-        "n_input_stages": 1
-        if "inputStage" in json_stage
-        else len(json_stage.get("inputStages", [])),
         "seeks": json_stage.get("seeks"),
     }

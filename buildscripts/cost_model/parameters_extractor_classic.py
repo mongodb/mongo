@@ -96,8 +96,9 @@ def get_execution_stats(
                 execution_time=enode.get_execution_time(),
                 n_returned=enode.n_returned,
                 n_processed=enode.n_processed,
+                n_processed_per_child=[child.n_processed for child in enode.children],
                 # This will be 0 in case there are no input stages
-                n_input_stages=enode.n_input_stages,
+                n_children=len(enode.children),
                 # Seeks will be None for any node but IXSCAN.
                 seeks=enode.seeks,
             )

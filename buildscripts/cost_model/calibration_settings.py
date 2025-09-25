@@ -409,6 +409,12 @@ intersection_sorted_collections = create_intersection_collection_template(
     cardinalities=[5, 100, 1000, 5000],
     value_range=10,
 )
+intersection_hash_collections = create_intersection_collection_template(
+    "intersection_hash",
+    distribution="normal",
+    cardinalities=[1000],
+    value_range=10,
+)
 
 # Data Generator settings
 data_generator = config.DataGeneratorConfig(
@@ -422,6 +428,7 @@ data_generator = config.DataGeneratorConfig(
         merge_sort_collections,
         or_collections,
         intersection_sorted_collections,
+        intersection_hash_collections,
         c_int_05,
         c_arr_01,
     ],
@@ -467,7 +474,17 @@ qsn_nodes = [
         ),
     ),
     config.QsNodeCalibrationConfig(type="FETCH"),
-    config.QsNodeCalibrationConfig(type="AND_HASH"),
+    config.QsNodeCalibrationConfig(
+        type="AND_HASH",
+        variables_override=lambda df: pd.concat(
+            [
+                df["n_processed_per_child"].str[0].rename("Documents from first child"),
+                df["n_processed_per_child"].str[1].rename("Documents from second child"),
+                df["n_returned"],
+            ],
+            axis=1,
+        ),
+    ),
     config.QsNodeCalibrationConfig(
         type="AND_SORTED",
         variables_override=lambda df: pd.concat(
@@ -484,8 +501,8 @@ qsn_nodes = [
         # Note: n_returned = n_processed - (amount of duplicates dropped)
         variables_override=lambda df: pd.concat(
             [
-                (df["n_returned"] * np.log2(df["n_input_stages"])).rename(
-                    "n_returned * log2(n_input_stages)"
+                (df["n_returned"] * np.log2(df["n_children"])).rename(
+                    "n_returned * log2(n_children)"
                 ),
                 df["n_processed"],
             ],

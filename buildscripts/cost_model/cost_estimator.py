@@ -45,7 +45,9 @@ class ExecutionStats:
     execution_time: int
     n_returned: int
     n_processed: int
-    n_input_stages: int
+    n_processed_per_child: list[int]
+    # Technically superfluous, because it's len(n_processed_per_child), but improves readability
+    n_children: int
     seeks: Optional[int]
 
 

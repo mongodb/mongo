@@ -296,6 +296,38 @@ async def execute_sort_intersections(
         )
 
 
+async def execute_hash_intersections(
+    database: DatabaseInstance, collections: Sequence[CollectionInfo]
+):
+    collections = [ci for ci in collections if ci.name.startswith("intersection_hash")]
+    # Values ranging from 1 to 10
+    values = collections[0].fields[0].distribution.get_values()
+
+    requests = []
+    for i in values:
+        for j in values:
+            requests.append(
+                Query(
+                    find_cmd={"filter": {"a": {"$lte": i}, "b": {"$lte": j}}},
+                    note="AND_HASH",
+                )
+            )
+
+    async with (
+        get_database_parameter(
+            database, "internalQueryForceIntersectionPlans"
+        ) as force_intersection_param,
+        get_database_parameter(
+            database, "internalQueryPlannerEnableHashIntersection"
+        ) as enable_hash_intersection_param,
+    ):
+        await force_intersection_param.set(True)
+        await enable_hash_intersection_param.set(True)
+        await workload_execution.execute(
+            database, main_config.workload_execution, collections, requests
+        )
+
+
 async def execute_fetches(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collection = [c for c in collections if c.name.startswith("coll_scan")][0]
 
@@ -338,6 +370,7 @@ async def main():
             execute_merge_sorts,
             execute_ors,
             execute_sort_intersections,
+            execute_hash_intersections,
             execute_fetches,
         ]
         for execute_query in execution_query_functions:
