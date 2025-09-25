@@ -49,6 +49,7 @@ class ExecutionStats:
     # Technically superfluous, because it's len(n_processed_per_child), but improves readability
     n_children: int
     seeks: Optional[int]
+    n_index_fields: Optional[int]
 
 
 @dataclass

@@ -347,6 +347,28 @@ async def execute_fetches(database: DatabaseInstance, collections: Sequence[Coll
     )
 
 
+async def execute_index_scans_w_diff_num_fields(
+    database: DatabaseInstance, collections: Sequence[CollectionInfo]
+):
+    collection = [c for c in collections if c.name.startswith("index_scan_diff_num_fields")][0]
+    requests = []
+
+    # The compound_indexes list does not contain the single-field index {a: 1}.
+    for index in ["a"] + collection.compound_indexes:
+        hint_obj = {key: 1 for key in index}
+
+        requests.append(
+            Query(
+                {"filter": {"a": {"$lt": 10000}}, "hint": hint_obj},
+                note="IXSCANS_W_DIFF_NUM_FIELDS",
+            )
+        )
+
+    await workload_execution.execute(
+        database, main_config.workload_execution, [collection], requests
+    )
+
+
 async def main():
     """Entry point function."""
     script_directory = os.path.abspath(os.path.dirname(__file__))
@@ -372,6 +394,7 @@ async def main():
             execute_sort_intersections,
             execute_hash_intersections,
             execute_fetches,
+            execute_index_scans_w_diff_num_fields,
         ]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)

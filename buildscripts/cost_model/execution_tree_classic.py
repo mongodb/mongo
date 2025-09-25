@@ -44,6 +44,7 @@ class Node:
     n_processed: int
     seeks: Optional[int]
     children: list[Node]
+    n_index_fields: Optional[int]
 
     def get_execution_time(self):
         """Execution time of this node without execution time of its children"""
@@ -54,7 +55,7 @@ class Node:
     def print(self, level=0):
         """Pretty print the execution tree"""
         print(
-            f'{"| " * level}{self.stage}, totalExecutionTime: {self.execution_time_nanoseconds:,}ns, seeks: {self.seeks}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}'
+            f'{"| " * level}{self.stage}, totalExecutionTime: {self.execution_time_nanoseconds:,}ns, seeks: {self.seeks}, nReturned: {self.n_returned}, nProcessed: {self.n_processed}, nIndexFields: {self.n_index_fields}'
         )
         for child in self.children:
             child.print(level + 1)
@@ -166,4 +167,5 @@ def get_common_fields(json_stage: dict[str, Any]) -> dict[str, Any]:
         "execution_time_nanoseconds": json_stage["executionTimeNanos"],
         "n_returned": json_stage["nReturned"],
         "seeks": json_stage.get("seeks"),
+        "n_index_fields": len(json_stage.get("keyPattern")) if "keyPattern" in json_stage else None,
     }

@@ -330,6 +330,41 @@ def create_intersection_collection_template(
     )
 
 
+def create_ixscan_diff_num_fields_template():
+    card = 10000
+    # Generate fields "a", "b", ... "j"
+    field_names = [chr(ord("a") + i) for i in range(10)]
+    fields = [
+        config.FieldTemplate(
+            name=field_name,
+            data_type=config.DataType.INTEGER,
+            distribution=RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, card)),
+            # We only want a single field index on 'a'.
+            indexed=(field_name == "a"),
+        )
+        for field_name in field_names
+    ]
+    compound_indexes = [
+        # Note the single field index is created in the FieldTemplate for 'a' above.
+        ["a", "b"],
+        ["a", "b", "c"],
+        ["a", "b", "c", "d"],
+        ["a", "b", "c", "d", "e"],
+        ["a", "b", "c", "d", "e", "f"],
+        ["a", "b", "c", "d", "e", "f", "g"],
+        ["a", "b", "c", "d", "e", "f", "g", "h"],
+        ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+        ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
+    ]
+
+    return config.CollectionTemplate(
+        name="index_scan_diff_num_fields",
+        fields=fields,
+        compound_indexes=compound_indexes,
+        cardinalities=[card],
+    )
+
+
 collection_cardinalities = list(range(10000, 50001, 10000))
 
 c_int_05 = config.CollectionTemplate(
@@ -416,6 +451,8 @@ intersection_hash_collections = create_intersection_collection_template(
     value_range=10,
 )
 
+index_scan_diff_num_fields_collections = create_ixscan_diff_num_fields_template()
+
 # Data Generator settings
 data_generator = config.DataGeneratorConfig(
     enabled=True,
@@ -429,6 +466,7 @@ data_generator = config.DataGeneratorConfig(
         or_collections,
         intersection_sorted_collections,
         intersection_hash_collections,
+        index_scan_diff_num_fields_collections,
         c_int_05,
         c_arr_01,
     ],
@@ -470,6 +508,14 @@ qsn_nodes = [
         type="IXSCAN",
         variables_override=lambda df: pd.concat(
             [df["n_processed"].rename("Keys Examined"), df["seeks"].rename("Number of seeks")],
+            axis=1,
+        ),
+    ),
+    config.QsNodeCalibrationConfig(
+        name="IXSCANS_W_DIFF_NUM_FIELDS",
+        type="IXSCAN",
+        variables_override=lambda df: pd.concat(
+            [df["n_index_fields"].rename("Number of fields in index")],
             axis=1,
         ),
     ),
