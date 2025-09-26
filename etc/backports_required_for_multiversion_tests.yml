@@ -21,7 +21,7 @@
 #
 last-continuous:
   all:
-  - test_file: jstests/core/query/json_schema/json_schema.js
+  - test_file: jstests/core/json_schema/json_schema.js
     ticket: SERVER-98676
   - test_file: jstests/core/query/explain/explain_plan_cache.js
     ticket: SERVER-97662
@@ -866,7 +866,7 @@ last-continuous:
   suites: null
 last-lts:
   all:
-  - test_file: jstests/core/query/json_schema/json_schema.js
+  - test_file: jstests/core/json_schema/json_schema.js
     ticket: SERVER-98676
   - test_file: jstests/core/query/explain/explain_plan_cache.js
     ticket: SERVER-97662
