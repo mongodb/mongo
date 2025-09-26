@@ -14,7 +14,7 @@ export function randomManualMigration($config, $super) {
     $config.data.isMoveChunkErrorAcceptable = (err) => {
         // When the balancer is enabled, the manual chunk migrations done by the moveChunk base
         // might conflict with the splits being done by the balancer.
-        let acceptDueToBalancerConflict = TestData.runningWithBalancer && err.code == 656452;
+        let acceptDueToBalancerConflict = TestData.runningWithBalancer && (err.code == 656452 || err.code == 11089203);
         // When shards are being added and removed, the target shard may no longer exist by the time
         // the migration is issued. We have to check the error messages because chunk migrations can
         // modify the error message and lose the original error code.
