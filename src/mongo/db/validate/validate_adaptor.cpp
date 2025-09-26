@@ -773,10 +773,27 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
 }
 
 void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* results) {
-    // TODO (SERVER-110844): Implement progress meter
     if (_validateState->getFirstRecordId().isNull()) {
         // The record store is empty if the first RecordId isn't initialized.
         return;
+    }
+
+    ON_BLOCK_EXIT([&]() {
+        results->setNumRecords(_numRecords);
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            _progress.get(lk)->finished();
+        }
+    });
+
+    // Because the progress meter is intended as an approximation, it's sufficient to get the number
+    // of records when we begin traversing, even if this number may deviate from the final number.
+    const auto& coll = _validateState->getCollection();
+    const char* curopMessage = "Validate: scanning documents for 'collHash' drill-down";
+    const auto totalRecords = coll->getRecordStore()->numRecords();
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        _progress.set(lk, CurOp::get(opCtx)->setProgress(lk, curopMessage, totalRecords), opCtx);
     }
 
     const std::unique_ptr<SeekableRecordThrottleCursor>& traverseRecordStoreCursor =
@@ -810,6 +827,11 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
              traverseRecordStoreCursor->seekExact(opCtx, _validateState->getFirstRecordId());
          record;
          record = traverseRecordStoreCursor->next(opCtx)) {
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            _progress.get(lk)->hit();
+        }
+        ++_numRecords;
         BSONObj recordBson = record->data.toBson();
         auto idField = recordBson["_id"];
 
