@@ -3295,6 +3295,7 @@ mongo_cc_library(
         "//src/mongo/util:ntservice",
         "//src/mongo/util/options_parser:options_parser_init",
         "//src/mongo/util:periodic_runner_factory",
+        "//src/mongo/util:pin_code_segments",
         "//src/mongo/util:testing_options",
         "//src/mongo/util:version_impl",
         "//src/mongo/watchdog:watchdog_mongod",
@@ -3385,9 +3386,6 @@ mongo_cc_library(
         "//bazel/config:use_tracing_profiler_enabled": [
             "//src/mongo/util/tracing_profiler",
         ],
-        "//conditions:default": [],
-    }) + select({
-        "@platforms//os:linux": ["//src/mongo/util:pin_code_segments"],
         "//conditions:default": [],
     }) + select({
         "@platforms//os:windows": ["windows_options"],
