@@ -60,6 +60,14 @@ if [ -f $ARTIFACTS_SCRIPT ]; then
     $python $ARTIFACTS_SCRIPT
 fi
 
+RBE_SYSROOT_SCRIPT="${SRC_DIR}/buildscripts/create_rbe_sysroot.py"
+if [[ -f "${RBE_SYSROOT_SCRIPT}" ]]; then
+    echo "Setting up RBE sysroot for unit test debugging..."
+    $python $RBE_SYSROOT_SCRIPT
+else
+    echo "Failed to find RBE sysroot setup script."
+fi
+
 archive_fail() {
     echo "Error: archive [${1}] not found." >&2
 }
@@ -257,14 +265,6 @@ fi' >> .bash_profile
         ln -s ${SRC_DIR}/buildscripts buildscripts
     else
         archive_fail "src"
-    fi
-
-    RBE_SYSROOT_SCRIPT="${SRC_DIR}/buildscripts/create_rbe_sysroot.py"
-    if [[ -f "${RBE_SYSROOT_SCRIPT}" ]]; then
-        echo "Setting up RBE sysroot for unit test debugging..."
-        $python $RBE_SYSROOT_SCRIPT
-    else
-        echo "Failed to find RBE sysroot setup script."
     fi
 
     set -x

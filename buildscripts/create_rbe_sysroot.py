@@ -30,7 +30,7 @@ def main():
 
     os.makedirs("./rbe_sysroot", exist_ok=True)
 
-    subprocess.run(["sudo", container_cli, "cp", f"{cid}:/", "./rbe_sysroot/"], check=True)
+    subprocess.run([container_cli, "cp", f"{cid}:/", "./rbe_sysroot/"], check=True)
 
     user = getpass.getuser()
     subprocess.run(["sudo", "chown", "-R", f"{user}:{user}", "./rbe_sysroot"], check=True)

@@ -6,7 +6,7 @@ import sys
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from buildscripts.print_local_rbe_container_url import calculate_local_rbe_container_url
+from buildscripts.local_rbe_container_url import calculate_local_rbe_container_url
 
 
 def main():
