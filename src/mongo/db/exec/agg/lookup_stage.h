@@ -134,7 +134,6 @@ private:
         const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
         const NamespaceString& resolvedNs,
         const std::vector<BSONObj>& viewPipeline,
-        std::vector<BSONObj> currentPipeline,
         bool attachCursorAfterOptimizing,
         ShardTargetingPolicy shardTargetingPolicy,
         std::function<void(mongo::Pipeline* pipeline,

@@ -310,7 +310,6 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& fromExpCtx,
     const NamespaceString& resolvedNs,
     const std::vector<BSONObj>& viewPipeline,
-    std::vector<BSONObj> currentPipeline,
     bool attachCursorAfterOptimizing,
     ShardTargetingPolicy shardTargetingPolicy,
     std::function<void(mongo::Pipeline* pipeline,
@@ -328,7 +327,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     std::unique_ptr<mongo::Pipeline> resolvedPipeline =
         mongo::Pipeline::makePipelineFromViewDefinition(fromExpCtx,
                                                         ResolvedNamespace{resolvedNs, viewPipeline},
-                                                        std::move(currentPipeline),
+                                                        std::move(_sharedState->resolvedPipeline),
                                                         opts,
                                                         _fromNs);
 
@@ -441,8 +440,8 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
     // If we don't have a cache, optimize and translate, and attach a cursor to the pipeline
     // immediately.
     if (!_cache || _cache->isAbandoned()) {
-        const auto& finalizePipeline = [this](mongo::Pipeline* pipeline,
-                                              MongoProcessInterface::CollectionMetadata collData) {
+        const auto& finalizePipeline = [](mongo::Pipeline* pipeline,
+                                          MongoProcessInterface::CollectionMetadata collData) {
             tassert(11028104, "Expected pipeline to finalize", pipeline);
             // TODO SERVER-103133 enable for viewless timeseries.
             // visit(OverloadedVisitor{
@@ -473,7 +472,6 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
             return buildPipelineFromViewDefinition(fromExpCtx,
                                                    e->getNamespace(),
                                                    e->getPipeline(),
-                                                   _sharedState->resolvedPipeline,
                                                    true /* attachCursorAfterOptimizing */,
                                                    shardTargetingPolicy,
                                                    finalizePipeline);
@@ -483,11 +481,6 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
     std::unique_ptr<mongo::Pipeline> pipeline;
     // If the cache has either been abandoned or has not yet been built, attach a cursor.
     bool attachCursorAfterOptimizing = !_cache->isServing();
-
-    // We can store the unoptimized serialization of the pipeline so that if we need to resolve
-    // a sharded view later on, and we have a local-foreign field join, we will need to update
-    // metadata tracking the position of this join in the _sharedState->resolvedPipeline.
-    std::vector<BSONObj> serializedPipeline = parsedPipeline->serializeToBson();
 
     const auto& finalizePipeline = [this](mongo::Pipeline* pipeline,
                                           MongoProcessInterface::CollectionMetadata collData) {
@@ -505,12 +498,16 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
         //               pipeline->performPreOptimizationRewrites(_fromExpCtx, cri);
         //           }},
         //       collData);
-        if (_cache && !_cache->isAbandoned()) {
-            // We do not validate the pipeline after adding the cache stage and optimizing the
-            // pipeline.
-            addCacheStageAndOptimize(
-                DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache), *pipeline);
-        }
+        // Update the resolvedPipeline with the translated stages, so we can avoid completing
+        // the translation when the cache is serving.
+        // if (pipeline->isTranslated()) {
+        //     _sharedState->resolvedPipeline = pipeline->serializeToBson();
+        // }
+        // We've already validated above the cache exists and is not abandoned, so we should
+        // always apply the optimization here. We do not validate the pipeline after adding the
+        // cache stage optimization.
+        addCacheStageAndOptimize(DocumentSourceSequentialDocumentCache::create(_fromExpCtx, _cache),
+                                 *pipeline);
     };
 
     try {
@@ -526,7 +523,6 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
         pipeline = buildPipelineFromViewDefinition(fromExpCtx,
                                                    e->getNamespace(),
                                                    e->getPipeline(),
-                                                   std::move(serializedPipeline),
                                                    attachCursorAfterOptimizing,
                                                    shardTargetingPolicy,
                                                    finalizePipeline);

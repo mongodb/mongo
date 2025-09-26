@@ -775,9 +775,13 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
             std::holds_alternative<ProofOfUpstreamFiltering>(shardFilterPolicy),
             expCtx->getOperationContext());
 
-    if (!requiresCollectionAcquisition(*pipeline)) {
-        // There's no need to attach a cursor here or acquire collections for viewless timeseries
-        // translations, so we can just make and optimize the pipeline and return early.
+    // If the pipeline doesn't require any collection acquisition, since it produces it's own data,
+    // or attachCursorAfterOptimizing is false we do not need to attach a cursor or perform viewless
+    // timeseries translations, so we can return early. 'attachCursorAfterOptimizing' will only be
+    // false if the pipeline is receiving documents from an in-memory local source, such as a cache.
+    // Viewless timeseries translations should have already occurred so we can get stable results
+    // reading from the cache.
+    if (!requiresCollectionAcquisition(*pipeline) || !attachCursorAfterOptimizing) {
         if (finalizePipeline) {
             finalizePipeline(pipeline.get(), std::monostate{});
         }
@@ -797,15 +801,6 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     if (finalizePipeline) {
         finalizePipeline(pipeline.get(), primaryAcquisition);
     }
-    if (!attachCursorAfterOptimizing) {
-        // If 'attachCursorAfterOptimizing' is false, we will not have a cursor attached. This means
-        // the pipeline will receive documents from an in-memory local source. For example, $lookup
-        // uses a cache. It was important that we still acquired the collection in order to check
-        // for a stale shard version and for viewless timeseries translations.
-        allAcquisitions.clear();
-        return pipeline;
-    }
-
     return attachCursorSourceToPipelineForLocalReadImpl(pipeline.release(),
                                                         allAcquisitions,
                                                         isAnySecondaryCollectionNotLocal,
