@@ -29,9 +29,13 @@ assert.commandWorked(bulk.execute());
 
 assert.commandWorked(db.adminCommand({split: coll.getFullName(), middle: {x: 50}}));
 // Move lower chunk to shard0
-assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 45}, to: st.shard0.shardName}));
+assert.commandWorked(
+    db.adminCommand({moveChunk: coll.getFullName(), find: {x: 45}, to: st.shard0.shardName, _waitForDelete: true}),
+);
 // Move upper chunk to shard1
-assert.commandWorked(db.adminCommand({moveChunk: coll.getFullName(), find: {x: 55}, to: st.shard1.shardName}));
+assert.commandWorked(
+    db.adminCommand({moveChunk: coll.getFullName(), find: {x: 55}, to: st.shard1.shardName, _waitForDelete: true}),
+);
 
 function runFindAndExplain({query, options = {}, expected = {}}) {
     let cursor = coll.find(query);
