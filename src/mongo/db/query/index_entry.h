@@ -61,14 +61,16 @@ struct CoreIndexInfo {
                   Identifier ident,
                   const MatchExpression* fe = nullptr,
                   const CollatorInterface* ci = nullptr,
-                  const IndexPathProjection* indexPathProj = nullptr)
+                  const IndexPathProjection* indexPathProj = nullptr,
+                  std::shared_ptr<const IndexCatalogEntry> iceStorage = nullptr)
         : identifier(std::move(ident)),
           keyPattern(kp),
           filterExpr(fe),
           type(type),
           sparse(sp),
           collator(ci),
-          indexPathProjection(indexPathProj) {
+          indexPathProjection(indexPathProj),
+          indexCatalogEntryStorage(std::move(iceStorage)) {
         // If a projection executor exists, we always expect a $** index
         if (indexPathProjection != nullptr)
             invariant(type == IndexType::INDEX_WILDCARD || type == IndexType::INDEX_COLUMN);
@@ -129,6 +131,10 @@ struct CoreIndexInfo {
     // hashing.
     BSONObj keyPattern;
 
+    // If this index is a partial index, 'filterExpr' is the MatchExpression representing the
+    // filter predicate. Otherwise, 'filterExpr' is null. It is the caller's responsibility to
+    // ensure that the pointer remains valid for the lifetime of this CoreIndexInfo.
+    // See 'indexCatalogEntryStorage' for more details.
     const MatchExpression* filterExpr;
 
     // What type of index is this? (What access method can we use on the index described by the
@@ -139,12 +145,22 @@ struct CoreIndexInfo {
 
     // Null if this index orders strings according to the simple binary compare. If non-null,
     // represents the collator used to generate index keys for indexed strings.
+    // It is the caller's responsibility to ensure that the pointer remains valid for the lifetime
+    // of this CoreIndexInfo.
+    // See 'indexCatalogEntryStorage' for more details.
     const CollatorInterface* collator = nullptr;
 
     // For $** indexes, a pointer to the projection executor owned by the index access method. Null
-    // unless this IndexEntry represents a wildcard or column storeindex, in which case this is
-    // always non-null.
+    // unless this IndexEntry represents a wildcard or column store index, in which case this is
+    // always non-null. It is the caller's responsibility to ensure that the pointer remains valid
+    // for the lifetime of this CoreIndexInfo. See 'indexCatalogEntryStorage' for more details.
     const IndexPathProjection* indexPathProjection = nullptr;
+
+    // Optional shared_ptr to the IndexCatalogEntry (storage's in-memory representation of an index
+    // in the catalog). This is used to keep the IndexCatalogEntry alive as long as this
+    // CoreIndexInfo. This is useful because the 'filterExpr', 'collator' and 'indexPathProjection'
+    // members are often pointers to data owned by IndexCatalogEntry.
+    std::shared_ptr<const IndexCatalogEntry> indexCatalogEntryStorage;
 };
 
 /**
@@ -168,8 +184,10 @@ struct IndexEntry : CoreIndexInfo {
                const BSONObj& io,
                const CollatorInterface* ci,
                const WildcardProjection* wildcardProjection,
+               std::shared_ptr<const IndexCatalogEntry> iceStorage = nullptr,
                size_t wildcardPos = 0)
-        : CoreIndexInfo(kp, type, sp, std::move(ident), fe, ci, wildcardProjection),
+        : CoreIndexInfo(
+              kp, type, sp, std::move(ident), fe, ci, wildcardProjection, std::move(iceStorage)),
           version(version),
           multikey(mk),
           unique(unq),

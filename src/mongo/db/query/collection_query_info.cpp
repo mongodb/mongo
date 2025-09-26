@@ -77,7 +77,8 @@ CoreIndexInfo indexInfoFromIndexCatalogEntry(const IndexCatalogEntry& ice) {
             IndexEntry::Identifier{desc->indexName()},
             ice.getFilterExpression(),
             ice.getCollator(),
-            projExec};
+            projExec,
+            ice.shared_from_this()};
 }
 
 }  // namespace
