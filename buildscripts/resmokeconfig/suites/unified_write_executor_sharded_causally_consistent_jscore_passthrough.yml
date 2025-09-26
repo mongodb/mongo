@@ -43,9 +43,6 @@ selector:
     # TODO: SERVER-104139 Support write commands against timeseries collections in UWE.
     - jstests/core/timeseries/**/*.js
 
-    # TODO: SERVER-104123 Support for 'multi: true' writes in UWE.
-    - jstests/core/query/batch_write/batch_write_command_delete.js
-
   exclude_with_any_tags:
     # This passthrough implicitly shards the accessed collections. Do not run tests where collections
     # can't be created on `getCollection` call.

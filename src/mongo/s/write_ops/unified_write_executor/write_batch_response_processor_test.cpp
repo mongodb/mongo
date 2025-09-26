@@ -966,6 +966,482 @@ TEST_F(WriteBatchResponseProcessorTest, NonVerboseModeWithMixedErrorsAndOk) {
     ASSERT_FALSE(batchedCommandReply.isErrDetailsSet());
 }
 
+TEST_F(WriteBatchResponseProcessorTest, MultiWritesOKReplies) {
+    auto update1 = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)), BSON("$set" << BSON("y" << 2)));
+    auto update2 = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -3 << "$lt" << 3)), BSON("$set" << BSON("z" << 3)));
+    auto update3 = BulkWriteUpdateOp(
+        0, BSON("y" << BSON("$gte" << -3 << "$lt" << 3)), BSON("$set" << BSON("z" << 1)));
+    update1.setMulti(true);
+    update2.setMulti(true);
+    update3.setMulti(true);
+    auto request = BulkWriteCommandRequest({update1, update2, update3}, {NamespaceInfoEntry(nss1)});
+
+    WriteOp op1(request, 0);
+    WriteOp op2(request, 1);
+    WriteOp op3(request, 2);
+
+    ShardId shard3Name = ShardId("shard3");
+    ShardEndpoint shard3Endpoint = ShardEndpoint(
+        shard3Name, ShardVersionFactory::make(ChunkVersion(gen, {100, 200})), boost::none);
+    HostAndPort host3 = HostAndPort("host3", 0);
+
+    // Response for shard1.
+    auto reply = makeReply();
+    reply.setNModified(3);
+    reply.setCursor(BulkWriteCommandResponseCursor(0,
+                                                   {BulkWriteReplyItem{0, Status::OK()},
+                                                    BulkWriteReplyItem{1, Status::OK()},
+                                                    BulkWriteReplyItem{2, Status::OK()}},
+                                                   nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    // Response for shard2.
+    auto reply2 = makeReply();
+    reply2.setNModified(1);
+    reply2.setCursor(BulkWriteCommandResponseCursor(0,
+                                                    {BulkWriteReplyItem{0, Status::OK()},
+                                                     BulkWriteReplyItem{1, Status::OK()},
+                                                     BulkWriteReplyItem{2, Status::OK()}},
+                                                    nss1));
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    // Response for shard3.
+    auto reply3 = makeReply();
+    reply3.setNModified(6);
+    reply3.setCursor(BulkWriteCommandResponseCursor(0,
+                                                    {BulkWriteReplyItem{0, Status::OK()},
+                                                     BulkWriteReplyItem{1, Status::OK()},
+                                                     BulkWriteReplyItem{2, Status::OK()}},
+                                                    nss1));
+    RemoteCommandResponse rcr3(host1, setTopLevelOK(reply3.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1, op2, op3}}},
+                                 {shard2Name, Response{rcr2, {op1, op2, op3}}},
+                                 {shard3Name, Response{rcr3, {op1, op2, op3}}}});
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+    ASSERT_EQ(clientReply.getNErrors(), 0);
+    ASSERT_EQ(clientReply.getNModified(), 10);
+    ASSERT_EQ(clientReply.getNInserted(), 0);
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 3);
+    ASSERT_EQ(batch[0].getIdx(), 0);
+    ASSERT_EQ(batch[1].getIdx(), 1);
+    ASSERT_EQ(batch[2].getIdx(), 2);
+    ASSERT_EQ(batch[0].getStatus(), Status::OK());
+    ASSERT_EQ(batch[1].getStatus(), Status::OK());
+    ASSERT_EQ(batch[2].getStatus(), Status::OK());
+}
+
+TEST_F(WriteBatchResponseProcessorTest, MixedMultiAndNonMultiWritesOKReplies) {
+    auto update1 = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)), BSON("$set" << BSON("y" << 2)));
+    auto update2 = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -3 << "$lt" << 3)), BSON("$set" << BSON("z" << 3)));
+    auto insert1 = BulkWriteInsertOp(0, BSON("_id" << 3));
+    update1.setMulti(true);
+    update2.setMulti(true);
+    auto request = BulkWriteCommandRequest({update1, insert1, update2}, {NamespaceInfoEntry(nss1)});
+
+    WriteOp op1(request, 0);
+    WriteOp op2(request, 1);
+    WriteOp op3(request, 2);
+
+    ShardId shard3Name = ShardId("shard3");
+    ShardEndpoint shard3Endpoint = ShardEndpoint(
+        shard3Name, ShardVersionFactory::make(ChunkVersion(gen, {100, 200})), boost::none);
+    HostAndPort host3 = HostAndPort("host3", 0);
+
+    // Response for shard1.
+    auto reply = makeReply();
+    reply.setNModified(3);
+    reply.setCursor(BulkWriteCommandResponseCursor(
+        0, {BulkWriteReplyItem{0, Status::OK()}, BulkWriteReplyItem{1, Status::OK()}}, nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    // Response for shard2.
+    auto reply2 = makeReply();
+    reply2.setNModified(2);
+    reply2.setNInserted(1);
+    reply2.setCursor(BulkWriteCommandResponseCursor(0,
+                                                    {BulkWriteReplyItem{0, Status::OK()},
+                                                     BulkWriteReplyItem{1, Status::OK()},
+                                                     BulkWriteReplyItem{2, Status::OK()}},
+                                                    nss1));
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    // Response for shard3.
+    auto reply3 = makeReply();
+    reply3.setNModified(6);
+    reply3.setCursor(BulkWriteCommandResponseCursor(
+        0, {BulkWriteReplyItem{0, Status::OK()}, BulkWriteReplyItem{1, Status::OK()}}, nss1));
+    RemoteCommandResponse rcr3(host1, setTopLevelOK(reply3.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1, op3}}},
+                                 {shard2Name, Response{rcr2, {op1, op2, op3}}},
+                                 {shard3Name, Response{rcr3, {op1, op3}}}});
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+    ASSERT_EQ(clientReply.getNErrors(), 0);
+    ASSERT_EQ(clientReply.getNModified(), 11);
+    ASSERT_EQ(clientReply.getNInserted(), 1);
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 3);
+    ASSERT_EQ(batch[0].getIdx(), 0);
+    ASSERT_EQ(batch[1].getIdx(), 1);
+    ASSERT_EQ(batch[2].getIdx(), 2);
+    ASSERT_EQ(batch[0].getStatus(), Status::OK());
+    ASSERT_EQ(batch[1].getStatus(), Status::OK());
+    ASSERT_EQ(batch[2].getStatus(), Status::OK());
+}
+
+TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndRetryableErrorThenOK) {
+    auto update = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)), BSON("$set" << BSON("y" << 2)));
+    update.setMulti(true);
+
+    auto request = BulkWriteCommandRequest({update}, {NamespaceInfoEntry(nss1)});
+
+    WriteOp op1(request, 0);
+
+    // Response for shard1.
+    auto reply = makeReply();
+    const ShardEndpoint shard1EndpointUnsharded =
+        ShardEndpoint(shard1Name,
+                      ShardVersionFactory::make(ChunkVersion::UNSHARDED()),
+                      DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseVersion newDbVersion(UUID::gen(), Timestamp(1, 100));
+    Status staleDbStatus(StaleDbRoutingVersion(
+                             nss2.dbName(), *shard1EndpointUnsharded.databaseVersion, newDbVersion),
+                         "");
+    reply.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, staleDbStatus}}, nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    // Response for shard2.
+    auto reply2 = makeReply();
+    reply2.setNModified(1);
+    reply2.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}},
+                                 {shard2Name, Response{rcr2, {op1}}}});
+
+
+    ASSERT_EQ(result.successfulShardSet.size(), 1);
+    ASSERT_EQ(result.opsToRetry.size(), 1);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    // OK response from shard 1 on retry.
+    RemoteCommandResponse rcr3(host1, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    auto nextResult = processor.onWriteBatchResponse(
+        opCtx, routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr3, {op1}}}});
+
+    ASSERT_EQ(nextResult.successfulShardSet.size(), 1);
+    ASSERT_EQ(nextResult.opsToRetry.size(), 0);
+    ASSERT_EQ(nextResult.collsToCreate.size(), 0);
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+    ASSERT_EQ(clientReply.getNErrors(), 0);
+    ASSERT_EQ(clientReply.getNModified(), 2);
+
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 1);
+    ASSERT_EQ(batch[0].getIdx(), 0);
+    ASSERT_EQ(batch[0].getStatus(), Status::OK());
+}
+
+TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndRetryableErrorThenNonRetryable) {
+    auto update = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)), BSON("$set" << BSON("y" << 2)));
+    update.setMulti(true);
+
+    auto request = BulkWriteCommandRequest({update}, {NamespaceInfoEntry(nss1)});
+
+    WriteOp op1(request, 0);
+
+    // Response for shard1.
+    auto reply = makeReply();
+    const ShardEndpoint shard1EndpointUnsharded =
+        ShardEndpoint(shard1Name,
+                      ShardVersionFactory::make(ChunkVersion::UNSHARDED()),
+                      DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseVersion newDbVersion(UUID::gen(), Timestamp(1, 100));
+    Status staleDbStatus(StaleDbRoutingVersion(
+                             nss2.dbName(), *shard1EndpointUnsharded.databaseVersion, newDbVersion),
+                         "");
+    reply.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, staleDbStatus}}, nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    // Response for shard2.
+    auto reply2 = makeReply();
+    reply2.setNModified(1);
+    reply2.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}},
+                                 {shard2Name, Response{rcr2, {op1}}}});
+
+
+    ASSERT_EQ(result.successfulShardSet.size(), 1);
+    ASSERT_EQ(result.opsToRetry.size(), 1);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    const auto errorCode = ErrorCodes::Interrupted;
+    const auto errorMsg = "CustomError";
+    RemoteCommandResponse rcr3(
+        host1,
+        [&errorCode, &errorMsg] {
+            auto error = ErrorReply(0, errorCode, errorMsg, errorMsg);
+            return error.toBSON();
+        }(),
+        Microseconds{0},
+        false);
+
+    auto nextResult = processor.onWriteBatchResponse(
+        opCtx, routingCtx, SimpleWriteBatchResponse{{shard1Name, Response{rcr3, {op1}}}});
+
+    ASSERT_EQ(nextResult.successfulShardSet.size(), 0);
+    ASSERT_EQ(nextResult.opsToRetry.size(), 0);
+    ASSERT_EQ(nextResult.collsToCreate.size(), 0);
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+    ASSERT_EQ(clientReply.getNErrors(), 1);
+    ASSERT_EQ(clientReply.getNModified(), 1);
+
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 1);
+    ASSERT_EQ(batch[0].getIdx(), 0);
+    ASSERT_EQ(batch[0].getStatus(), Status(errorCode, errorMsg));
+}
+
+TEST_F(WriteBatchResponseProcessorTest, MultiWriteMixedOKAndNonRetryableError) {
+    auto update = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)), BSON("$set" << BSON("y" << 2)));
+    update.setMulti(true);
+
+    auto request = BulkWriteCommandRequest({update}, {NamespaceInfoEntry(nss1)});
+
+    WriteOp op1(request, 0);
+
+    const auto errorCode = ErrorCodes::Interrupted;
+    const auto errorMsg = "CustomError";
+    RemoteCommandResponse rcr1(
+        host1,
+        [&errorCode, &errorMsg] {
+            auto error = ErrorReply(0, errorCode, errorMsg, errorMsg);
+            return error.toBSON();
+        }(),
+        Microseconds{0},
+        false);
+
+    // Response for shard2.
+    auto reply2 = makeReply();
+    reply2.setNModified(1);
+    reply2.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
+    RemoteCommandResponse rcr2(host2, setTopLevelOK(reply2.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}},
+                                 {shard2Name, Response{rcr2, {op1}}}});
+
+
+    ASSERT_EQ(result.successfulShardSet.size(), 1);
+    ASSERT_EQ(result.opsToRetry.size(), 0);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+    ASSERT_EQ(clientReply.getNErrors(), 1);
+    ASSERT_EQ(clientReply.getNModified(), 1);
+
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 1);
+    ASSERT_EQ(batch[0].getIdx(), 0);
+    ASSERT_EQ(batch[0].getStatus(), Status(errorCode, errorMsg));
+}
+
+TEST_F(WriteBatchResponseProcessorTest, MultiWriteNonRetryableErrors) {
+    auto update = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)), BSON("$set" << BSON("y" << 2)));
+    update.setMulti(true);
+
+    auto request = BulkWriteCommandRequest({update}, {NamespaceInfoEntry(nss1)});
+
+    WriteOp op1(request, 0);
+
+    const auto errorCode = ErrorCodes::Interrupted;
+    const auto errorMsg = "interrupted error message";
+    RemoteCommandResponse rcr1(
+        host1,
+        [&errorCode, &errorMsg] {
+            auto error = ErrorReply(0, errorCode, "Interrupted", errorMsg);
+            return error.toBSON();
+        }(),
+        Microseconds{0},
+        false);
+
+    const auto errorCode2 = ErrorCodes::InvalidOptions;
+    const auto errorMsg2 = "invalid options error message";
+
+    auto reply = makeReply();
+    reply.setCursor(
+        BulkWriteCommandResponseCursor(0,
+                                       {
+                                           BulkWriteReplyItem{0, Status(errorCode2, errorMsg2)},
+                                       },
+                                       nss1));
+    RemoteCommandResponse rcr2(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}},
+                                 {shard2Name, Response{rcr2, {op1}}}});
+
+
+    ASSERT_EQ(result.successfulShardSet.size(), 0);
+    ASSERT_EQ(result.opsToRetry.size(), 0);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+    ASSERT_EQ(clientReply.getNErrors(), 2);
+    ASSERT_EQ(clientReply.getNModified(), 0);
+
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 1);
+    ASSERT_EQ(batch[0].getIdx(), 0);
+
+    BSONArrayBuilder errArr;
+    auto w1 = write_ops::WriteError(0, Status(ErrorCodes::Interrupted, errorMsg));
+    auto w2 = write_ops::WriteError(0, Status(ErrorCodes::InvalidOptions, errorMsg2));
+    errArr.append(w1.serialize());
+    errArr.append(w2.serialize());
+
+    std::stringstream msg("multiple errors for op : ");
+    msg << errorMsg << " :: and :: " << errorMsg2;
+
+    ASSERT_EQ(batch[0].getStatus(), Status(MultipleErrorsOccurredInfo(errArr.arr()), msg.str()));
+}
+
+TEST_F(WriteBatchResponseProcessorTest, MultiWriteRetryableNonRetryableAndOK) {
+    auto update1 = BulkWriteUpdateOp(
+        0, BSON("x" << BSON("$gte" << -5 << "$lt" << 5)), BSON("$set" << BSON("y" << 2)));
+    update1.setMulti(true);
+    auto request = BulkWriteCommandRequest({update1}, {NamespaceInfoEntry(nss1)});
+
+    WriteOp op1(request, 0);
+
+    ShardId shard3Name = ShardId("shard3");
+    ShardEndpoint shard3Endpoint = ShardEndpoint(
+        shard3Name, ShardVersionFactory::make(ChunkVersion(gen, {100, 200})), boost::none);
+    HostAndPort host3 = HostAndPort("host3", 0);
+
+    // Response for shard1.
+    auto reply = makeReply();
+    const ShardEndpoint shard1EndpointUnsharded =
+        ShardEndpoint(shard1Name,
+                      ShardVersionFactory::make(ChunkVersion::UNSHARDED()),
+                      DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
+    DatabaseVersion newDbVersion(UUID::gen(), Timestamp(1, 100));
+    Status staleDbStatus(StaleDbRoutingVersion(
+                             nss2.dbName(), *shard1EndpointUnsharded.databaseVersion, newDbVersion),
+                         "");
+    reply.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, staleDbStatus}}, nss1));
+    RemoteCommandResponse rcr1(host1, setTopLevelOK(reply.toBSON()), Microseconds{0}, false);
+
+    // Response for shard2.
+    const auto errorCode = ErrorCodes::InvalidOptions;
+    const auto errorMsg = "invalid options error message";
+    RemoteCommandResponse rcr2(
+        host1,
+        [&errorCode, &errorMsg] {
+            auto error = ErrorReply(0, errorCode, "InvalidOptions", errorMsg);
+            return error.toBSON();
+        }(),
+        Microseconds{0},
+        false);
+
+    // Response for shard3.
+    auto reply3 = makeReply();
+    reply3.setNModified(6);
+    reply3.setCursor(
+        BulkWriteCommandResponseCursor(0, {BulkWriteReplyItem{0, Status::OK()}}, nss1));
+    RemoteCommandResponse rcr3(host1, setTopLevelOK(reply3.toBSON()), Microseconds{0}, false);
+
+    WriteCommandRef cmdRef(request);
+    Stats stats;
+    WriteBatchResponseProcessor processor(cmdRef, stats);
+
+    auto result = processor.onWriteBatchResponse(
+        opCtx,
+        routingCtx,
+        SimpleWriteBatchResponse{{shard1Name, Response{rcr1, {op1}}},
+                                 {shard2Name, Response{rcr2, {op1}}},
+                                 {shard3Name, Response{rcr3, {op1}}}});
+
+
+    ASSERT_EQ(result.successfulShardSet.size(), 1);
+    ASSERT_EQ(result.opsToRetry.size(), 0);
+    ASSERT_EQ(result.collsToCreate.size(), 0);
+
+    auto clientReply = processor.generateClientResponseForBulkWriteCommand(opCtx);
+    ASSERT_EQ(clientReply.getNErrors(), 1);
+    ASSERT_EQ(clientReply.getNModified(), 6);
+
+    auto batch = clientReply.getCursor().getFirstBatch();
+    ASSERT_EQ(batch.size(), 1);
+    ASSERT_EQ(batch[0].getIdx(), 0);
+
+    ASSERT_EQ(batch[0].getStatus(), Status(errorCode, errorMsg));
+}
+
+
 class WriteBatchResponseProcessorTxnTest : public WriteBatchResponseProcessorTest {
 public:
     void setUp() override {

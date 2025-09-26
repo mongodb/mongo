@@ -13,7 +13,7 @@ selector:
     - jstests/concurrency/fsm_workloads/query/kill_multicollection_aggregation.js
     - jstests/concurrency/fsm_workloads/query/invalidated_cursors.js
     - jstests/concurrency/fsm_workloads/query/globally_managed_cursors.js
-    # TODO: SERVER-104123 Support for 'multi: true' writes.
+    # TODO: SERVER-110574 Support for 'pauseMigrationsDuringMultiUpdatesParameter'.
     - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_multi_update_delete_paused_migrations.js
   exclude_with_any_tags:
     - requires_standalone

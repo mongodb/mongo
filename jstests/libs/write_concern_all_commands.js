@@ -6088,19 +6088,6 @@ function shouldSkipTestCase(clusterType, command, testCase, shardedCollection, w
             return true;
         }
     }
-
-    // TODO SERVER-104123: Support for 'multi: true' writes
-    const isUnifiedWriteExecutor = TestData.setParametersMongos.internalQueryUnifiedWriteExecutor;
-    if (
-        isUnifiedWriteExecutor &&
-        (command == "updateMany" ||
-            (command == "bulkWriteUnordered" && testCase == "noop") ||
-            (command == "bulkWriteUnordered" && testCase == "failure") ||
-            (command == "bulkWriteOrdered" && testCase == "noop") ||
-            (command == "bulkWriteOrdered" && testCase == "failure"))
-    ) {
-        return true;
-    }
 }
 
 // These commands only accept w:1 or w:majority.

@@ -272,6 +272,13 @@ WriteOpBatcher::Result OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
         // If analyze() was successful, see if 'writeOp' can be added to the current batch.
         auto& analysis = swAnalysis.getValue();
 
+        // Skips any operations for which all the shards already got successful replies.
+        removeSuccessfulShardsFromEndpoints(writeOp->getId(), analysis.shardsAffected);
+        if (analysis.shardsAffected.empty()) {
+            _producer.advance();
+            continue;
+        }
+
         if (builder) {
             // If this is not the first op, see if it's compatible with the current batch.
             if (builder.isCompatibleWithBatch(writeOp->getNss(), analysis)) {
@@ -342,7 +349,17 @@ WriteOpBatcher::Result UnorderedWriteOpBatcher::getNextBatch(OperationContext* o
             // 'analyzedOp' and break out of the inner loop.
             auto swAnalysis = _analyzer.analyze(opCtx, routingCtx, *writeOp);
             if (swAnalysis.isOK()) {
-                analyzedOp.emplace(std::move(*writeOp), std::move(swAnalysis.getValue()));
+                // Advance past any ops where the operation already succeeded.
+                auto analysis = swAnalysis.getValue();
+
+                // Skips any operations for which all the shards already got successful replies.
+                removeSuccessfulShardsFromEndpoints(writeOp->getId(), analysis.shardsAffected);
+                if (analysis.shardsAffected.empty()) {
+                    _producer.advance();
+                    continue;
+                }
+
+                analyzedOp.emplace(std::move(*writeOp), std::move(analysis));
                 break;
             }
             // If the write command is running in a transaction, then discard the current batch,

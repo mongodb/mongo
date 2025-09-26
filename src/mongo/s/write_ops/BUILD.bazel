@@ -73,3 +73,19 @@ mongo_cc_library(
         "//src/mongo/s:sharding_router_api",
     ],
 )
+
+mongo_cc_library(
+    name = "write_op_helper",
+    srcs = [
+        "write_op_helper.cpp",
+    ],
+    hdrs = [
+        "write_op_helper.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/rpc:command_status",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)

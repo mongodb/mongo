@@ -43,6 +43,7 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/write_op_helper.h"
 #include "mongo/util/assert_util.h"
 
 #include <algorithm>
@@ -61,56 +62,23 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterCompletingWriteWithoutShardKeyWithId);
 
-bool isRetryErrCode(int errCode) {
-    return errCode == ErrorCodes::StaleConfig || errCode == ErrorCodes::StaleDbVersion ||
-        errCode == ErrorCodes::ShardCannotRefreshDueToLocksHeld ||
-        errCode == ErrorCodes::CannotImplicitlyCreateCollection;
-}
-
-bool errorsAllSame(const std::vector<ChildWriteOp const*>& errOps) {
-    auto errCode = errOps.front()->error->getStatus().code();
-    if (std::all_of(++errOps.begin(), errOps.end(), [errCode](const ChildWriteOp* errOp) {
-            return errOp->error->getStatus().code() == errCode;
-        })) {
-        return true;
-    }
-
-    return false;
-}
-
-bool hasOnlyOneNonRetryableError(const std::vector<ChildWriteOp const*>& errOps) {
-    return std::count_if(errOps.begin(), errOps.end(), [](ChildWriteOp const* errOp) {
-               return !isRetryErrCode(errOp->error->getStatus().code());
-           }) == 1;
-}
-
-bool hasAnyNonRetryableError(const std::vector<ChildWriteOp const*>& errOps) {
-    return std::count_if(errOps.begin(), errOps.end(), [](ChildWriteOp const* errOp) {
-               return !isRetryErrCode(errOp->error->getStatus().code());
-           }) > 0;
-}
-
-write_ops::WriteError getFirstNonRetryableError(const std::vector<ChildWriteOp const*>& errOps) {
-    auto nonRetryableErr =
-        std::find_if(errOps.begin(), errOps.end(), [](ChildWriteOp const* errOp) {
-            return !isRetryErrCode(errOp->error->getStatus().code());
-        });
-
-    invariant(nonRetryableErr != errOps.end());
-
-    return *(*nonRetryableErr)->error;
-}
-
 // Aggregate a bunch of errors for a single op together
 write_ops::WriteError combineOpErrors(const std::vector<ChildWriteOp const*>& errOps) {
+    auto getStatusCode = [](ChildWriteOp const* item) {
+        return item->error->getStatus().code();
+    };
     // Special case single response, all errors are the same, or a single non-retryable error
-    if (errOps.size() == 1 || errorsAllSame(errOps)) {
+    if (errOps.size() == 1 || write_op_helpers::errorsAllSame(errOps, getStatusCode)) {
         return *errOps.front()->error;
-    } else if (hasOnlyOneNonRetryableError(errOps)) {
-        return getFirstNonRetryableError(errOps);
+    } else if (write_op_helpers::hasOnlyOneNonRetryableError(errOps, getStatusCode)) {
+        auto nonRetryableError =
+            write_op_helpers::getFirstNonRetryableError(errOps, getStatusCode)->error;
+        tassert(
+            10412304, "Expected the erroring child operation to have an error", nonRetryableError);
+        return nonRetryableError.value();
     }
 
-    bool skipRetryableErrors = hasAnyNonRetryableError(errOps);
+    bool skipRetryableErrors = write_op_helpers::hasAnyNonRetryableError(errOps, getStatusCode);
 
     // Generate the multi-error message below
     std::stringstream msg("multiple errors for op : ");
@@ -120,7 +88,8 @@ write_ops::WriteError combineOpErrors(const std::vector<ChildWriteOp const*>& er
     for (std::vector<ChildWriteOp const*>::const_iterator it = errOps.begin(); it != errOps.end();
          ++it) {
         const ChildWriteOp* errOp = *it;
-        if (!skipRetryableErrors || !isRetryErrCode(errOp->error->getStatus().code())) {
+        if (!skipRetryableErrors ||
+            !write_op_helpers::isRetryErrCode(errOp->error->getStatus().code())) {
             if (firstError) {
                 msg << " :: and :: ";
                 firstError = false;
@@ -391,7 +360,7 @@ void WriteOp::_updateOpState(OperationContext* opCtx,
         if (childOp.state == WriteOpState_Error) {
             childErrors.push_back(&childOp);
 
-            if (!isRetryErrCode(childOp.error->getStatus().code())) {
+            if (!write_op_helpers::isRetryErrCode(childOp.error->getStatus().code())) {
                 isRetryError = false;
             }
             if (_inTxn && childOp.error->getStatus().code() != ErrorCodes::WouldChangeOwningShard) {

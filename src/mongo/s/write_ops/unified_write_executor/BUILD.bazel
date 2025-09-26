@@ -41,6 +41,7 @@ mongo_cc_library(
         "//src/mongo/s/write_ops:batch_write_types",
         "//src/mongo/s/write_ops:fle",
         "//src/mongo/s/write_ops:wc_error",
+        "//src/mongo/s/write_ops:write_op_helper",
     ],
 )
 
@@ -61,5 +62,6 @@ mongo_cc_unit_test(
         "//src/mongo/db/pipeline/process_interface:mongos_process_interface_factory",
         "//src/mongo/s:sharding_mongos_test_fixture",
         "//src/mongo/s:sharding_test_fixture_common",
+        "//src/mongo/s/write_ops:write_op_helper",
     ],
 )

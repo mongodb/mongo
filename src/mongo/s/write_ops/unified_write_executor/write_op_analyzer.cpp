@@ -29,8 +29,10 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
+#include "mongo/db/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
 #include "mongo/db/raw_data_operation.h"
+#include "mongo/s/transaction_router.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -83,7 +85,7 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     const bool isTimeseriesRetryableUpdateOp =
         isShardedTimeseries && isUpdate && isRetryableWrite && !inTxn && !isRawData;
 
-    const auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
+    auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
         opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
 
     if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
@@ -105,6 +107,33 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
         return Analysis{
             BatchType::kSingleShard, std::move(tr.endpoints), std::move(targetedSampleId)};
     } else {
+        // multi:true writes outside of a transaction are not
+        // retryable. We target all shards and set the placement version to ignored.
+
+        // Fetch the "onlyTargetDataOwningShardsForMultiWrites" cluster param.
+        auto* clusterParam =
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<OnlyTargetDataOwningShardsForMultiWritesParam>>(
+                    "onlyTargetDataOwningShardsForMultiWrites");
+
+        // We target all shards for multi: true writes outside of a transaction when the
+        // 'onlyTargetDataOwningShardsForMultiWrites' is false.
+        const bool targetAllShards = op.isMulti() &&
+            !static_cast<bool>(TransactionRouter::get(opCtx)) &&
+            !clusterParam->getValue(boost::none).getEnabled();
+        if (targetAllShards) {
+            auto endpoints = targeter.targetAllShards(opCtx);
+
+            for (auto& endpoint : endpoints) {
+                endpoint.shardVersion->setPlacementVersionIgnored();
+            }
+            tr.endpoints = std::move(endpoints);
+
+            // Regenerate the targetedSampleId since we changed the endpoints to target all shards.
+            targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
+                opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
+        }
+
         return Analysis{
             BatchType::kMultiShard, std::move(tr.endpoints), std::move(targetedSampleId)};
     }

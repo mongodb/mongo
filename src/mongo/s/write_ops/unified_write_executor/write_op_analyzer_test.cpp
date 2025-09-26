@@ -30,12 +30,14 @@
 #include "mongo/s/write_ops/unified_write_executor/write_op_analyzer.h"
 
 #include "mongo/bson/json.h"
+#include "mongo/db/cluster_parameters/sharding_cluster_parameters_gen.h"
 #include "mongo/db/global_catalog/catalog_cache/catalog_cache.h"
 #include "mongo/db/global_catalog/chunk_manager.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/sharding_environment/sharding_mongos_test_fixture.h"
 #include "mongo/db/sharding_environment/sharding_test_fixture_common.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/tick_source_mock.h"
@@ -52,9 +54,52 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
               std::make_unique<ScopedGlobalServiceContextForTest>(ServiceContext::make(
                   nullptr, nullptr, std::make_unique<TickSourceMock<Nanoseconds>>()))) {}
 
+    const ShardId shardId1 = ShardId("shard1");
+    const ShardId shardId2 = ShardId("shard2");
+    const int port = 12345;
+
     void setUp() override {
         ShardingTestFixture::setUp();
-        configTargeter()->setFindHostReturnValue(HostAndPort("config", 12345));
+        configTargeter()->setFindHostReturnValue(HostAndPort("config", port));
+
+        std::vector<std::pair<ShardId, HostAndPort>> remoteShards{
+            {shardId1, HostAndPort(shardId1.toString(), port)},
+            {shardId2, HostAndPort(shardId2.toString(), port)},
+        };
+
+        std::vector<ShardType> shards;
+        for (size_t i = 0; i < remoteShards.size(); i++) {
+            ShardType shardType;
+            shardType.setName(get<0>(remoteShards[i]).toString());
+            shardType.setHost(get<1>(remoteShards[i]).toString());
+            shards.push_back(shardType);
+
+            std::unique_ptr<RemoteCommandTargeterMock> targeter(
+                std::make_unique<RemoteCommandTargeterMock>());
+            targeter->setConnectionStringReturnValue(ConnectionString(get<1>(remoteShards[i])));
+            targeter->setFindHostReturnValue(get<1>(remoteShards[i]));
+            targeterFactory()->addTargeterToReturn(ConnectionString(get<1>(remoteShards[i])),
+                                                   std::move(targeter));
+        }
+        setupShards(shards);
+    }
+
+    void setClusterParameter() {
+        OnlyTargetDataOwningShardsForMultiWritesParam updatedParam;
+        ClusterServerParameter baseCSP;
+        baseCSP.setClusterParameterTime(LogicalTime(Timestamp(Date_t::now())));
+        baseCSP.set_id("onlyTargetDataOwningShardsForMultiWrites"_sd);
+        updatedParam.setClusterServerParameter(baseCSP);
+        updatedParam.setEnabled(true);
+        auto param = ServerParameterSet::getClusterParameterSet()->get(
+            "onlyTargetDataOwningShardsForMultiWrites");
+        ASSERT_OK(param->set(updatedParam.toBSON(), boost::none));
+    }
+
+    void resetClusterParameter() {
+        auto param = ServerParameterSet::getClusterParameterSet()->get(
+            "onlyTargetDataOwningShardsForMultiWrites");
+        ASSERT_OK(param->reset(boost::none));
     }
 
     Stats stats;
@@ -331,11 +376,15 @@ TEST_F(WriteOpAnalyzerTestImpl, RangeUpdateManys) {
     auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(ChunkVersion::IGNORED(), analysis.shardsAffected[0].shardVersion->placementVersion());
+    ASSERT_EQ(ChunkVersion::IGNORED(), analysis.shardsAffected[1].shardVersion->placementVersion());
 
     WriteOp op2(request, 1);
     analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(ChunkVersion::IGNORED(), analysis.shardsAffected[0].shardVersion->placementVersion());
+    ASSERT_EQ(ChunkVersion::IGNORED(), analysis.shardsAffected[1].shardVersion->placementVersion());
 
     rtx->onRequestSentForNss(nss);
 }
@@ -491,11 +540,15 @@ TEST_F(WriteOpAnalyzerTestImpl, RangeDeleteManys) {
     auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(ChunkVersion::IGNORED(), analysis.shardsAffected[0].shardVersion->placementVersion());
+    ASSERT_EQ(ChunkVersion::IGNORED(), analysis.shardsAffected[1].shardVersion->placementVersion());
 
     WriteOp op2(request, 1);
     analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
     ASSERT_EQ(2, analysis.shardsAffected.size());
     ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT_EQ(ChunkVersion::IGNORED(), analysis.shardsAffected[0].shardVersion->placementVersion());
+    ASSERT_EQ(ChunkVersion::IGNORED(), analysis.shardsAffected[1].shardVersion->placementVersion());
 
     rtx->onRequestSentForNss(nss);
 }
@@ -716,6 +769,98 @@ TEST_F(WriteOpAnalyzerTestImpl, AnalysisContainsSampleIdWhenQuerySamplerConfigur
            analysis.targetedSampleId->isFor(kShard2Name));
 
     rtx->onRequestSentForNss(nss);
+}
+
+TEST_F(WriteOpAnalyzerTestImpl, MultiWriteInATransaction) {
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    UUID uuid = UUID::gen();
+    auto rtx = createRoutingContextSharded({{uuid, nss}});
+
+    // Setup transaction.
+    auto lsid = LogicalSessionId(UUID::gen(), SHA256Block());
+    operationContext()->setLogicalSessionId(lsid);
+    TxnNumber txnNumber = 0;
+    operationContext()->setTxnNumber(txnNumber);
+
+    // Necessary for TransactionRouter::get to be non-null for this opCtx.
+    RouterOperationContextSession rocs(operationContext());
+
+    BulkWriteCommandRequest request(
+        {
+            [&]() {
+                auto op = BulkWriteDeleteOp(
+                    0, BSON("x" << BSON("$gt" << -1) << "_id" << BSON("$gt" << -1)));
+                op.setMulti(true);
+                return op;
+            }(),
+            [&]() {
+                auto op = BulkWriteDeleteOp(
+                    0, BSON("x" << BSON("$lt" << 1) << "_id" << BSON("$lt" << 1)));
+                op.setMulti(true);
+                return op;
+            }(),
+        },
+        {NamespaceInfoEntry(nss)});
+
+    WriteOp op1(request, 0);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
+    ASSERT_EQ(2, analysis.shardsAffected.size());
+    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[0].shardVersion->placementVersion());
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[1].shardVersion->placementVersion());
+
+    WriteOp op2(request, 1);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
+    ASSERT_EQ(2, analysis.shardsAffected.size());
+    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[0].shardVersion->placementVersion());
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[1].shardVersion->placementVersion());
+
+    rtx->onRequestSentForNss(nss);
+}
+
+TEST_F(WriteOpAnalyzerTestImpl,
+       MultiWriteWithOnlyTargetDataOwningShardsForMultiWritesParamEnabled) {
+    // Fetch the "onlyTargetDataOwningShardsForMultiWrites" cluster param.
+    setClusterParameter();
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    UUID uuid = UUID::gen();
+    auto rtx = createRoutingContextSharded({{uuid, nss}});
+
+    BulkWriteCommandRequest request(
+        {
+            [&]() {
+                auto op = BulkWriteDeleteOp(
+                    0, BSON("x" << BSON("$gt" << -1) << "_id" << BSON("$gt" << -1)));
+                op.setMulti(true);
+                return op;
+            }(),
+            [&]() {
+                auto op = BulkWriteDeleteOp(
+                    0, BSON("x" << BSON("$lt" << 1) << "_id" << BSON("$lt" << 1)));
+                op.setMulti(true);
+                return op;
+            }(),
+        },
+        {NamespaceInfoEntry(nss)});
+
+    WriteOp op1(request, 0);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
+    ASSERT_EQ(2, analysis.shardsAffected.size());
+    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[0].shardVersion->placementVersion());
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[1].shardVersion->placementVersion());
+
+    WriteOp op2(request, 1);
+    analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op2));
+    ASSERT_EQ(2, analysis.shardsAffected.size());
+    ASSERT_EQ(BatchType::kMultiShard, analysis.type);
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[0].shardVersion->placementVersion());
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[1].shardVersion->placementVersion());
+
+    rtx->onRequestSentForNss(nss);
+    resetClusterParameter();
 }
 
 }  // namespace

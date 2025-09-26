@@ -210,12 +210,46 @@ public:
         _retryOnTargetError = b;
     }
 
+
+    /**
+     * Marks the shards that ops already succeeded in case we only need to retry parts
+     * of any ops.
+     */
+    void noteSuccessfulShards(std::map<WriteOpId, std::set<ShardId>> successfulShardsToAdd) {
+        for (auto& [opId, successfulShards] : successfulShardsToAdd) {
+            auto it = _successfulShardMap.find(opId);
+            if (it == _successfulShardMap.cend()) {
+                _successfulShardMap.emplace(opId, std::move(successfulShards));
+            } else {
+                std::move(successfulShards.begin(),
+                          successfulShards.end(),
+                          std::inserter(it->second, it->second.end()));
+            }
+        }
+    }
+
+    /**
+     * Removes any shards that already succeeded from the endpoints for the operations with the
+     * provided id.
+     */
+    void removeSuccessfulShardsFromEndpoints(WriteOpId opId,
+                                             std::vector<ShardEndpoint>& endpoints) {
+        // Remove shards that already succeeded in previous attempts.
+        auto it = _successfulShardMap.find(opId);
+        if (it != _successfulShardMap.cend()) {
+            std::erase_if(endpoints, [&](auto&& e) { return it->second.count(e.shardName); });
+        }
+    }
+
 protected:
     WriteOpProducer& _producer;
     WriteOpAnalyzer& _analyzer;
 
     // Boolean flag that controls how target errors are handled.
     bool _retryOnTargetError = true;
+
+    // Tracks which shards operations already succeeded on.
+    std::map<WriteOpId, std::set<ShardId>> _successfulShardMap;
 };
 
 class OrderedWriteOpBatcher : public WriteOpBatcher {

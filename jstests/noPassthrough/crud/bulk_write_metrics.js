@@ -244,8 +244,7 @@ function runTest(isMongos, cluster, bulkWrite, retryCount, timeseries) {
         metricChecker.executeCommand({insert: collName1, documents: [{timestamp: key4, x: 2}]});
     }
 
-    // TODO SERVER-104123: Enabled when 'multi: true' writes are supported.
-    if (!isMongos || !uweEnabled) {
+    if (!isMongos) {
         metricChecker.checkMetrics(
             "Simple update with multi: true",
             [{update: 0, filter: {timestamp: key4}, updateMods: {$set: {x: 3}}, multi: true}],

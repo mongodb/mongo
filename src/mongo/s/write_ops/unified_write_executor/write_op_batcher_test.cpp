@@ -563,6 +563,72 @@ TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherAttachesSampleIdToB
     ASSERT_TRUE(batch5.isEmptyBatch());
 }
 
+TEST_F(OrderedUnifiedWriteExecutorBatcherTest, OrderedBatcherSkipsDoneBatches) {
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(1, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(1, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+        },
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    WriteOpProducer producer(request);
+
+    WriteOpAnalyzerMock analyzer({
+        {0, Analysis{kSingleShard, {nss1Shard0}}},
+        {1, Analysis{kSingleShard, {nss1Shard0}}},
+        {2, Analysis{kMultiShard, {nss0Shard0, nss0Shard1}}},
+        {3, Analysis{kSingleShard, {nss1Shard1}}},
+        {4, Analysis{kMultiShard, {nss0Shard0, nss0Shard1}}},
+        {5, Analysis{kSingleShard, {nss0Shard1}}},
+        {6, Analysis{kMultiShard, {nss0Shard0, nss0Shard1}}},
+        {7, Analysis{kSingleShard, {nss1Shard0}}},
+        {8, Analysis{kMultiShard, {nss0Shard0, nss0Shard1}}},
+        {9, Analysis{kSingleShard, {nss1Shard0}}},
+        {10, Analysis{kMultiShard, {nss0Shard0, nss0Shard1}}},
+    });
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = OrderedWriteOpBatcher(producer, analyzer);
+
+    // Note a few operations to have all shards already successfully written to.
+    const std::map<WriteOpId, std::set<ShardId>> successfulShardsToAdd{
+        {WriteOpId(0), std::set<ShardId>{nss1Shard0.shardName}},
+        {WriteOpId(4), std::set<ShardId>{nss0Shard0.shardName, nss0Shard1.shardName}},
+        {WriteOpId(6), std::set<ShardId>{nss0Shard0.shardName, nss0Shard1.shardName}},
+        {WriteOpId(7), std::set<ShardId>{nss1Shard0.shardName}},
+        {WriteOpId(9), std::set<ShardId>{nss1Shard0.shardName}},
+        {WriteOpId(10), std::set<ShardId>{nss0Shard0.shardName, nss0Shard1.shardName}}};
+    batcher.noteSuccessfulShards(successfulShardsToAdd);
+
+    // Output batches: [1], [2], [3, 5]
+    auto [batch1, errors1] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
+    ASSERT_FALSE(batch1.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(batch1, {1}, {nss1Shard0});
+
+    auto [batch2, errors2] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
+    ASSERT_FALSE(batch2.isEmptyBatch());
+    assertMultiShardSimpleWriteBatch(batch2, 2, {nss0Shard0, nss0Shard1});
+
+    auto [batch3, errors3] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
+    ASSERT_FALSE(batch3.isEmptyBatch());
+    assertSingleShardSimpleWriteBatch(batch3, {3, 5}, {nss1Shard1, nss0Shard1});
+
+    auto [batch4, errors4] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
+    ASSERT_FALSE(batch4.isEmptyBatch());
+    assertMultiShardSimpleWriteBatch(batch4, 8, {nss0Shard0, nss0Shard1});
+
+    auto [batch5, errors5] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
+    ASSERT_TRUE(batch5.isEmptyBatch());
+}
+
 TEST_F(UnorderedUnifiedWriteExecutorBatcherTest,
        UnorderedBatcherBatchesSingleShardOpsTargetingDifferentShardsInOneBatch) {
     BulkWriteCommandRequest request({BulkWriteInsertOp(0, BSONObj()),
@@ -1001,6 +1067,58 @@ TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherDoesNotStopOnWr
     auto [batch2, errors2] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
     ASSERT_FALSE(batch2.isEmptyBatch());
     assertUnorderedSimpleWriteBatch(batch2, expectedBatch2);
+
+    auto [batch3, errors3] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
+    ASSERT_TRUE(batch3.isEmptyBatch());
+}
+
+TEST_F(UnorderedUnifiedWriteExecutorBatcherTest, UnorderedBatcherSkipsDoneBatches) {
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+            BulkWriteInsertOp(0, BSONObj()),
+        },
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+    WriteOpProducer producer(request);
+
+    WriteOpAnalyzerMock analyzer({
+        {0, Analysis{kSingleShard, {nss1Shard0}}},
+        {1, Analysis{kSingleShard, {nss0Shard0}}},
+        {2, Analysis{kMultiShard, {{nss0Shard0, nss0Shard1}}}},
+        {3, Analysis{kMultiShard, {{nss0Shard0, nss0Shard1}}}},
+        {4, Analysis{kNonTargetedWrite, {nss0Shard0}}},
+        {5, Analysis{kMultiShard, {{nss0Shard0, nss0Shard1}}}},
+        {6, Analysis{kSingleShard, {nss1Shard0}}},
+    });
+
+    auto routingCtx = RoutingContext::createSynthetic({});
+    auto batcher = UnorderedWriteOpBatcher(producer, analyzer);
+
+    // Note a few operations to have all shards already successfully written to.
+    const std::map<WriteOpId, std::set<ShardId>> successfulShardsToAdd{
+        {WriteOpId(0), std::set<ShardId>{nss1Shard0.shardName}},
+        {WriteOpId(2), std::set<ShardId>{nss0Shard0.shardName, nss0Shard1.shardName}},
+        {WriteOpId(5), std::set<ShardId>{nss0Shard0.shardName, nss0Shard1.shardName}},
+        {WriteOpId(6), std::set<ShardId>{nss1Shard0.shardName}}};
+    batcher.noteSuccessfulShards(successfulShardsToAdd);
+
+    SimpleWriteBatch::ShardRequest shardRequest1{{{nss0, nss0Shard0}},
+                                                 {WriteOp(request, 1), WriteOp(request, 3)}};
+    SimpleWriteBatch::ShardRequest shardRequest2{{{nss0, nss0Shard1}}, {WriteOp(request, 3)}};
+    SimpleWriteBatch expectedBatch1{{{shardId0, shardRequest1}, {shardId1, shardRequest2}}};
+
+    auto [batch1, errors1] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
+    ASSERT_FALSE(batch1.isEmptyBatch());
+    assertUnorderedSimpleWriteBatch(batch1, expectedBatch1);
+
+    auto [batch2, errors2] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
+    ASSERT_FALSE(batch2.isEmptyBatch());
+    assertNonTargetedWriteBatch(batch2, 4);
 
     auto [batch3, errors3] = batcher.getNextBatch(nullptr /*opCtx*/, *routingCtx);
     ASSERT_TRUE(batch3.isEmptyBatch());
