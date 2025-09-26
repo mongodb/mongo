@@ -143,6 +143,8 @@ AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(Opera
        $listClusterCatalog: { "shards": true }
      })");
     const BSONObj shardsCondition = BSON("shards" << shardId);
+    // TODO SERVER-101594 remove condition about type:timeseries. After 9.0 becomes last LTS only
+    // viewless timeseries will exist and they will always have an associated UUID.
     const BSONObj matchStage = fromjson(str::stream() << R"({
        $match: {
            $and: [
@@ -150,7 +152,11 @@ AggregateCommandRequest makeUnshardedCollectionsOnSpecificShardAggregation(Opera
                { db: {$ne: 'config'} },
                { db: {$ne: 'admin'} },
                )" << shardsCondition.jsonString() << R"(,
-               { type: {$nin: ["timeseries","view"]} },
+               { type: {$ne: "view"} },
+               { $or: [
+                    {type: {$ne: "timeseries"}},
+                    {"info.uuid": {$exists: true}}
+               ]},
                { ns: {$not: {$regex: "^enxcol_\..*(\.esc|\.ecc|\.ecoc|\.ecoc\.compact)$"} }},
                { $or: [
                     {ns: {$not: { $regex: "\.system\." }}},
