@@ -9,13 +9,13 @@ import {
     testGetCmdLineOptsMongos,
     writeJSONConfigFile,
 } from "jstests/libs/command_line/test_parsed_options.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
-import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    generateExtensionConfigs,
+    deleteExtensionConfigs,
+    checkPlatformCompatibleWithExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
-if (!isLinux()) {
-    jsTest.log.info("Skipping test on non-Linux platform");
-    quit();
-}
+checkPlatformCompatibleWithExtensions();
 
 const extensionNames = generateExtensionConfigs(["libfoo_mongo_extension.so", "libbar_mongo_extension.so"]);
 

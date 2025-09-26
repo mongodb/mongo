@@ -8,14 +8,14 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 
-import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    generateExtensionConfigs,
+    deleteExtensionConfigs,
+    checkPlatformCompatibleWithExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
-// Extensions are only supported on Linux platforms, so skip this test on other operating systems
-if (!isLinux()) {
-    quit();
-}
+checkPlatformCompatibleWithExtensions();
 
 const extensionNames = generateExtensionConfigs("libfoo_mongo_extension.so");
 

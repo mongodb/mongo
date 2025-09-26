@@ -1,18 +1,18 @@
 /**
- * Tests that the extension $vectorSearch stage has overriden the server implementation
+ * Tests that the extension $vectorSearch stage has overridden the server implementation
  * when loaded.
  *
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
-import {generateExtensionConfigs, deleteExtensionConfigs} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {
+    generateExtensionConfigs,
+    deleteExtensionConfigs,
+    checkPlatformCompatibleWithExtensions,
+} from "jstests/noPassthrough/libs/extension_helpers.js";
 
-if (!isLinux()) {
-    jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");
-    quit();
-}
+checkPlatformCompatibleWithExtensions();
 
 const extensionNames = generateExtensionConfigs("libvector_search_extension.so");
 

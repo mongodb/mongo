@@ -2,7 +2,15 @@
  * Helpers for generating and deleting extension .conf files in noPassthrough tests.
  */
 import {getPython3Binary} from "jstests/libs/python.js";
+import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+
+export function checkPlatformCompatibleWithExtensions() {
+    if (!isLinux()) {
+        jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");
+        quit();
+    }
+}
 
 /**
  * @param {string|string[]} soFileNames A shared object file name or a list of shared object file names

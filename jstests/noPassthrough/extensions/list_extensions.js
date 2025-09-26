@@ -4,20 +4,17 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 
-import {isLinux} from "jstests/libs/os_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
 import {after, before, describe, it} from "jstests/libs/mochalite.js";
 import {
     generateExtensionConfigs,
     deleteExtensionConfigs,
+    checkPlatformCompatibleWithExtensions,
     generateExtensionConfigWithOptions,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 
-if (!isLinux()) {
-    jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");
-    quit();
-}
+checkPlatformCompatibleWithExtensions();
 
 const kNotAllowedWithinFacetErrorCode = 40600;
 const kNotAllowedWithinUnionWithErrorCode = 31441;

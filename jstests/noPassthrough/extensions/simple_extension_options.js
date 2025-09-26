@@ -4,19 +4,16 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
 import {
     withExtensions,
     generateExtensionConfigWithOptions,
     deleteExtensionConfigs,
     checkExtensionFailsToLoad,
+    checkPlatformCompatibleWithExtensions,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 
-if (!isLinux()) {
-    jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");
-    quit();
-}
+checkPlatformCompatibleWithExtensions();
 
 function testStageRegistration(expectedOptionA, conn) {
     const db = conn.getDB("test");

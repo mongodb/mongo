@@ -6,13 +6,9 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {isLinux} from "jstests/libs/os_helpers.js";
-import {withExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
+import {withExtensions, checkPlatformCompatibleWithExtensions} from "jstests/noPassthrough/libs/extension_helpers.js";
 
-if (!isLinux()) {
-    jsTest.log.info("Skipping test since extensions are only available on Linux platforms.");
-    quit();
-}
+checkPlatformCompatibleWithExtensions();
 
 function confirmNoMaxRestriction(conn) {
     const db = conn.getDB("test");
