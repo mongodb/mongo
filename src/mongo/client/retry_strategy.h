@@ -356,7 +356,7 @@ public:
 
     static bool defaultRetryCriteria(Status s, std::span<const std::string> errorLabels);
 
-    struct BackoffParameters {
+    struct RetryParameters {
         // Maximum number of retries after initial retriable error.
         std::int32_t maxRetryAttempts;
         // The base of the exponent used when calculating backoff times.
@@ -366,12 +366,17 @@ public:
     };
 
     DefaultRetryStrategy()
-        : DefaultRetryStrategy{defaultRetryCriteria, backoffFromServerParameters()} {}
+        : DefaultRetryStrategy{defaultRetryCriteria, getRetryParametersFromServerParameters()} {}
 
-    DefaultRetryStrategy(RetryCriteria retryCriteria, BackoffParameters backoffParameters)
+    DefaultRetryStrategy(uint32_t maxRetryAttempts)
+        : DefaultRetryStrategy{defaultRetryCriteria, getRetryParametersFromServerParameters()} {
+        _maxRetryAttempts = maxRetryAttempts;
+    }
+
+    DefaultRetryStrategy(RetryCriteria retryCriteria, RetryParameters retryParameters)
         : _retryCriteria{std::move(retryCriteria)},
-          _backoffWithJitter{backoffParameters.baseBackoff, backoffParameters.maxBackoff},
-          _maxRetryAttempts{backoffParameters.maxRetryAttempts} {}
+          _backoffWithJitter{retryParameters.baseBackoff, retryParameters.maxBackoff},
+          _maxRetryAttempts{retryParameters.maxRetryAttempts} {}
 
     [[nodiscard]]
     bool recordFailureAndEvaluateShouldRetry(Status s,
@@ -382,7 +387,7 @@ public:
         // Noop, as there's nothing to cleanup on success.
     }
 
-    static BackoffParameters backoffFromServerParameters();
+    static RetryParameters getRetryParametersFromServerParameters();
 
     Milliseconds getNextRetryDelay() const override {
         return _backoffWithJitter.getBackoffDelay();
@@ -398,6 +403,40 @@ private:
     std::int32_t _maxRetryAttempts;
     std::int32_t _retryAttemptCount = 0;
     TargetingMetadata _targetingMetadata;
+};
+
+/**
+ * A retry strategy implementation that never retries operations.
+ *
+ * This strategy is used when retries should be disabled entirely. All retry-related
+ * methods return values indicating no retries should be performed, and success
+ * recording is a no-op since there's no retry state to maintain.
+ */
+class NoRetryStrategy final : public RetryStrategy {
+public:
+    /**
+     * Always returns false, indicating that no retries should be performed
+     * regardless of the failure status or error labels.
+     */
+    [[nodiscard]]
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& target,
+                                             std::span<const std::string> errorLabels) override {
+        return false;
+    }
+
+    void recordSuccess(const boost::optional<HostAndPort>& target) override {
+        // Noop, as there's nothing to cleanup on success.
+    }
+
+    Milliseconds getNextRetryDelay() const override {
+        return Milliseconds{0};
+    }
+
+    const TargetingMetadata& getTargetingMetadata() const override {
+        static const TargetingMetadata emptyMetadata{};
+        return emptyMetadata;
+    }
 };
 
 /**
@@ -464,7 +503,7 @@ public:
     };
 
     using RetryCriteria = DefaultRetryStrategy::RetryCriteria;
-    using BackoffParameters = DefaultRetryStrategy::BackoffParameters;
+    using RetryParameters = DefaultRetryStrategy::RetryParameters;
 
     static bool defaultRetryCriteria(Status s, std::span<const std::string> errorLabels) {
         return DefaultRetryStrategy::defaultRetryCriteria(s, errorLabels);
@@ -480,9 +519,9 @@ public:
     explicit AdaptiveRetryStrategy(
         std::shared_ptr<RetryBudget> budget,
         RetryCriteria retryCriteria = defaultRetryCriteria,
-        BackoffParameters backoffParameters = DefaultRetryStrategy::backoffFromServerParameters())
+        RetryParameters parameters = DefaultRetryStrategy::getRetryParametersFromServerParameters())
         : _underlyingStrategy{std::make_unique<DefaultRetryStrategy>(std::move(retryCriteria),
-                                                                     backoffParameters)},
+                                                                     parameters)},
           _budget{std::move(budget)} {
         invariant(_budget);
     }

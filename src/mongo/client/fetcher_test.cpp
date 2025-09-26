@@ -275,20 +275,19 @@ TEST_F(FetcherTest, InvalidConstruction) {
                                 ErrorCodes::BadValue,
                                 "callback function cannot be null");
 
-    // Retry policy for first command cannot be null.
-    ASSERT_THROWS_CODE_AND_WHAT(
-        Fetcher(&executor,
-                source,
-                DatabaseName::createDatabaseName_forTest(boost::none, "db"),
-                findCmdObj,
-                unreachableCallback,
-                rpc::makeEmptyMetadata(),
-                RemoteCommandRequest::kNoTimeout,
-                RemoteCommandRequest::kNoTimeout,
-                std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy>()),
-        AssertionException,
-        ErrorCodes::BadValue,
-        "retry policy cannot be null");
+    // Retry strategy for first command cannot be null.
+    ASSERT_THROWS_CODE_AND_WHAT(Fetcher(&executor,
+                                        source,
+                                        DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                        findCmdObj,
+                                        unreachableCallback,
+                                        rpc::makeEmptyMetadata(),
+                                        RemoteCommandRequest::kNoTimeout,
+                                        RemoteCommandRequest::kNoTimeout,
+                                        std::unique_ptr<DefaultRetryStrategy>()),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "retry strategy cannot be null");
 }
 
 TEST_F(FetcherTest, FetcherCompletionFutureBecomesReadyAfterCompletingWork) {
@@ -1198,9 +1197,8 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
     ASSERT_EQUALS(ErrorCodes::ShutdownInProgress, status.code());
 }
 
-TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreRequests) {
-    auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
-        3U, executor::RemoteCommandRequest::kNoTimeout);
+TEST_F(FetcherTest, FetcherAppliesRetryStrategyToFirstCommandButNotToGetMoreRequests) {
+    auto strategy = std::make_unique<DefaultRetryStrategy>(3U);
 
     fetcher = std::make_unique<Fetcher>(&getExecutor(),
                                         source,
@@ -1210,13 +1208,13 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
                                         rpc::makeEmptyMetadata(),
                                         executor::RemoteCommandRequest::kNoTimeout,
                                         executor::RemoteCommandRequest::kNoTimeout,
-                                        std::move(policy));
+                                        std::move(strategy));
 
     callbackHook = appendGetMoreRequest;
 
     ASSERT_OK(fetcher->schedule());
 
-    // Retry policy is applied to find command.
+    // Retry strategy is applied to find command.
     const BSONObj doc = BSON("_id" << 1);
     auto rs =
         ResponseStatus::make_forTest(Status(ErrorCodes::HostUnreachable, "first"), Milliseconds(0));
@@ -1239,7 +1237,7 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
 
     rs = ResponseStatus::make_forTest(Status(ErrorCodes::OperationFailed, "getMore failed"),
                                       Milliseconds(0));
-    // No retry policy for subsequent getMore commands.
+    // No retry strategy for subsequent getMore commands.
     processNetworkResponse(rs, ReadyQueueState::kEmpty, FetcherState::kInactive);
     ASSERT_EQUALS(ErrorCodes::OperationFailed, status);
 }

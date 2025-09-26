@@ -141,7 +141,7 @@ public:
      * The callback function 'work' is not allowed to call into the Fetcher instance. This
      * behavior is undefined and may result in a deadlock.
      *
-     * An optional retry policy may be provided for the first remote command request so that
+     * An optional retry strategy may be provided for the first remote command request so that
      * the remote command scheduler will re-send the command in case of transient network errors.
      */
     Fetcher(executor::TaskExecutor* executor,
@@ -152,8 +152,8 @@ public:
             const BSONObj& metadata = ReadPreferenceSetting::secondaryPreferredMetadata(),
             Milliseconds findNetworkTimeout = RemoteCommandRequest::kNoTimeout,
             Milliseconds getMoreNetworkTimeout = RemoteCommandRequest::kNoTimeout,
-            std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy =
-                RemoteCommandRetryScheduler::makeNoRetryPolicy(),
+            std::unique_ptr<mongo::RetryStrategy> firstCommandRetryStrategy =
+                std::make_unique<NoRetryStrategy>(),
             transport::ConnectSSLMode sslMode = transport::kGlobalSSLMode);
 
     virtual ~Fetcher();

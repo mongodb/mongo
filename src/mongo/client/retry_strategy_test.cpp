@@ -131,7 +131,7 @@ public:
     static constexpr std::int32_t kMaxNumberOfRetries = 64;
     static constexpr std::int32_t kKnownSeed = 12345;
 
-    static constexpr DefaultRetryStrategy::BackoffParameters kBackoffParameters{
+    static constexpr DefaultRetryStrategy::RetryParameters kBackoffParameters{
         .maxRetryAttempts = kMaxNumberOfRetries,
         .baseBackoff = Milliseconds{kDefaultClientBaseBackoffMillisDefault},
         .maxBackoff = Milliseconds{kDefaultClientMaxBackoffMillisDefault},
@@ -175,7 +175,7 @@ private:
         return AdaptiveRetryStrategy{
             _retryBudget,
             [](Status, std::span<const std::string>) { return true; },
-            AdaptiveRetryStrategy::BackoffParameters{
+            AdaptiveRetryStrategy::RetryParameters{
                 .maxRetryAttempts = kMaxNumberOfRetries,
                 .baseBackoff = Milliseconds{kDefaultClientBaseBackoffMillisDefault},
                 .maxBackoff = Milliseconds{kDefaultClientMaxBackoffMillisDefault},

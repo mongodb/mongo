@@ -70,7 +70,7 @@ bool DefaultRetryStrategy::recordFailureAndEvaluateShouldRetry(
     return true;
 }
 
-auto DefaultRetryStrategy::backoffFromServerParameters() -> BackoffParameters {
+auto DefaultRetryStrategy::getRetryParametersFromServerParameters() -> RetryParameters {
     return {
         gDefaultClientMaxRetryAttempts.loadRelaxed(),
         Milliseconds{gDefaultClientBaseBackoffMillis.loadRelaxed()},

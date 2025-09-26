@@ -156,7 +156,7 @@ public:
     private:
         RetryStrategy(const Shard& shard,
                       Shard::RetryPolicy retryPolicy,
-                      AdaptiveRetryStrategy::BackoffParameters backoff);
+                      AdaptiveRetryStrategy::RetryParameters parameters);
 
         AdaptiveRetryStrategy _underlyingStrategy;
     };

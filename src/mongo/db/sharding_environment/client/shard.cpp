@@ -60,11 +60,11 @@ auto makeRetryCriteriaForShard(const Shard& shard, Shard::RetryPolicy retryPolic
 }
 
 auto backoffFromMaxRetryAttempts(std::int32_t maxRetryAttempts) {
-    const auto backoff = DefaultRetryStrategy::backoffFromServerParameters();
-    return DefaultRetryStrategy::BackoffParameters{
+    const auto parameters = DefaultRetryStrategy::getRetryParametersFromServerParameters();
+    return DefaultRetryStrategy::RetryParameters{
         .maxRetryAttempts = maxRetryAttempts,
-        .baseBackoff = backoff.baseBackoff,
-        .maxBackoff = backoff.maxBackoff,
+        .baseBackoff = parameters.baseBackoff,
+        .maxBackoff = parameters.maxBackoff,
     };
 }
 
@@ -111,7 +111,8 @@ StatusWith<Shard::CommandResponse> runCommandWithRetryStrategy(Interruptible* in
 }  // namespace
 
 Shard::RetryStrategy::RetryStrategy(const Shard& shard, Shard::RetryPolicy retryPolicy)
-    : RetryStrategy{shard, retryPolicy, DefaultRetryStrategy::backoffFromServerParameters()} {}
+    : RetryStrategy{
+          shard, retryPolicy, DefaultRetryStrategy::getRetryParametersFromServerParameters()} {}
 
 Shard::RetryStrategy::RetryStrategy(const Shard& shard,
                                     Shard::RetryPolicy retryPolicy,
@@ -120,9 +121,9 @@ Shard::RetryStrategy::RetryStrategy(const Shard& shard,
 
 Shard::RetryStrategy::RetryStrategy(const Shard& shard,
                                     Shard::RetryPolicy retryPolicy,
-                                    AdaptiveRetryStrategy::BackoffParameters backoff)
+                                    AdaptiveRetryStrategy::RetryParameters parameters)
     : _underlyingStrategy{
-          shard._retryBudget, makeRetryCriteriaForShard(shard, retryPolicy), backoff} {}
+          shard._retryBudget, makeRetryCriteriaForShard(shard, retryPolicy), parameters} {}
 
 void Shard::initServerParameterPointersToAvoidLinking(Atomic<double>* returnRate,
                                                       Atomic<std::int32_t>* capacity) {

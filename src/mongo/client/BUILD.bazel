@@ -446,6 +446,7 @@ mongo_cc_library(
         "remote_command_retry_scheduler.h",
     ],
     deps = [
+        ":retry_strategy",
         "//src/mongo:base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/executor:task_executor_interface",
     ],

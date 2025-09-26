@@ -955,8 +955,7 @@ Status InitialSyncer::_scheduleGetBeginFetchingOpTime(
         ReadPreferenceSetting::secondaryPreferredMetadata(),
         RemoteCommandRequest::kNoTimeout /* find network timeout */,
         RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
-        RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
-            numInitialSyncOplogFindAttempts.load(), executor::RemoteCommandRequest::kNoTimeout));
+        std::make_unique<DefaultRetryStrategy>(numInitialSyncOplogFindAttempts.load()));
     Status scheduleStatus = _beginFetchingOpTimeFetcher->schedule();
     if (!scheduleStatus.isOK()) {
         _beginFetchingOpTimeFetcher.reset();
@@ -1084,8 +1083,7 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForBeginApplyingTimestamp(
         ReadPreferenceSetting::secondaryPreferredMetadata(),
         RemoteCommandRequest::kNoTimeout /* find network timeout */,
         RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
-        RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
-            numInitialSyncOplogFindAttempts.load(), executor::RemoteCommandRequest::kNoTimeout));
+        std::make_unique<DefaultRetryStrategy>(numInitialSyncOplogFindAttempts.load()));
     Status scheduleStatus = _fCVFetcher->schedule();
     if (!scheduleStatus.isOK()) {
         _fCVFetcher.reset();
@@ -1883,20 +1881,24 @@ Status InitialSyncer::_scheduleLastOplogEntryFetcher(
                     << "limit" << 1 << ReadConcernArgs::kReadConcernFieldName
                     << ReadConcernArgs::kLocal.toBSONInner());
 
-    _lastOplogEntryFetcher = std::make_unique<Fetcher>(
-        *_attemptExec,
-        _syncSource,
-        NamespaceString::kRsOplogNamespace.dbName(),
-        query,
-        callback,
-        ReadPreferenceSetting::secondaryPreferredMetadata(),
-        RemoteCommandRequest::kNoTimeout /* find network timeout */,
-        RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
-        (retryStrategy == kFetcherHandlesRetries)
-            ? RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::RetriableError>(
-                  numInitialSyncOplogFindAttempts.load(),
-                  executor::RemoteCommandRequest::kNoTimeout)
-            : RemoteCommandRetryScheduler::makeNoRetryPolicy());
+    std::unique_ptr<mongo::RetryStrategy> retryStrategyPtr;
+    if (retryStrategy == kFetcherHandlesRetries) {
+        retryStrategyPtr =
+            std::make_unique<DefaultRetryStrategy>(numInitialSyncOplogFindAttempts.load());
+    } else {
+        retryStrategyPtr = std::make_unique<NoRetryStrategy>();
+    }
+
+    _lastOplogEntryFetcher =
+        std::make_unique<Fetcher>(*_attemptExec,
+                                  _syncSource,
+                                  NamespaceString::kRsOplogNamespace.dbName(),
+                                  query,
+                                  callback,
+                                  ReadPreferenceSetting::secondaryPreferredMetadata(),
+                                  RemoteCommandRequest::kNoTimeout /* find network timeout */,
+                                  RemoteCommandRequest::kNoTimeout /* getMore network timeout */,
+                                  std::move(retryStrategyPtr));
     Status scheduleStatus = _lastOplogEntryFetcher->schedule();
     if (!scheduleStatus.isOK()) {
         _lastOplogEntryFetcher.reset();

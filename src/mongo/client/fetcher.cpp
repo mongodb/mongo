@@ -176,7 +176,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const BSONObj& metadata,
                  Milliseconds findNetworkTimeout,
                  Milliseconds getMoreNetworkTimeout,
-                 std::unique_ptr<RemoteCommandRetryScheduler::RetryPolicy> firstCommandRetryPolicy,
+                 std::unique_ptr<mongo::RetryStrategy> firstCommandRetryStrategy,
                  transport::ConnectSSLMode sslMode)
     : _executor(executor),
       _source(source),
@@ -195,7 +195,7 @@ Fetcher::Fetcher(executor::TaskExecutor* executor,
               return request;
           }(),
           [this](const auto& x) { return this->_callback(x, kFirstBatchFieldName); },
-          std::move(firstCommandRetryPolicy)),
+          std::move(firstCommandRetryStrategy)),
       _sslMode(sslMode) {
     uassert(ErrorCodes::BadValue, "callback function cannot be null", _work);
 }
