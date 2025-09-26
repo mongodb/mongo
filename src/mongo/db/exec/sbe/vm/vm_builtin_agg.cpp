@@ -570,6 +570,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastNMerge(Ar
     uassert(7548703,
             "Two arrays to merge should have the same MaxSize component",
             maxSize == mergeMaxSize);
+    tassert(11093706, "Array size cannot be greater than maxSize", array->size() <= maxSize);
 
     if (array->size() < maxSize) {
         // add values from accArr to mergeArray
@@ -588,7 +589,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastNMerge(Ar
         return {true, mergeStateTag, mergeStateVal};
     } else {
         // return accArray since it contains last n values
-        invariant(array->size() == maxSize);
         stateGuard.reset();
         return {true, stateTag, stateVal};
     }
@@ -611,7 +611,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggLastNFinalize
         }
     }
 
-    invariant(arr->size() == maxSize);
+    tassert(11093707, "Array size must be equal to maxSize", arr->size() == maxSize);
     auto [outArrayTag, outArrayVal] = value::makeNewArray();
     auto outArray = value::getArrayView(outArrayVal);
     outArray->reserve(maxSize);
@@ -2651,7 +2651,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableConc
                                                      value::Value elemBeingRemovedVal) {
             value::ValueGuard removedGuard{elemBeingRemovedTag, elemBeingRemovedVal};
             auto elemSize = value::getApproximateSize(elemBeingRemovedTag, elemBeingRemovedVal);
-            invariant(elemSize <= accArrSize);
+            tassert(11093708,
+                    "Size of element is larger than size of accumulator array",
+                    elemSize <= accArrSize);
 
             // Ensure that there is a value to remove from the window.
             tassert(9476005, "Trying to remove from an empty window", accArr->size() > 0);
@@ -2663,9 +2665,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableConc
                 auto [frontElemTag, frontElemVal] = arrayQueueFront(accArr);
                 auto [cmpTag, cmpVal] = value::compareValue(
                     frontElemTag, frontElemVal, elemBeingRemovedTag, elemBeingRemovedVal);
-                invariant(cmpTag == value::TypeTags::NumberInt32 &&
-                              value::bitcastTo<int32_t>(cmpVal) == 0,
-                          "Can't remove a value that is not at the front of the window");
+                tassert(11093709,
+                        "Can't remove a value that is not at the front of the window",
+                        cmpTag == value::TypeTags::NumberInt32 &&
+                            value::bitcastTo<int32_t>(cmpVal) == 0);
             }
 
             // Remove the value.
@@ -3259,7 +3262,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableAddT
     auto [stateArr, accMultiSet, accMultiSetSize] = setOperatorCommonState(stateTag, stateVal);
 
     int32_t elSize = value::getApproximateSize(elTag, elVal);
-    invariant(elSize <= accMultiSetSize);
+    tassert(11093710,
+            "Size of element is larger than size of accumulator multiset",
+            elSize <= accMultiSetSize);
     stateArr->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),
                     value::TypeTags::NumberInt32,
                     value::bitcastFrom<int32_t>(accMultiSetSize - elSize));
@@ -3384,7 +3389,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableSetU
             value::TypeTags elemBeingRemovedTag, value::Value elemBeingRemovedVal) {
             value::ValueGuard removedGuard{elemBeingRemovedTag, elemBeingRemovedVal};
             auto elemSize = value::getApproximateSize(elemBeingRemovedTag, elemBeingRemovedVal);
-            invariant(elemSize <= accMultiSetSize);
+            tassert(11093711,
+                    "Size of element is larger than size of accumulator multiset",
+                    elemSize <= accMultiSetSize);
             tassert(9475902,
                     "Can't remove a value that is not contained in the window",
                     accMultiSet->remove(elemBeingRemovedTag, elemBeingRemovedVal));
@@ -3543,7 +3550,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRemovableMinM
     auto accMultiSet = value::getArrayMultiSetView(accMultiSetVal);
 
     int32_t elSize = value::getApproximateSize(elTag, elVal);
-    invariant(elSize <= memUsage);
+    tassert(11093712, "Size of element is larger than used memory", elSize <= memUsage);
 
     // remove element
     stateArr->setAt(static_cast<size_t>(AggAccumulatorNElems::kMemUsage),

@@ -555,7 +555,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinExtractSubArray(
                 startEnumerator.advance();
                 windowEndEnumerator.advance();
             }
-            invariant(windowEndEnumerator.atEnd());
+            tassert(11093713,
+                    "Enumerator didn't reach the end of the array",
+                    windowEndEnumerator.atEnd());
         } else {
             advance(startEnumerator, start);
         }

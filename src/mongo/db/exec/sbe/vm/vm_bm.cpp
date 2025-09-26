@@ -141,7 +141,7 @@ public:
 
     std::unique_ptr<CollatorInterface> createCollator() {
         auto statusWithCollator = _collatorFactory.makeFromBSON(BSON("locale" << "en_US"));
-        invariant(statusWithCollator.getStatus());
+        tassert(11093705, "Could not create collator", statusWithCollator.isOK());
         return std::move(statusWithCollator.getValue());
     }
 

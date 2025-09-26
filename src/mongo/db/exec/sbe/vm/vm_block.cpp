@@ -1055,9 +1055,20 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::blockNativeAggTopBottom
 
     MultiAccState stateTuple = getMultiAccState(stateTag, stateVal);
     auto [state, mergeArr, startIdx, maxSize, memUsage, memLimit, isGroupAccum] = stateTuple;
-    invariant(maxSize > 0);
+    tassert(11093700, "maxSize must be greater than zero", maxSize > 0);
 
-    invariant(sortKeyCount == valBlock->count() && sortKeyCount == bitsetBlock->count());
+    tassert(11093701,
+            fmt::format("Number of sort keys ({}) in block doesn't match the number of values in "
+                        "valBlock ({})",
+                        sortKeyCount,
+                        valBlock->count()),
+            sortKeyCount == valBlock->count());
+    tassert(11093702,
+            fmt::format("Number of sort keys ({}) in block doesn't match the number of values in "
+                        "bitsetBlock ({})",
+                        sortKeyCount,
+                        bitsetBlock->count()),
+            sortKeyCount == bitsetBlock->count());
 
     const auto sortPattern = sortSpec->getSortPattern();
     bool isAscending = sortPattern.front().isAscending;
@@ -1292,7 +1303,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockAggTop
 
     auto [state, array, startIdx, maxSize, memUsage, memLimit, isGroupAccum] =
         getMultiAccState(stateTag, stateVal);
-    invariant(maxSize > 0);
+    tassert(11093703, "maxSize must be greater than zero", maxSize > 0);
 
     value::DeblockedTagVals bitset = bitsetBlock->extract();
 
@@ -2440,7 +2451,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCellFoldValues_F
         size_t valIdx = 0;
         for (size_t rowIdx = 0; rowIdx < positionInfo.size(); ++rowIdx) {
             const auto nElementsForRow = positionInfo[rowIdx];
-            invariant(nElementsForRow >= 0);
+            tassert(11093704, "nElementsForRow cannot be negative", nElementsForRow >= 0);
 
             bool foldedResultForRow = false;
             for (int elementForDoc = 0; elementForDoc < nElementsForRow; ++elementForDoc) {

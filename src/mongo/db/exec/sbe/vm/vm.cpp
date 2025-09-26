@@ -179,8 +179,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::TypeT
             enumerator.advance();
             windowEndEnumerator.advance();
         }
-        invariant(enumerator.atEnd());
-        invariant(!windowEndEnumerator.atEnd());
+        tassert(11093714, "Enumerator didn't reach the end of the array", enumerator.atEnd());
+        tassert(11093715,
+                "Enumerator should not have reached the end of the array",
+                !windowEndEnumerator.atEnd());
 
         auto [tag, val] = windowEndEnumerator.getViewOfValue();
         return {false, tag, val};
