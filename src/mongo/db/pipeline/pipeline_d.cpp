@@ -1237,6 +1237,9 @@ tryPrepareDistinctExecutor(const intrusive_ptr<ExpressionContext>& expCtx,
     // 2) Non-strict parameter would allow use of multikey indexes for DISTINCT_SCAN, which
     //    means that for {a: [1, 2]} two distinct values would be returned, but for group keys
     //    arrays shouldn't be traversed.
+    // 3) Non-strict parameter would allow use of sparse indexes for DISTINCT_SCAN, which means that
+    //    for document {b: 5} no values would be returned, but for group keys we want to treat
+    //    missing fields as null.
     auto swQuerySolution =
         tryGetQuerySolutionForDistinct(collections, plannerOpts, *cq, flipDistinctScanDirection);
     if (swQuerySolution.isOK()) {

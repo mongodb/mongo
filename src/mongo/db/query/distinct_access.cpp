@@ -57,8 +57,9 @@ bool isIndexSuitableForDistinct(const IndexEntry& index,
                                 bool strictDistinctOnly,
                                 bool hasSort) {
     // If the caller did not request a "strict" distinct scan then we may choose a plan which
-    // unwinds arrays and treats each element in an array as its own key.
-    const bool mayUnwindArrays = !strictDistinctOnly;
+    // either unwinds arrays and treats each element in an array as its own key or ignores missing
+    // fields.
+    const bool mayUnwindArraysOrIgnoreMissing = !strictDistinctOnly;
 
     if (index.keyPattern.hasField(field)) {
         // This handles regular fields of Compound Wildcard Indexes as well.
@@ -74,7 +75,13 @@ bool isIndexSuitableForDistinct(const IndexEntry& index,
             // user's requested sort order.
             return false;
         }
-        if (!mayUnwindArrays &&
+
+        // If we do not want to ignore missing fields then we cannot use a sparse index.
+        if (!mayUnwindArraysOrIgnoreMissing && index.sparse) {
+            return false;
+        }
+
+        if (!mayUnwindArraysOrIgnoreMissing &&
             isAnyComponentOfPathOrProjectionMultikey(index.keyPattern,
                                                      index.multikey,
                                                      index.multikeyPaths,

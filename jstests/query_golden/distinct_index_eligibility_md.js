@@ -55,9 +55,26 @@ outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$last: "$b"}
 subSection("strict (with sort) && sparse index => no DISTINCT_SCAN");
 outputAggregationPlanAndResults(coll, [{$sort: {a: 1}}, {$group: {_id: "$a"}}]);
 
+subSection("strict && sparse index && alternative compound index => DISTINCT_SCAN on compound index");
+coll.createIndex({a: 1, b: 1});
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$a"}}]);
+
+subSection("strict (with accum) && sparse index && alternative compound index => DISTINCT_SCAN on compound index");
+outputAggregationPlanAndResults(coll, [{$group: {_id: "$a", accum: {$last: "$b"}}}]);
+
+subSection("strict (with sort) && sparse index && alternative compound index => DISTINCT_SCAN on compound index");
+outputAggregationPlanAndResults(coll, [{$sort: {a: 1}}, {$group: {_id: "$a"}}]);
+
 subSection("strict (with sort and accum) && sparse index => no DISTINCT_SCAN");
 coll.dropIndex({a: 1});
+coll.dropIndex({a: 1, b: 1});
 coll.createIndex({a: 1, b: 1}, {sparse: true});
+outputAggregationPlanAndResults(coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
+
+subSection(
+    "strict (with sort and accum) && sparse index && alternative compound index => DISTINCT_SCAN on compound index",
+);
+coll.createIndex({a: 1, b: 1, c: 1});
 outputAggregationPlanAndResults(coll, [{$sort: {a: 1, b: 1}}, {$group: {_id: "$a", accum: {$last: "$b"}}}]);
 
 subSection("!strict && sparse index => DISTINCT_SCAN");

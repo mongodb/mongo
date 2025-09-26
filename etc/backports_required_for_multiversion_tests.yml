@@ -60,7 +60,7 @@ last-continuous:
     - test_file: jstests/core/timeseries/write/timeseries_closed_update_delete.js
       ticket: SERVER-95726
     - test_file: jstests/query_golden/distinct_index_eligibility_md.js
-      ticket: SERVER-110423
+      ticket: SERVER-111486
   suites: null
 last-lts:
   all:
@@ -619,7 +619,7 @@ last-lts:
     - test_file: jstests/core/timeseries/write/timeseries_closed_update_delete.js
       ticket: SERVER-95726
     - test_file: jstests/query_golden/distinct_index_eligibility_md.js
-      ticket: SERVER-110423
+      ticket: SERVER-111486
     - test_file: jstests/noPassthrough/query/notablescan.js
       ticket: SERVER-110058
     - test_file: jstests/core/query/notablescan_sbe_consistency.js
