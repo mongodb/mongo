@@ -1758,7 +1758,7 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
                                                       std::move(pipelineTargetingInfo),
                                                       pipelineDataSource,
                                                       std::move(shardCursorsSortSpec),
-                                                      std::move(readConcern),
+                                                      readConcern,
                                                       requestQueryStatsFromRemotes);
 }
 
