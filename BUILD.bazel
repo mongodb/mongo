@@ -283,6 +283,7 @@ mongo_install(
         "//src/mongo/db/query/search/mongotmock",
         "//src/mongo/db/query/stage_builder/sbe/abt:optimizer_gdb_test_program",
         "//src/mongo/db/storage/key_string:ksdecode",
+        "//src/mongo/replay:mongor",
         "//src/mongo/s:mongos",
         "//src/mongo/shell:mongo",
         "//src/mongo/tools/mongobridge_tool:mongobridge",
