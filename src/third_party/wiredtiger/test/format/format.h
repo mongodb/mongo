@@ -522,6 +522,7 @@ void wts_open(const char *, WT_CONNECTION **, bool);
 void wts_read_scan(TABLE *, void *);
 void wts_reopen(void);
 void wts_salvage(TABLE *, void *);
+void wts_prepare_discover(WT_CONNECTION *);
 void wts_stats(void);
 void wts_verify(WT_CONNECTION *, bool);
 void wts_verify_mirrored_truncate(TINFO *tinfo);

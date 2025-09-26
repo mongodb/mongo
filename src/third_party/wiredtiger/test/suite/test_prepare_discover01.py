@@ -51,7 +51,6 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
 
     scenarios = make_scenarios(types, txn_end)
 
-    @wttest.only_for_hook("disagg", "FIXME-WT-15343 disable RTS when precise checkpoint is on")
     def test_prepare_discover01(self):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(50))
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(50))
@@ -95,7 +94,7 @@ class test_prepare_discover01(wttest.WiredTigerTestCase, suite_subprocess):
             count += 1
             prepared_id = prepared_discover_cursor.get_key()
             self.assertEqual(prepared_id, 123)
-            c2s2.begin_transaction("claim_prepared=" + self.timestamp_str(prepared_id))
+            c2s2.begin_transaction("claim_prepared_id=" + self.timestamp_str(prepared_id))
             c2s2.rollback_transaction("rollback_timestamp=" + self.timestamp_str(200))
         self.assertEqual(count, 1)
 

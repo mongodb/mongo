@@ -349,6 +349,7 @@ main(int argc, char *argv[])
         timestamp_init();
     }
 
+    wts_prepare_discover(g.wts_conn);
     locks_init(g.wts_conn);
 
     /*

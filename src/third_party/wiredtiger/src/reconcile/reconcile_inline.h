@@ -73,6 +73,17 @@ __rec_page_time_stats_clear(WTI_RECONCILE *r)
 }
 
 /*
+ * __rec_page_delta_stats_clear --
+ *     Clear page delta statistics.
+ */
+static WT_INLINE void
+__rec_page_delta_stats_clear(WTI_RECONCILE *r)
+{
+    r->count_internal_page_delta_key_deleted = 0;
+    r->count_internal_page_delta_key_updated = 0;
+}
+
+/*
  * __rec_page_time_stats --
  *     Update statistics about this page.
  */

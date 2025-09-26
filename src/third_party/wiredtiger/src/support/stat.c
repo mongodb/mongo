@@ -331,6 +331,8 @@ static const char *const __stats_dsrc_desc[] = {
   "reconciliation: fast-path pages deleted",
   "reconciliation: full internal pages written instead of a page delta",
   "reconciliation: full leaf pages written instead of a page delta",
+  "reconciliation: internal page delta keys deleted",
+  "reconciliation: internal page delta keys updated/inserted",
   "reconciliation: internal page deltas written",
   "reconciliation: internal page key bytes discarded using suffix compression",
   "reconciliation: internal page multi-block writes",
@@ -751,6 +753,8 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->rec_page_delete_fast = 0;
     stats->rec_page_full_image_internal = 0;
     stats->rec_page_full_image_leaf = 0;
+    stats->rec_page_delta_internal_key_deleted = 0;
+    stats->rec_page_delta_internal_key_updated = 0;
     stats->rec_page_delta_internal = 0;
     stats->rec_suffix_compression = 0;
     stats->rec_multiblock_internal = 0;
@@ -1174,6 +1178,8 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->rec_page_delete_fast += from->rec_page_delete_fast;
     to->rec_page_full_image_internal += from->rec_page_full_image_internal;
     to->rec_page_full_image_leaf += from->rec_page_full_image_leaf;
+    to->rec_page_delta_internal_key_deleted += from->rec_page_delta_internal_key_deleted;
+    to->rec_page_delta_internal_key_updated += from->rec_page_delta_internal_key_updated;
     to->rec_page_delta_internal += from->rec_page_delta_internal;
     to->rec_suffix_compression += from->rec_suffix_compression;
     to->rec_multiblock_internal += from->rec_multiblock_internal;
@@ -1632,6 +1638,10 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->rec_page_delete_fast += WT_STAT_DSRC_READ(from, rec_page_delete_fast);
     to->rec_page_full_image_internal += WT_STAT_DSRC_READ(from, rec_page_full_image_internal);
     to->rec_page_full_image_leaf += WT_STAT_DSRC_READ(from, rec_page_full_image_leaf);
+    to->rec_page_delta_internal_key_deleted +=
+      WT_STAT_DSRC_READ(from, rec_page_delta_internal_key_deleted);
+    to->rec_page_delta_internal_key_updated +=
+      WT_STAT_DSRC_READ(from, rec_page_delta_internal_key_updated);
     to->rec_page_delta_internal += WT_STAT_DSRC_READ(from, rec_page_delta_internal);
     to->rec_suffix_compression += WT_STAT_DSRC_READ(from, rec_suffix_compression);
     to->rec_multiblock_internal += WT_STAT_DSRC_READ(from, rec_multiblock_internal);
@@ -2488,6 +2498,8 @@ static const char *const __stats_connection_desc[] = {
   "reconciliation: fast-path pages deleted",
   "reconciliation: full internal pages written instead of a page delta",
   "reconciliation: full leaf pages written instead of a page delta",
+  "reconciliation: internal page delta keys deleted",
+  "reconciliation: internal page delta keys updated/inserted",
   "reconciliation: internal page deltas written",
   "reconciliation: internal page multi-block writes",
   "reconciliation: leaf page deltas written",
@@ -3448,6 +3460,8 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->rec_page_delete_fast = 0;
     stats->rec_page_full_image_internal = 0;
     stats->rec_page_full_image_leaf = 0;
+    stats->rec_page_delta_internal_key_deleted = 0;
+    stats->rec_page_delta_internal_key_updated = 0;
     stats->rec_page_delta_internal = 0;
     stats->rec_multiblock_internal = 0;
     stats->rec_page_delta_leaf = 0;
@@ -4564,6 +4578,10 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->rec_page_delete_fast += WT_STAT_CONN_READ(from, rec_page_delete_fast);
     to->rec_page_full_image_internal += WT_STAT_CONN_READ(from, rec_page_full_image_internal);
     to->rec_page_full_image_leaf += WT_STAT_CONN_READ(from, rec_page_full_image_leaf);
+    to->rec_page_delta_internal_key_deleted +=
+      WT_STAT_CONN_READ(from, rec_page_delta_internal_key_deleted);
+    to->rec_page_delta_internal_key_updated +=
+      WT_STAT_CONN_READ(from, rec_page_delta_internal_key_updated);
     to->rec_page_delta_internal += WT_STAT_CONN_READ(from, rec_page_delta_internal);
     to->rec_multiblock_internal += WT_STAT_CONN_READ(from, rec_multiblock_internal);
     to->rec_page_delta_leaf += WT_STAT_CONN_READ(from, rec_page_delta_leaf);

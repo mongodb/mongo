@@ -205,23 +205,24 @@ endif()
 set(CMAKE_CONFIGURATION_TYPES ${BUILD_MODES})
 
 # We want to use the optimization level from CC_OPTIMIZE_LEVEL and our DEBUG settings as well.
-# Remove the default values from Release and RelWithDebInfo.
-if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
-    string(REPLACE "/O3" "" CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
-    string(REPLACE "/O3" "" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
-    string(REPLACE "/Z7" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
-    string(REPLACE "/Z7" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
-    string(REPLACE "/O2" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
-    string(REPLACE "/O2" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+if(MSVC_C_COMPILER)
+    set(opt_flags "/O3" "/O2")
 else()
-    string(REPLACE "-O3" "" CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
-    string(REPLACE "-O3" "" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
-    string(REPLACE "-O2" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
-    string(REPLACE "-O2" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
-    string(REPLACE "-g" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
-    string(REPLACE "-g" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+    set(opt_flags "-O3" "-O2")
+    set(debug_flags "-g")
 endif()
 
+foreach(lang C CXX)
+    replace_compile_options(CMAKE_${lang}_FLAGS_RELEASE
+        REMOVE ${opt_flags}
+        ADD ${CC_OPTIMIZE_LEVEL})
+    replace_compile_options(CMAKE_${lang}_FLAGS_RELWITHDEBINFO
+        REMOVE ${opt_flags} ${debug_flags}
+        ADD ${CC_OPTIMIZE_LEVEL})
+endforeach()
+
 if(GNU_C_COMPILER OR GNU_CXX_COMPILER)
-    add_compile_options(-fno-strict-aliasing)
+    foreach(lang C CXX)
+        add_cmake_flag(CMAKE_${lang}_FLAGS -fno-strict-aliasing)
+    endforeach()
 endif()

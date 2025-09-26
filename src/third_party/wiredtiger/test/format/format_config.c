@@ -432,8 +432,16 @@ config_table(TABLE *table, void *arg)
     config_pct(table);
 
     /* Column-store tables require special row insert resolution. */
-    if (table->type != ROW)
+    if (table->type != ROW) {
         g.column_store_config = true;
+        /* FIXME-WT-15274 Support column store with precise checkpoint */
+        if (GV(PRECISE_CHECKPOINT)) {
+            if (config_explicit(NULL, "precise_checkpoint"))
+                WARN("turning off precise_checkpoint as table%" PRIu32 " is a column-store",
+                  table->id);
+            config_off(NULL, "precise_checkpoint");
+        }
+    }
 
     /* Only row-store tables support a collation order. */
     if (table->type != ROW)
@@ -1000,6 +1008,8 @@ config_in_memory(void)
         return;
     if (config_explicit(NULL, "ops.verify"))
         return;
+    if (config_explicit(NULL, "precise_checkpoint"))
+        return;
     if (config_explicit(NULL, "runs.mirror"))
         return;
     if (config_explicit(NULL, "runs.predictable_replay"))
@@ -1050,6 +1060,8 @@ config_in_memory_reset(void)
         config_off(NULL, "ops.salvage");
     if (!config_explicit(NULL, "ops.verify"))
         config_off(NULL, "ops.verify");
+    if (!config_explicit(NULL, "precise_checkpoint"))
+        config_off(NULL, "precise_checkpoint");
     if (!config_explicit(NULL, "prefetch"))
         config_off(NULL, "prefetch");
 }
@@ -1617,6 +1629,14 @@ config_transaction(void)
         config_off(NULL, "ops.prepare");
         config_off(NULL, "precise_checkpoint");
         config_off(NULL, "preserve_prepared");
+    }
+    /* FIXME-WT-15565 Write prepared truncate operation to disk. */
+    if (GV(PRECISE_CHECKPOINT) && GV(OPS_PREPARE)) {
+        if (config_explicit(NULL, "ops.truncate")) {
+            WARN("%s" PRIu32,
+              "turning off ops.truncate to work with ops.prepare and precise checkpoint");
+        }
+        config_off(NULL, "ops.truncate");
     }
 
     /* Set a default transaction timeout limit if one is not specified. */

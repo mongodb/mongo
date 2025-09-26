@@ -1910,11 +1910,11 @@ __wt_txn_claim_prepared_txn(WT_SESSION_IMPL *session, uint64_t prepared_id)
     prepared_item->mod = tmp_mod;
     prepared_item->mod_alloc = 0;
     prepared_item->mod_count = 0;
-    WT_RET(__wt_prepared_discover_remove_item(session, prepared_id));
 #ifdef HAVE_DIAGNOSTIC
     txn->prepare_count = prepared_item->prepare_count;
     prepared_item->prepare_count = 0;
 #endif
+    WT_RET(__wt_prepared_discover_remove_item(session, prepared_id));
 
     /* There's no txn id since claimed prepared txn is from recovery */
     WT_ASSERT(session, !F_ISSET(session->txn, WT_TXN_HAS_ID));
@@ -1930,7 +1930,7 @@ __wt_txn_begin(WT_SESSION_IMPL *session, WT_CONF *conf)
 {
     WT_CONFIG_ITEM cval;
     WT_TXN *txn;
-    wt_timestamp_t prepared_id;
+    uint64_t prepared_id;
 
     txn = session->txn;
     txn->isolation = session->isolation;

@@ -268,6 +268,7 @@ __prepared_discover_process_leaf_page(WT_SESSION_IMPL *session, WT_REF *ref)
         break;
     case WT_PAGE_COL_FIX:
     case WT_PAGE_COL_VAR:
+        /* FIXME-WT-15274 Support column store with prepared discovery */
         WT_ASSERT_ALWAYS(session, false, "Prepared discovery does not support column stores");
         /* Fall through. */
     case WT_PAGE_COL_INT:

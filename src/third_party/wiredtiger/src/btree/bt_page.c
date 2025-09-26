@@ -173,7 +173,7 @@ __page_merge_internal_delta_with_base_image(WT_SESSION_IMPL *session, WT_REF *re
             WT_ERR(__page_build_ref(
               session, ref, base_key, base_val, NULL, true, &refs[final_entries++], incr));
         } else if (cmp >= 0) {
-            if (!F_ISSET(delta[j], WT_DELTA_INT_IS_DELETE))
+            if (!__wt_delta_cell_type_visible_all(delta[j]))
                 WT_ERR(__page_build_ref(
                   session, ref, NULL, NULL, delta[j], false, &refs[final_entries++], incr));
             if (cmp == 0)
@@ -189,7 +189,7 @@ __page_merge_internal_delta_with_base_image(WT_SESSION_IMPL *session, WT_REF *re
           session, ref, base_key, base_val, NULL, true, &refs[final_entries++], incr));
     }
     for (; j < delta_entries; j++)
-        if (!F_ISSET(delta[j], WT_DELTA_INT_IS_DELETE))
+        if (!__wt_delta_cell_type_visible_all(delta[j]))
             WT_ERR(__page_build_ref(
               session, ref, NULL, NULL, delta[j], false, &refs[final_entries++], incr));
 
@@ -304,8 +304,9 @@ __page_reconstruct_internal_deltas(
     for (i = 0, j = 0; i < (uint32_t)delta_size; ++i, j = 0) {
         header = (WT_PAGE_HEADER *)deltas[i].data;
         WT_ASSERT(session, header->u.entries != 0);
-        delta_size_each[i] = (size_t)header->u.entries;
+        WT_ASSERT(session, header->u.entries % 2 == 0);
 
+        delta_size_each[i] = (size_t)header->u.entries / 2; /* Each entry has a key and a value. */
         WT_ERR(__wt_calloc_def(session, header->u.entries, &unpacked_deltas[i]));
         WT_CELL_FOREACH_DELTA_INT(session, ref->page->dsk, header, unpacked_deltas[i][j])
         {

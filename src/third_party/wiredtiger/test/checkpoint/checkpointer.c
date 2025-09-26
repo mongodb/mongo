@@ -647,7 +647,9 @@ diagnose_key_error(WT_CURSOR *cursor1, table_type type1, int index1, WT_CURSOR *
     session = cursor1->session;
     key1_orig = key2_orig = 0;
 
-    testutil_snprintf(ckpt, sizeof(ckpt), "checkpoint=%s", g.checkpoint_name);
+    /* FIXME-WT-15357: Checkpoint cursors are not compatible with disagg for now. */
+    if (!g.opts.disagg_storage)
+        testutil_snprintf(ckpt, sizeof(ckpt), "checkpoint=%s", g.checkpoint_name);
 
     /* Save the failed keys. */
     if (cursor1->get_key(cursor1, &key1_orig) != 0 || cursor2->get_key(cursor2, &key2_orig) != 0) {

@@ -227,8 +227,6 @@ struct __wt_data_handle;
 typedef struct __wt_data_handle WT_DATA_HANDLE;
 struct __wt_data_handle_cache;
 typedef struct __wt_data_handle_cache WT_DATA_HANDLE_CACHE;
-struct __wt_delta_cell_int;
-typedef struct __wt_delta_cell_int WT_DELTA_CELL_INT;
 struct __wt_delta_cell_leaf;
 typedef struct __wt_delta_cell_leaf WT_DELTA_CELL_LEAF;
 struct __wt_disagg_copy_metadata;

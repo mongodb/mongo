@@ -2189,35 +2189,59 @@ __wti_rec_pack_delta_internal(
   WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_KV *key, WTI_REC_KV *value)
 {
     WT_PAGE_HEADER *header;
+    WTI_REC_KV t_kv_struct, *t_kv;
     size_t packed_size;
-    uint8_t flags;
-    uint8_t *p, *head_byte;
+    uint8_t *p;
 
-    flags = 0;
-
+    WT_CLEAR(t_kv_struct);
     header = (WT_PAGE_HEADER *)r->delta.data;
 
-    packed_size = 1 + key->len;
+    packed_size = key->len;
     if (value != NULL)
         packed_size += value->len;
 
     if (r->delta.size + packed_size > r->delta.memsize)
         WT_RET(__wt_buf_grow(session, &r->delta, r->delta.size + packed_size));
 
-    head_byte = (uint8_t *)r->delta.data + r->delta.size;
-    p = head_byte + 1;
+    p = (uint8_t *)r->delta.data + r->delta.size;
 
     __wti_rec_kv_copy(session, p, key);
     p += key->len;
-    if (value == NULL)
-        LF_SET(WT_DELTA_INT_IS_DELETE);
-    else
+
+    /*
+     * If the value is NULL, write a cell with zeroed-out values and a data size of zero, setting
+     * the cell type to WT_CELL_ADDR_DEL_VISIBLE_ALL. This approach allows for potential future
+     * extensions where additional information might be added to the delete cell.
+     */
+    if (value == NULL) {
+        t_kv = &t_kv_struct;
+        t_kv->buf.data = NULL;
+        t_kv->buf.size = 0;
+        /*
+         * Initialize an empty instance of WT_TIME_AGGREGATE to avoid writing a page deleted
+         * structure to disk.
+         */
+        static WT_TIME_AGGREGATE local_ta;
+        WT_TIME_AGGREGATE_INIT(&local_ta);
+
+        t_kv->cell_len = __wt_cell_pack_addr(
+          session, &t_kv->cell, WT_CELL_ADDR_DEL_VISIBLE_ALL, WT_RECNO_OOB, NULL, &local_ta, 0);
+        t_kv->len = t_kv->cell_len;
+        __wti_rec_kv_copy(session, p, t_kv);
+        packed_size += t_kv->len;
+        ++r->count_internal_page_delta_key_deleted;
+    } else {
         __wti_rec_kv_copy(session, p, value);
+        ++r->count_internal_page_delta_key_updated;
+    }
 
     r->delta.size += packed_size;
-    *head_byte = flags;
 
-    ++header->u.entries;
+    /*
+     * Each delta entry consists of two components: a key and a value. If the value is NULL, a cell
+     * of type WT_CELL_ADDR_DEL_VISIBLE_ALL is used to represent the deletion.
+     */
+    header->u.entries += 2;
     header->mem_size = (uint32_t)r->delta.size;
 
     return (0);
@@ -2549,6 +2573,17 @@ __rec_write_delta(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WTI_REC_CHUNK *chu
 
     delta_pct = (r->delta.size * 100) / chunk->image.size;
     if (F_ISSET(r->ref, WT_REF_FLAG_INTERNAL)) {
+        /*
+         * If we decide to write the delta we packed, track the number of internal keys deleted and
+         * inserted/updated
+         */
+        if (r->count_internal_page_delta_key_deleted != 0)
+            WT_STAT_CONN_DSRC_INCRV(session, rec_page_delta_internal_key_deleted,
+              r->count_internal_page_delta_key_deleted);
+        if (r->count_internal_page_delta_key_updated != 0)
+            WT_STAT_CONN_DSRC_INCRV(session, rec_page_delta_internal_key_updated,
+              r->count_internal_page_delta_key_updated);
+
         WT_STAT_CONN_DSRC_INCR(session, rec_page_delta_internal);
 
         /*
@@ -2941,6 +2976,7 @@ copy_image:
 
     /* Whether we wrote or not, clear the accumulated time statistics. */
     __rec_page_time_stats_clear(r);
+    __rec_page_delta_stats_clear(r);
 
     return (0);
 }

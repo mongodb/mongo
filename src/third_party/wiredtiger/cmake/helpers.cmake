@@ -589,23 +589,135 @@ function(parse_filelist_source filelist output_var)
     set(${output_var} ${output_files} PARENT_SCOPE)
 endfunction()
 
-# escape_regex_special_characters(input output)
-# A helper function that escapes special characters in the input string,
-# making it safe for checking regular expressions. It replaces each special character
-# with its escaped counterpart by adding a preceding '\'.
-# function(escape_regex_special_characters input output)
-function(escape_regex_special_characters input output)
-    string(REGEX REPLACE "([][+.*()^])" "\\\\\\1" escaped_input "${input}")
-    set(${output} "${escaped_input}" PARENT_SCOPE)
-endfunction()
-
-# check_c_flag(flag)
+# add_cmake_flag(dest_var flag)
 # A helper function that adds a CMake flag to a list of included flags if it's not already present.
-# It first checks if the flag is already included in the list using a regex pattern.
-# If the flag is not already included, it appends the flag to the list of included flags.
 function(add_cmake_flag included_flags flag)
-    escape_regex_special_characters("${flag}" escaped_flag)
-    if (NOT ${included_flags} MATCHES ".*${escaped_flag}.*")
+    string(FIND " ${${included_flags}} " " ${flag} " flag_position)
+    if(flag_position EQUAL -1)
         set(${included_flags} "${${included_flags}} ${flag}" CACHE STRING "" FORCE)
     endif()
+endfunction()
+
+# add_cmake_compiler_flags(FLAGS <flags...> LANGUAGES <languages...> BUILD_TYPES <build_types...>)
+# A helper function that adds one or more compiler flags to specified languages and build types,
+# avoiding duplication by using the existing add_cmake_flag function.
+#   FLAGS <flags...> - one or more compilation flags to add
+#   LANGUAGES <languages...> - one or more languages (C, CXX, etc.)
+#   BUILD_TYPES <build_types...> - one or more build types (Debug, RelWithDebInfo, Release, etc.)
+function(add_cmake_compiler_flags)
+    cmake_parse_arguments(
+        PARSE_ARGV
+        0
+        "COMPILER_FLAGS"
+        ""
+        ""
+        "FLAGS;LANGUAGES;BUILD_TYPES"
+    )
+
+    # Validate required arguments
+    if(NOT COMPILER_FLAGS_FLAGS)
+        message(FATAL_ERROR "add_cmake_compiler_flags: FLAGS argument is required")
+    endif()
+    if(NOT COMPILER_FLAGS_LANGUAGES)
+        message(FATAL_ERROR "add_cmake_compiler_flags: LANGUAGES argument is required")
+    endif()
+    if(NOT COMPILER_FLAGS_BUILD_TYPES)
+        message(FATAL_ERROR "add_cmake_compiler_flags: BUILD_TYPES argument is required")
+    endif()
+
+    # Add each flag to each language/build_type combination
+    foreach(lang ${COMPILER_FLAGS_LANGUAGES})
+        foreach(build_type ${COMPILER_FLAGS_BUILD_TYPES})
+            # Convert build type to uppercase for CMAKE variable names
+            string(TOUPPER "${build_type}" build_type_upper)
+
+            # Initialize the flags variable if not already defined
+            if(NOT DEFINED CMAKE_${lang}_FLAGS_${build_type_upper})
+                set(CMAKE_${lang}_FLAGS_${build_type_upper} "")
+            endif()
+
+            # Add each flag while avoiding duplication
+            foreach(flag ${COMPILER_FLAGS_FLAGS})
+                add_cmake_flag(CMAKE_${lang}_FLAGS_${build_type_upper} "${flag}")
+            endforeach()
+        endforeach()
+    endforeach()
+endfunction()
+
+# add_cmake_linker_flags(FLAGS <flags...> BINARIES <binaries...> BUILD_TYPES <build_types...>)
+# A helper function that adds one or more linker flags to specified binary types and build types,
+# avoiding duplication by using the existing add_cmake_flag function.
+#   FLAGS <flags...> - one or more linker flags to add
+#   BINARIES <binaries...> - one or more binary types (EXE, SHARED, MODULE, etc.)
+#   BUILD_TYPES <build_types...> - one or more build types (Debug, RelWithDebInfo, Release, etc.)
+function(add_cmake_linker_flags)
+    cmake_parse_arguments(
+        PARSE_ARGV
+        0
+        "LINKER_FLAGS"
+        ""
+        ""
+        "FLAGS;BINARIES;BUILD_TYPES"
+    )
+
+    # Validate required arguments
+    if(NOT LINKER_FLAGS_FLAGS)
+        message(FATAL_ERROR "add_cmake_linker_flags: FLAGS argument is required")
+    endif()
+    if(NOT LINKER_FLAGS_BINARIES)
+        message(FATAL_ERROR "add_cmake_linker_flags: BINARIES argument is required")
+    endif()
+    if(NOT LINKER_FLAGS_BUILD_TYPES)
+        message(FATAL_ERROR "add_cmake_linker_flags: BUILD_TYPES argument is required")
+    endif()
+
+    # Add each flag to each binary_type/build_type combination
+    foreach(binary ${LINKER_FLAGS_BINARIES})
+        foreach(build_type ${LINKER_FLAGS_BUILD_TYPES})
+            # Convert build type to uppercase for CMAKE variable names
+            string(TOUPPER "${build_type}" build_type_upper)
+
+            # Initialize the flags variable if not already defined
+            if(NOT DEFINED CMAKE_${binary}_LINKER_FLAGS_${build_type_upper})
+                set(CMAKE_${binary}_LINKER_FLAGS_${build_type_upper} "")
+            endif()
+
+            # Add each flag while avoiding duplication
+            foreach(flag ${LINKER_FLAGS_FLAGS})
+                add_cmake_flag(CMAKE_${binary}_LINKER_FLAGS_${build_type_upper} "${flag}")
+            endforeach()
+        endforeach()
+    endforeach()
+endfunction()
+
+
+# replace_compile_options(flag_var [REMOVE <flags...>] [ADD <flags...>])
+# A helper function that removes specified compiler flags from a flag variable and optionally adds new ones.
+# This is useful for replacing default compiler flags with custom ones while maintaining clean flag strings.
+#   flag_var - name of the variable containing compiler flags to modify (modified in parent scope)
+#   REMOVE <flags...> - list of flags to remove from the flag variable
+#   ADD <flags...> - list of flags to add to the flag variable after removal
+function(replace_compile_options flag_var)
+    cmake_parse_arguments(
+        PARSE_ARGV
+        1
+        "REPLACE"
+        ""
+        ""
+        "REMOVE;ADD"
+    )
+
+    # Remove existing flags
+    foreach(flag ${REPLACE_REMOVE})
+        string(REPLACE "${flag}" "" ${flag_var} ${${flag_var}})
+    endforeach()
+
+    # Add custom flags if provided
+    foreach(flag ${REPLACE_ADD})
+        set(${flag_var} "${${flag_var}} ${flag}")
+    endforeach()
+
+    # Clean up extra spaces
+    string(STRIP "${${flag_var}}" ${flag_var})
+    set(${flag_var} "${${flag_var}}" CACHE STRING "" FORCE)
 endfunction()

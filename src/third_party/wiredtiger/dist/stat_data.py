@@ -1318,6 +1318,8 @@ conn_dsrc_stats = [
     RecStat('rec_page_delete', 'pages deleted'),
     RecStat('rec_page_delete_fast', 'fast-path pages deleted'),
     RecStat('rec_page_delta_internal', 'internal page deltas written'),
+    RecStat('rec_page_delta_internal_key_deleted', 'internal page delta keys deleted'),
+    RecStat('rec_page_delta_internal_key_updated', 'internal page delta keys updated/inserted'),
     RecStat('rec_page_delta_leaf', 'leaf page deltas written'),
     RecStat('rec_page_full_image_internal', 'full internal pages written instead of a page delta'),
     RecStat('rec_page_full_image_leaf', 'full leaf pages written instead of a page delta'),

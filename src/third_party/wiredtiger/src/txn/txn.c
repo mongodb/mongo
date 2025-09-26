@@ -2515,7 +2515,7 @@ __wt_txn_global_shutdown(WT_SESSION_IMPL *session, const char **cfg)
          * Perform rollback to stable to ensure that the stable version is written to disk on a
          * clean shutdown.
          */
-        if (use_timestamp && !conn_is_disagg) {
+        if (use_timestamp && !conn_is_disagg && !F_ISSET(conn, WT_CONN_PRECISE_CHECKPOINT)) {
             const char *rts_cfg[] = {
               WT_CONFIG_BASE(session, WT_CONNECTION_rollback_to_stable), NULL, NULL};
             if (conn->rts->cfg_threads_num != 0) {

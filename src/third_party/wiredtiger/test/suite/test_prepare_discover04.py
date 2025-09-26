@@ -34,7 +34,6 @@ from suite_subprocess import suite_subprocess
 import wttest
 from wtscenario import make_scenarios
 
-@wttest.only_for_hook("disagg", "FIXME-WT-15343 disable RTS when precise checkpoint is on")
 class test_prepare_discover04(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_prepare_discover04'
     uri = 'table:' + tablename
