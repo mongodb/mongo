@@ -60,7 +60,10 @@ function testAddWithSnapshot(secondariesDown) {
     backupData(primary, newdbpath);
     // Add some data after the backup.
     assert.commandWorked(
-        testDb[testName].insert({addWithSnapshotAfterSnapshot: secondariesDown}, {writeConcern: {w: 1}}),
+        testDb[testName].insert(
+            {addWithSnapshotAfterSnapshot: secondariesDown, msg: "Data written after backup"},
+            {writeConcern: {w: 1}},
+        ),
     );
     let config = rst.getReplSetConfigFromNode();
     secondariesDown = secondariesDown || 0;
@@ -95,7 +98,12 @@ function testAddWithSnapshot(secondariesDown) {
     if (!useForce) {
         // Make sure we can replicate to it.  This only works if the set was healthy, otherwise we
         // can't.
-        assert.commandWorked(testDb[testName].insert({addWithSnapshot: secondariesDown}, {writeConcern: {w: 1}}));
+        assert.commandWorked(
+            testDb[testName].insert(
+                {addWithSnapshot: secondariesDown, msg: "Replicating write to new node"},
+                {writeConcern: {w: 1}},
+            ),
+        );
         rst.awaitReplication(undefined, undefined, [newNode]);
     }
 
@@ -105,6 +113,10 @@ function testAddWithSnapshot(secondariesDown) {
     assert.soon(() => primary == rst.getPrimary());
     rst.checkOplogs();
     rst.checkReplicatedDataHashes();
+
+    // Stabilize the cluster before removing the new node.
+    assert.commandWorked(testDb[testName].insert({addWithSnapshot: secondariesDown, msg: "Reconnected secondaries"}));
+    rst.awaitReplication();
 
     // Remove our extra node.
     rst.stop(newNode);
