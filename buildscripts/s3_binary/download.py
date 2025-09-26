@@ -98,7 +98,12 @@ def _download_and_verify(s3_path, output_path, remote_sha_allowed, ignore_file_n
             try:
                 download_from_s3_with_boto(s3_path, output_path)
             except Exception:
-                download_from_s3_with_requests(s3_path, output_path)
+                try:
+                    download_from_s3_with_requests(s3_path, output_path, raise_on_error=True)
+                except Exception:
+                    if ignore_file_not_exist:
+                        print("Failed to find remote file. Ignoring and skipping...")
+                        return
 
             validate_file(s3_path, output_path, remote_sha_allowed)
             break
@@ -106,8 +111,6 @@ def _download_and_verify(s3_path, output_path, remote_sha_allowed, ignore_file_n
         except Exception:
             print("Download failed:")
             traceback.print_exc()
-            if ignore_file_not_exist:
-                return
             if i == 4:
                 raise
             print("Retrying download...")

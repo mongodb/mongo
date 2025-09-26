@@ -53,8 +53,10 @@ def extract_s3_bucket_key(url: str) -> tuple[str, str]:
     return bucket, key
 
 
-def download_from_s3_with_requests(url, output_file):
+def download_from_s3_with_requests(url, output_file, raise_on_error=False):
     with requests.get(url, stream=True) as reader:
+        if raise_on_error:
+            reader.raise_for_status()
         with open(output_file, "wb") as file_handle:
             shutil.copyfileobj(reader.raw, file_handle)
 

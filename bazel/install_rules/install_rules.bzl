@@ -589,16 +589,11 @@ def mongo_install(
             }),
             **kwargs
         )
-
         if try_zstd:
-            compressor = select({
-                "@zstd//:zstd_tool_available": "@zstd//:bin",
-                "//conditions:default": None,
-            })
             pkg_tar(
                 name = "archive-" + name + install_type + "_zst",
                 srcs = [install_target + "_files", install_target + "_licenses"],
-                compressor = compressor,
+                compressor = "@zstd//:bin",
                 package_dir = package_extract_name,
                 package_file_name = name + install_type + ".zst",
                 extension = "zst",
@@ -611,6 +606,7 @@ def mongo_install(
                 testonly = testonly,
                 target_compatible_with = select({
                     "@platforms//os:windows": ["@platforms//:incompatible"],
+                    "@zstd//:zstd_tool_not_available": ["@platforms//:incompatible"],
                     "//conditions:default": [],
                 }),
                 **kwargs
@@ -620,7 +616,8 @@ def mongo_install(
                 name = "archive-" + name + install_type,
                 srcs = select({
                     "@platforms//os:windows": ["archive-" + name + install_type + "_zip"],
-                    "//conditions:default": ["archive-" + name + install_type + "_tar", "archive-" + name + install_type + "_zst"],
+                    "@zstd//:zstd_tool_available": ["archive-" + name + install_type + "_tar", "archive-" + name + install_type + "_zst"],
+                    "//conditions:default": ["archive-" + name + install_type + "_tar"],
                 }),
                 testonly = testonly,
             )
