@@ -912,7 +912,7 @@ void SessionWorkflow::Impl::_scheduleIteration() try {
         }
     });
 
-    taskRunner()->runOnDataAvailable(session(), std::move(runOneIteration));
+    taskRunner()->runTaskForSession(session(), std::move(runOneIteration));
 } catch (const DBException& ex) {
     auto error = ex.toStatus();
     LOGV2_WARNING_OPTIONS(22993,

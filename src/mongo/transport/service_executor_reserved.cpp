@@ -252,7 +252,8 @@ auto ServiceExecutorReserved::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
             _e->_schedule(std::move(task));
         }
 
-        void runOnDataAvailable(std::shared_ptr<Session> session, Task task) override {
+        void runTaskForSession(std::shared_ptr<Session> session, Task task) override {
+            // Wait for data to become available on session before running task.
             _e->_runOnDataAvailable(std::move(session), std::move(task));
         }
 

@@ -212,7 +212,7 @@ auto ServiceExecutorSyncImpl::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
             _e->_sharedState->schedule(std::move(task), _e->getName());
         }
 
-        void runOnDataAvailable(std::shared_ptr<Session> session, Task task) override {
+        void runTaskForSession(std::shared_ptr<Session> session, Task task) override {
             invariant(session);
             _e->_sharedState->schedule(std::move(task), _e->getName());
         }

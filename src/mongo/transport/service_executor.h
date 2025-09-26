@@ -57,11 +57,11 @@ public:
     class TaskRunner : public OutOfLineExecutor {
     public:
         /**
-         * Awaits the availability of incoming data for the specified session. On success, it will
-         * schedule the callback on current executor. Otherwise, it will invoke the callback with a
-         * non-okay status on the caller thread.
+         * Runs the task associated with a session. On success, it will schedule the callback on
+         * current executor. Otherwise, it will invoke the callback with a non-okay status on the
+         * caller thread.
          */
-        virtual void runOnDataAvailable(std::shared_ptr<Session> session, Task task) = 0;
+        virtual void runTaskForSession(std::shared_ptr<Session> session, Task task) = 0;
     };
 
     /**
