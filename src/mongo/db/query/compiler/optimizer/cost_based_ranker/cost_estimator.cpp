@@ -155,12 +155,16 @@ void CostEstimator::computeAndSetNodeCost(const QuerySolutionNode* node,
                 incrCC = sortWithLimitIncrement;
                 logFactor = std::min(logFactor, static_cast<double>(sortNode->limit));
             }
+            // The logFactor is used to estimate the number of sort steps. Even for very small
+            // estimates make sure to count at least one sort step per input document.
+            logFactor += 1;
 
             nodeCost = sortStartup * oneCE + childCosts[0];
-            if (logFactor > 1.0) {
-                CardinalityEstimate sortSteps = inCE * std::log2(logFactor);
-                nodeCost += incrCC * sortSteps;
-            }
+            tassert(10064900,
+                    "The logFactor for sort steps estimation should be at least 1.",
+                    logFactor >= 1.0);
+            CardinalityEstimate sortSteps = inCE * std::log2(logFactor);
+            nodeCost += incrCC * sortSteps;
             break;
         }
         case STAGE_PROJECTION_DEFAULT:

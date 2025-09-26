@@ -70,6 +70,13 @@ function rootStageCost(cursor) {
 }
 
 /**
+ * Extract the cost of the input stage only.
+ */
+function inputStageCost(cursor) {
+    return planCost(cursor) - rootStageCost(cursor);
+}
+
+/**
  * Extract the cost of the IXSCAN stage out of the explain().
  */
 function ixscanCost({predicate, hint}) {
@@ -279,9 +286,46 @@ function runTest(planRankerMode) {
      */
 
     // SORT with a small $limit should have a small cost
-    assert.lt(rootStageCost(coll.find().sort({a: 1}).limit(1).hint({$natural: 1})), 0.0002);
-    // TODO(SERVER-100648): assert.lt(rootStageCost(coll.find().sort({a:1}).limit(2).hint({$natural:
-    // 1})), 0.001);
+    assert.close(rootStageCost(collOneRow.find().sort({a: 1}).limit(1).hint({$natural: 1})), 0.0002);
+
+    // Sorting more input documents is more expensive for the same limit.
+    assert.lt(
+        rootStageCost(collOneRow.find().sort({a: 1}).limit(1).hint({$natural: 1})),
+        rootStageCost(coll.find().sort({a: 1}).limit(1).hint({$natural: 1})),
+    );
+
+    if (planRankerMode !== "heuristicCE") {
+        // Exclude heuristicCE with which the predicates get the same CE.
+        assert.lt(
+            rootStageCost(
+                coll
+                    .find({a: {$lte: 100}})
+                    .sort({a: 1})
+                    .limit(10)
+                    .hint({$natural: 1}),
+            ),
+            rootStageCost(
+                coll
+                    .find({a: {$lte: 1000}})
+                    .sort({a: 1})
+                    .limit(10)
+                    .hint({$natural: 1}),
+            ),
+        );
+    }
+
+    // Sorting the same number of input documents is more expensive for larger limit.
+    assert.lt(
+        rootStageCost(coll.find().sort({a: 1}).limit(10).hint({$natural: 1})),
+        rootStageCost(coll.find().sort({a: 1}).limit(100).hint({$natural: 1})),
+    );
+
+    // The cost for limit 1 and limit 2 is close for the same input size.
+    assert.lt(
+        rootStageCost(coll.find().sort({a: 1}).limit(2).hint({$natural: 1})) -
+            rootStageCost(coll.find().sort({a: 1}).limit(1).hint({$natural: 1})),
+        0.5,
+    );
 
     /*
      * Cost of stand-alone LIMIT.
@@ -292,6 +336,7 @@ function runTest(planRankerMode) {
         planCost(coll.find().limit(1).hint({$natural: 1})),
         planCost(coll.find().limit(1000).hint({$natural: 1})),
     );
+
     // The cost of limit stage should depend on the limit itself, as long as it is smaller than the
     // cardinality of its child. LIMIT cost should not depend on the type of input (COLLSCAN vs.
     // FETCH + IXSCAN).
@@ -300,6 +345,29 @@ function runTest(planRankerMode) {
         rootStageCost(coll.find().limit(100).hint({$natural: 1})),
     );
     assert.lt(rootStageCost(coll.find().limit(1).hint({a: 1})), rootStageCost(coll.find().limit(100).hint({a: 1})));
+
+    // TODO(SERVER-100647: Pushdown stand-alone LIMIT into streaming operators while estimating CE)
+    // Currently, the input streaming operator has the same cost independently from the LIMIT above.
+    assert.close(
+        inputStageCost(coll.find().limit(1).hint({$natural: 1})),
+        inputStageCost(coll.find().limit(100).hint({$natural: 1})),
+    );
+
+    // TODO(SERVER-100647):
+    assert.close(
+        inputStageCost(
+            coll
+                .find({a: {$gt: 100}})
+                .limit(1)
+                .hint({a: 1}),
+        ),
+        inputStageCost(
+            coll
+                .find({a: {$gt: 100}})
+                .limit(100)
+                .hint({a: 1}),
+        ),
+    );
 
     assert.close(
         rootStageCost(coll.find().limit(1).hint({$natural: 1})),

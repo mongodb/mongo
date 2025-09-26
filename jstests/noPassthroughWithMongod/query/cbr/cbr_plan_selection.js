@@ -165,23 +165,21 @@ try {
      * Plan selection for find() + sort() on different fields.
      */
 
-    // In the presence of a very-selective find() + sort(), we pick the index on the find()
+    // In the presence of a very-selective find() + sort(), we pick the index on the find().
     assert.eq(winningIndexFromCursor(coll.find({unique1: -1}).sort({b: 1})), "unique1_1");
     assert.eq(winningIndexFromCursor(coll.find({b: -1}).sort({unique1: 1})), "b_1");
     assert.eq(winningIndexFromCursor(coll.find({unique1: 1}).sort({b: 1})), "unique1_1");
 
-    // TODO(SERVER-100647):
-    // assert.eq(winningIndexFromCursor(coll.find({a:-1}).sort({b:1}).limit(1)), "unique1_1");
-    // TODO(SERVER-100647):
-    // assert.eq(winningIndexFromCursor(coll.find({b:-1}).sort({a:1}).limit(1)), "b_1");
-    // TODO(SERVER-100647): assert.eq(winningIndexFromCursor(coll.find({a:1}).sort({b:1}).limit(1)),
-    // "unique1_1");
+    // In the presence of a very-selective find() + sort() + limit(), we pick the index on the find().
+    assert.eq(winningIndexFromCursor(coll.find({unique1: -1}).sort({b: 1}).limit(1)), "unique1_1");
+    assert.eq(winningIndexFromCursor(coll.find({b: -1}).sort({unique1: 1}).limit(1)), "b_1");
+    assert.eq(winningIndexFromCursor(coll.find({unique1: 1}).sort({b: 1}).limit(1)), "unique1_1");
 
-    // In the presence of non-selective find() + sort(), we pick the index on the sort
+    // In the presence of non-selective find() + sort(), we pick the index on the sort.
     assert.eq(winningIndexFromCursor(coll.find({unique1: {$gte: 0}}).sort({b: 1})), "b_1");
     assert.eq(winningIndexFromCursor(coll.find({b: {$gte: 0}}).sort({unique1: 1})), "unique1_1");
 
-    // In the presence of sort() + limit(1) we pick the index on the predicate.
+    // In the presence of non-selective find() + sort() + limit() we pick the index on the sort field.
     assert.eq(
         winningIndexFromCursor(
             coll
@@ -189,7 +187,7 @@ try {
                 .sort({b: 1})
                 .limit(1),
         ),
-        "unique1_1",
+        "b_1",
     );
     assert.eq(
         winningIndexFromCursor(
@@ -198,10 +196,9 @@ try {
                 .sort({unique1: 1})
                 .limit(1),
         ),
-        "b_1",
+        "unique1_1",
     );
 
-    // In the presence of sort() + large limit, we pick again the index on the sort field.
     assert.eq(
         winningIndexFromCursor(
             coll
@@ -219,6 +216,29 @@ try {
                 .limit(10000),
         ),
         "unique1_1",
+    );
+
+    // Mixed case: non-selective find() + sort() + limit() may pick the index on the sort field
+    // or on the predicate depending on the limit value.
+    // TODO(SERVER-100647): Pushdown stand-alone LIMIT into streaming operators while estimating CE.
+    // This will reduce the cost of the streaming index scan on the sort field and result in choosing this plan in more cases.
+    assert.eq(
+        winningIndexFromCursor(
+            coll
+                .find({unique1: {$gte: 100}})
+                .sort({b: 1})
+                .limit(1),
+        ),
+        "unique1_1",
+    );
+    assert.eq(
+        winningIndexFromCursor(
+            coll
+                .find({unique1: {$gte: 100}})
+                .sort({b: 1})
+                .limit(100),
+        ),
+        "b_1",
     );
 } finally {
     assert.commandWorked(db.adminCommand({setParameter: 1, planRankerMode: "multiPlanning"}));
