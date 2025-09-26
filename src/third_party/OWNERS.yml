@@ -145,6 +145,3 @@ filters:
   - "zstandard":
     approvers:
       - 10gen/server-networking-and-observability
-  - "*.bazel":
-    approvers:
-      - 10gen/devprod-build
