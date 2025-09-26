@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 
 namespace mongo::variableValidation {
 Status isValidNameForUserWrite(StringData varName);

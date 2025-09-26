@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <cmath>

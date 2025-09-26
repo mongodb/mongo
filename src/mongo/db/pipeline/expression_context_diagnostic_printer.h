@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/modules.h"
 
 #include <fmt/format.h>
 

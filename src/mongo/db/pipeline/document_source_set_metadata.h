@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

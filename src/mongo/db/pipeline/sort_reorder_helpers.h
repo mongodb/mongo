@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/logical_model/sort_pattern/sort_pattern.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

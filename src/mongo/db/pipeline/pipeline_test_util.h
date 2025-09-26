@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

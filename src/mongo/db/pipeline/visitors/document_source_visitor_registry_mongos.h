@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 #include "mongo/s/query/exec/document_source_merge_cursors.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

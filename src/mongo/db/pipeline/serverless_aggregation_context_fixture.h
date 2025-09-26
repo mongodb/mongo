@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

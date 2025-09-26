@@ -39,6 +39,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/util/deferred.h"
+#include "mongo/util/modules.h"
 
 #include <deque>
 #include <set>

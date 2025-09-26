@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>

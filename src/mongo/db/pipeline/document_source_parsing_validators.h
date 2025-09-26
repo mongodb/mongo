@@ -31,6 +31,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 Status validateObjectIsEmpty(const BSONObj&);

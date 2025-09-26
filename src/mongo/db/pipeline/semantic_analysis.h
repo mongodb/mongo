@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/string_map.h"
 
 #include <functional>

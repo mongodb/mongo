@@ -37,6 +37,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
+#include "mongo/util/modules.h"
 
 #include <functional>
 

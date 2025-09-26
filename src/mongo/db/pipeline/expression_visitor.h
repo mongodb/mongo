@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/util/modules.h"
 
 namespace ExpressionTests {
 class Testable;

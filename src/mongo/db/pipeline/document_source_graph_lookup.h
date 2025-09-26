@@ -58,6 +58,7 @@
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>

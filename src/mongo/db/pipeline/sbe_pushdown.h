@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 class CanonicalQuery;

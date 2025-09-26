@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

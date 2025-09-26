@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/util/modules.h"
 
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>

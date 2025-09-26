@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/modules.h"
 
 #include <fmt/format.h>
 

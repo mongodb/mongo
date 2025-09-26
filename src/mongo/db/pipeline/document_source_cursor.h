@@ -51,6 +51,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>

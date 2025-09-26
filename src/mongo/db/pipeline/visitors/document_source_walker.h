@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

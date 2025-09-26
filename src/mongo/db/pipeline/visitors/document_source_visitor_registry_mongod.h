@@ -101,6 +101,7 @@
 #include "mongo/db/s/resharding/document_source_resharding_add_resume_id.h"
 #include "mongo/db/s/resharding/document_source_resharding_iterate_transaction.h"
 #include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

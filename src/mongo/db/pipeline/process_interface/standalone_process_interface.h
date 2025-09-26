@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>

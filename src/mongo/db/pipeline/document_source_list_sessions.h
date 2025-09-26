@@ -47,6 +47,7 @@
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

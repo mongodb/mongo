@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/query/expression_walker.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

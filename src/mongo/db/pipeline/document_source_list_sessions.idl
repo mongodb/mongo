@@ -29,6 +29,7 @@
 # Document source list sessions stage IDL file
 
 global:
+    mod_visibility: private
     cpp_namespace: "mongo"
 
 imports:

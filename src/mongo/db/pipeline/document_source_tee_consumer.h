@@ -40,6 +40,7 @@
 #include "mongo/db/query/compiler/dependency_analysis/dependencies.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <set>
