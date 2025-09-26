@@ -7,7 +7,7 @@
 export function runBatchedMultiDeletesTest(coll, queryPredicate) {
     const testDB = coll.getDB();
 
-    const collCount = 94321; // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
+    const collCount = 54321; // Intentionally not a multiple of batchedDeletesTargetBatchDocs.
 
     coll.drop();
     assert.commandWorked(
