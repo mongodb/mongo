@@ -870,7 +870,7 @@ void ProgramRunner::parseName(bool isMongo,
     } else if (programName == "mongobridge") {
         _name = "b";
     } else if (!loggingPrefix.empty()) {
-        _name = loggingPrefix + ":";
+        _name = "sh_" + loggingPrefix + ":";
     } else {
         _name = "sh";
     }
