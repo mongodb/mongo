@@ -45,7 +45,11 @@ struct ShardWCError {
         error.cloneTo(&this->error);
     }
 
-    ShardId shardName;
+    ShardWCError(const WriteConcernErrorDetail& error) {
+        error.cloneTo(&this->error);
+    }
+
+    boost::optional<ShardId> shardName;
     WriteConcernErrorDetail error;
 };
 

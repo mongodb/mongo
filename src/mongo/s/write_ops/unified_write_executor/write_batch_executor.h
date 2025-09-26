@@ -58,7 +58,6 @@ struct NoRetryWriteBatchResponse {
     StatusWith<BulkWriteCommandReply> swResponse;
     boost::optional<WriteConcernErrorDetail> wce;
     WriteOp op;
-    boost::optional<ShardId> shardId;
 };
 
 using WriteBatchResponse =

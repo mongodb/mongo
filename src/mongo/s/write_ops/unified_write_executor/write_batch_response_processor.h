@@ -198,22 +198,6 @@ private:
                               const Status& status);
 
     /**
-     * If the write command is running in a transaction and 'status' is a transient transaction
-     * error, then this method returns 'status'. Otherwise this method returns boost::none.
-     */
-    boost::optional<Status> getTransientTxnError(OperationContext* opCtx, const Status& status);
-
-    /**
-     * If the write command is running in a transaction and 'status' is a transient transaction
-     * error, then this method returns 'status' with some additional context added. Otherwise this
-     * method returns boost::none.
-     */
-    boost::optional<Status> getTransientTxnError(
-        OperationContext* opCtx,
-        const executor::RemoteCommandResponse& shardResponse,
-        const Status& status);
-
-    /**
      * Returns the retriedStmtIds to set them in the client response.
      */
     std::vector<StmtId> getRetriedStmtIds() const {

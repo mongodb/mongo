@@ -35,8 +35,9 @@
 namespace mongo {
 boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
     const std::vector<ShardWCError>& wcErrors) {
-    if (!wcErrors.size())
+    if (!wcErrors.size()) {
         return boost::none;
+    }
 
     StringBuilder msg;
     auto errCode = wcErrors.front().error.toStatus().code();
@@ -49,7 +50,11 @@ boost::optional<WriteConcernErrorDetail> mergeWriteConcernErrors(
             msg << " :: and :: ";
         }
 
-        msg << it->error.toString() << " at " << it->shardName;
+        msg << it->error.toString();
+
+        if (it->shardName) {
+            msg << " at " << *it->shardName;
+        }
     }
 
     return boost::make_optional<WriteConcernErrorDetail>(Status(errCode, msg.str()));

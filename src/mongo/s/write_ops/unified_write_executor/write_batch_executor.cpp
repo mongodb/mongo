@@ -42,6 +42,13 @@
 namespace mongo {
 namespace unified_write_executor {
 
+namespace {
+BulkWriteCommandReply parseBulkWriteCommandReply(const BSONObj& responseData) {
+    return BulkWriteCommandReply::parse(responseData,
+                                        IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec"));
+}
+}  // namespace
+
 bool WriteBatchExecutor::usesProvidedRoutingContext(const WriteBatch& batch) const {
     // For SimpleWriteBatches, the executor use the provided RoutingContext. For all other batch
     // types, the executor does not use the provided RoutingContext.
@@ -255,15 +262,31 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
     boost::optional<WriteConcernErrorDetail> wce;
     auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
         opCtx, writeOp.getNss(), std::move(cmdObj), wce);
-    StatusWith<BulkWriteCommandReply> swBulkWriteResponse = [&]() {
-        if (swRes.isOK() && !swRes.getValue().getResponse().isEmpty()) {
-            return StatusWith(BulkWriteCommandReply::parse(
-                swRes.getValue().getResponse(),
-                IDLParserContext("BulkWriteCommandReply_UnifiedWriteExec")));
-        } else {
-            return StatusWith<BulkWriteCommandReply>(swRes.getStatus());
+
+    // If 'swRes' is OK but the response is empty, that means the two-phase write completed
+    // successfully without updating or deleting anything (because nothing matched the filter).
+    //
+    // In this case, we create a BulkWriteCommandReply containing a single reply item with an OK
+    // status and with n=0 (and with nModified=0 if 'op' is an update), and then we return a
+    // NoRetryWriteBatchResponse containing this BulkWriteCommandReply.
+    if (swRes.isOK() && swRes.getValue().getResponse().isEmpty()) {
+        BulkWriteReplyItem replyItem(0, swRes.getStatus());
+        replyItem.setN(0);
+        if (writeOp.getType() == WriteType::kUpdate) {
+            replyItem.setNModified(0);
         }
-    }();
+
+        auto cursor =
+            BulkWriteCommandResponseCursor(0 /*cursorId*/,
+                                           std::vector<BulkWriteReplyItem>{std::move(replyItem)},
+                                           NamespaceString::makeBulkWriteNSS(boost::none));
+        return NoRetryWriteBatchResponse{
+            BulkWriteCommandReply(std::move(cursor), 0, 0, 0, 0, 0, 0), std::move(wce), writeOp};
+    }
+
+    auto swBulkWriteResponse = swRes.isOK()
+        ? StatusWith{parseBulkWriteCommandReply(swRes.getValue().getResponse())}
+        : StatusWith<BulkWriteCommandReply>{swRes.getStatus()};
 
     return NoRetryWriteBatchResponse{std::move(swBulkWriteResponse), std::move(wce), writeOp};
 }
