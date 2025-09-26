@@ -363,7 +363,6 @@ buildvariants:
     expansions:
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
-        --subcommands
         --build_enterprise=False
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s

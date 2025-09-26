@@ -82,7 +82,6 @@ buildvariants:
       build_mongot: true
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
-        --subcommands
         --build_enterprise=False
       test_flags: >-
         --excludeWithAnyTags=incompatible_with_amazon_linux,requires_external_data_source

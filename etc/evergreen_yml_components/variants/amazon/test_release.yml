@@ -353,7 +353,6 @@ buildvariants:
       push_arch: aarch64-amazon2023
       bazel_compile_flags: >-
         --define=MONGO_DISTMOD=amazon2023
-        --subcommands
         --build_enterprise=False
       compile_all_but_not_unittests_flags: >-
         --linkopt=-s
