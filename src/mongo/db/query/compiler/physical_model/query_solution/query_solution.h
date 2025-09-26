@@ -2251,22 +2251,32 @@ struct BinaryJoinEmbeddingNode : public QuerySolutionNode {
                 leftEmbeddingField.has_value() || rightEmbeddingField.has_value());
     }
 
-    // As an initial implementation, provide conservative implementations of all QuerySolutionNode
-    // virtual functions.
-    // TODO SERVER-110765: Provide a proper implementation for these functions.
     bool fetched() const override {
-        return false;
+        // This is used query planner/ analysis (not relevant), but does come up during SBE
+        // stage-building.
+        tassert(11083900,
+                "BinaryJoinEmbeddingNode must have exactly 2 children",
+                children.size() == 2 && children[0] && children[1]);
+        // Similar to other stages, we would only consider this stage to be 'fetched' if its
+        // children are.
+        return children[0]->fetched() && children[1]->fetched();
     }
 
     FieldAvailability getFieldAvailability(const std::string& field) const override {
+        // This is only used (currently) to determine if we need to fetch before shard-fltering.
+        // For now, this node will only be generated for unsharded collections.
         return FieldAvailability::kNotProvided;
     }
 
     bool sortedByDiskLoc() const override {
+        // This is only used when generating index intersection plans for a $match in query planner
+        // analysis, so is not relevant.
         return false;
     }
 
     const ProvidedSortSet& providedSorts() const final {
+        // This is used in query planning/analysis (we won't pass through that logic after this node
+        // is created) and for stage-building a FETCH stage, so not relevant.
         return kEmptySet;
     }
 
