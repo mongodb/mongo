@@ -5,8 +5,6 @@ package(default_visibility = ["//visibility:public"])
 exports_files([
     "agg_join_model.h",
     "agg_join_model.cpp",
-    "single_table_access.cpp",
-    "single_table_access.h",
 ])
 
 mongo_cc_library(
@@ -48,17 +46,5 @@ mongo_cc_library(
     ],
     deps = [
         "//src/mongo/db/pipeline:field_path",
-    ],
-)
-
-mongo_cc_unit_test(
-    name = "single_table_access_test",
-    srcs = [
-        "single_table_access_test.cpp",
-    ],
-    tags = ["mongo_unittest_fifth_group"],
-    deps = [
-        "//src/mongo/db:query_exec",
-        "//src/mongo/db/query/compiler/ce/sampling:sampling_test_utils",
     ],
 )
