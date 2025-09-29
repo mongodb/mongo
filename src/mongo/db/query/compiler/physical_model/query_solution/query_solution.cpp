@@ -60,7 +60,6 @@
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/iterator/iterator_facade.hpp>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/range/adaptor/argument_fwd.hpp>

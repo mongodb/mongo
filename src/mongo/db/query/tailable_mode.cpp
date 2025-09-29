@@ -31,7 +31,6 @@
 
 #include "mongo/base/error_codes.h"
 
-#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

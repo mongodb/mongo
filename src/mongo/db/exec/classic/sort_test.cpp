@@ -59,7 +59,6 @@
 #include <memory>
 #include <utility>
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using namespace mongo;
 

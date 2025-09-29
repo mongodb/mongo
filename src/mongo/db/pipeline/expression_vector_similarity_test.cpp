@@ -36,7 +36,6 @@
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/unittest/unittest.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

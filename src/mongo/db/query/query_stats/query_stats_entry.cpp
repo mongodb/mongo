@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/query_stats/query_stats_entry.h"
 
-#include <boost/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

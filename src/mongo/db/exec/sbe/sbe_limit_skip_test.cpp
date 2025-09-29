@@ -46,8 +46,6 @@
 #include <memory>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 
 namespace mongo::sbe {
 

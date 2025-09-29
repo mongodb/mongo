@@ -40,9 +40,6 @@
 #include <string>
 #include <utility>
 
-#include <absl/container/node_hash_map.h>
-
-
 namespace mongo::stage_builder::abt_lower {
 namespace {
 using namespace unit_test_abt_literals;

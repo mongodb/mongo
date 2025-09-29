@@ -65,7 +65,6 @@
 
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>

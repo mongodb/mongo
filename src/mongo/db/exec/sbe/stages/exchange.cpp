@@ -45,9 +45,6 @@
 #include <mutex>
 #include <string>
 
-#include <absl/container/inlined_vector.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/smart_ptr.hpp>
 
 namespace mongo::sbe {
 std::unique_ptr<ThreadPool> s_globalThreadPool;

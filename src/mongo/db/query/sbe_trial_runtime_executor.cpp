@@ -40,8 +40,6 @@
 #include <deque>
 #include <tuple>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {
 

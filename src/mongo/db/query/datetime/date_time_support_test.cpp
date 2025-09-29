@@ -29,7 +29,6 @@
 
 #include <array>
 
-#include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/query/datetime/date_time_support.h"

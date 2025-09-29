@@ -29,8 +29,6 @@
 
 #include "mongo/db/exec/sbe/stages/union.h"
 
-#include <absl/container/inlined_vector.h>
-#include <absl/container/node_hash_map.h>
 #include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/string_data.h"

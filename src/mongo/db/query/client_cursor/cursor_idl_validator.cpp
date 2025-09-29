@@ -33,8 +33,7 @@
 #include "mongo/util/assert_util.h"
 
 #include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+
 
 namespace mongo {
 

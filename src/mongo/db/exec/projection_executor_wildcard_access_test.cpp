@@ -33,7 +33,6 @@
 #include <set>
 
 #include <boost/container/small_vector.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"

@@ -49,7 +49,7 @@
 #include <string>
 
 #include "document_value/document_value_test_util.h"
-#include <boost/none.hpp>
+
 
 namespace mongo {
 namespace {

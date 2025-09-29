@@ -51,7 +51,6 @@
 #include <cstddef>
 #include <memory>
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 class IntervalEvaluationTreeTest : public unittest::Test {

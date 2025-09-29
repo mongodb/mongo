@@ -36,7 +36,6 @@
 
 #include <algorithm>
 
-#include <boost/container/vector.hpp>
 
 namespace mongo {
 

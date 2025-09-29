@@ -49,8 +49,6 @@
 #include "mongo/db/query/bson/multikey_dotted_path_support.h"
 #include "mongo/unittest/unittest.h"
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
 
 namespace mongo {
 namespace {

@@ -33,7 +33,6 @@
 #include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/unittest/unittest.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

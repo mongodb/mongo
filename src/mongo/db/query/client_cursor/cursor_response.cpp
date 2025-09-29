@@ -40,7 +40,6 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/type_traits/decay.hpp>

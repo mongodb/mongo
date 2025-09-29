@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
+
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/string_data.h"

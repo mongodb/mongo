@@ -38,7 +38,6 @@
 #include <string>
 #include <utility>
 
-#include <absl/container/inlined_vector.h>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {

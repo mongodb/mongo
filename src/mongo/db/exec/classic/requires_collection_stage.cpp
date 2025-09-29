@@ -33,7 +33,6 @@
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/util/assert_util.h"
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

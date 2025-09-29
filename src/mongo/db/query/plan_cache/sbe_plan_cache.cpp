@@ -39,8 +39,6 @@
 #include "mongo/util/processinfo.h"
 #include "mongo/util/synchronized_value.h"
 
-#include <absl/container/node_hash_map.h>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 

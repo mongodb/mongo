@@ -46,8 +46,6 @@
 #include <string>
 #include <vector>
 
-#include <absl/container/node_hash_set.h>
-
 namespace mongo {
 namespace document_path_support {
 

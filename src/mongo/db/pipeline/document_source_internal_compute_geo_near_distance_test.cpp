@@ -40,7 +40,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace {

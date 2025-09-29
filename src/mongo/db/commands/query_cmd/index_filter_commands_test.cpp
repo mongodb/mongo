@@ -68,8 +68,6 @@
 #include <variant>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
-#include <boost/none.hpp>
 #include <fmt/format.h>
 
 namespace mongo {

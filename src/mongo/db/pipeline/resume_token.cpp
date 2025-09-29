@@ -47,7 +47,6 @@
 #include <ostream>
 #include <set>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 

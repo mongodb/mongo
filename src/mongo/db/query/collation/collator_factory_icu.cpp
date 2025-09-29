@@ -45,8 +45,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 #include <unicode/coll.h>
 #include <unicode/errorcode.h>
 #include <unicode/locid.h>

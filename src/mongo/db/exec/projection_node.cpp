@@ -36,10 +36,6 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::projection_executor {

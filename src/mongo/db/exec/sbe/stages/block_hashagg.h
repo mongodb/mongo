@@ -37,7 +37,6 @@
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/stdx/unordered_map.h"
 
-#include <absl/hash/hash.h>
 
 namespace mongo {
 namespace sbe {

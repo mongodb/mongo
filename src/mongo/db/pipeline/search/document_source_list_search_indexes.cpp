@@ -34,7 +34,6 @@
 #include "mongo/db/query/search/search_index_process_interface.h"
 #include "mongo/db/version_context.h"
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

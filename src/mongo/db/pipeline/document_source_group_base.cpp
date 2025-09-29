@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
-#include <boost/move/utility_core.hpp>
+
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>

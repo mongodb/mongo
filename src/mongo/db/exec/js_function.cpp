@@ -44,7 +44,6 @@
 #include <ostream>
 #include <utility>
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

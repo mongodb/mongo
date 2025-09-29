@@ -40,9 +40,6 @@
 
 #include <set>
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-#include <absl/meta/type_traits.h>
 
 namespace mongo {
 namespace sbe {

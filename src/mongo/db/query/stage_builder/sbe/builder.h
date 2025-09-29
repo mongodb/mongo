@@ -71,7 +71,6 @@
 #include <absl/hash/hash.h>
 #include <absl/meta/type_traits.h>
 #include <absl/strings/string_view.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

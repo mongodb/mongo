@@ -40,7 +40,6 @@
 #include "mongo/db/storage/key_string/key_string.h"
 #include "mongo/util/assert_util.h"
 
-#include <boost/none.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

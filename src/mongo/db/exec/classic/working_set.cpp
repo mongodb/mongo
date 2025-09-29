@@ -35,7 +35,6 @@
 
 #include <cstdint>
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

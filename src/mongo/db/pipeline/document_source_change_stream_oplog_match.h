@@ -43,7 +43,6 @@
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/tailable_mode_gen.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

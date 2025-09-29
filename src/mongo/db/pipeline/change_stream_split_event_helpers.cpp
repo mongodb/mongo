@@ -42,8 +42,6 @@
 #include <map>
 #include <string>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace change_stream_split_event {

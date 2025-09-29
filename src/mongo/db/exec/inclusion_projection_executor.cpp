@@ -38,8 +38,6 @@
 #include <tuple>
 #include <vector>
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/meta/type_traits.h>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

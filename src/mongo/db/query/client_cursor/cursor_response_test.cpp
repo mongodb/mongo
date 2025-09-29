@@ -42,9 +42,8 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/namespace_string_util.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+
 
 namespace mongo {
 

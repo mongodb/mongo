@@ -38,9 +38,6 @@
 #include <cstdint>
 #include <utility>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-
 namespace mongo::stage_builder {
 using namespace std::string_literals;
 void ExpressionConstEval::optimize(abt::ABT& n) {

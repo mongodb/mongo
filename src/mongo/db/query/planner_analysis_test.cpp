@@ -46,7 +46,6 @@
 
 #include <s2cellid.h>
 
-#include <boost/move/utility_core.hpp>
 
 using namespace mongo;
 

@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
+
 #include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/error_codes.h"

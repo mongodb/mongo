@@ -41,8 +41,6 @@
 
 #include <string>
 
-#include <absl/container/node_hash_map.h>
-
 namespace mongo::stage_builder {
 namespace {
 

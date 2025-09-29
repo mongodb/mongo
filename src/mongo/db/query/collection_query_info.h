@@ -40,7 +40,6 @@
 #include <cstddef>
 #include <memory>
 
-#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

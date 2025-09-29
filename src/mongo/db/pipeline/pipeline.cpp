@@ -30,7 +30,6 @@
 
 #include "mongo/db/pipeline/pipeline.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/range/combine.hpp>

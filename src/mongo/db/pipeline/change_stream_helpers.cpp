@@ -34,7 +34,6 @@
 #include "mongo/db/topology/sharding_state.h"
 #include "mongo/util/assert_util.h"
 
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::change_stream {

@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 // IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -38,7 +38,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_path_tracking_visitor.h"
-#include "mongo/db/query/compiler/logical_model/projection/projection_ast_util.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_ast_visitor.h"
 #include "mongo/db/query/query_shape/serialization_options.h"
 #include "mongo/db/query/tree_walker.h"

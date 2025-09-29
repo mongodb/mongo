@@ -38,7 +38,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 

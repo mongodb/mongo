@@ -50,7 +50,7 @@
 #include <vector>
 
 #include <benchmark/benchmark.h>
-#include <boost/optional/optional.hpp>
+
 
 namespace mongo::sbe {
 namespace {

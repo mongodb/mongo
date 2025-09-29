@@ -68,7 +68,6 @@
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 
-#include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

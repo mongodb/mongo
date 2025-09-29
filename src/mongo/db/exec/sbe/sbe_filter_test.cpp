@@ -49,7 +49,6 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/inlined_vector.h>
 
 namespace mongo::sbe {
 

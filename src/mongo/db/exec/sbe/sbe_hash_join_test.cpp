@@ -54,7 +54,6 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/inlined_vector.h>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {

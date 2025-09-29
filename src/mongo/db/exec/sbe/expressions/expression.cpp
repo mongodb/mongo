@@ -48,10 +48,6 @@
 #include <sstream>
 #include <vector>
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-#include <absl/meta/type_traits.h>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

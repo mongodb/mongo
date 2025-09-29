@@ -69,9 +69,6 @@
 
 #include <cstddef>
 
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo::dependency_analysis {
 

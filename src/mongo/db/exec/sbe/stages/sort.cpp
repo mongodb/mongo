@@ -43,9 +43,6 @@
 #include <limits>
 #include <string>
 
-#include <absl/container/inlined_vector.h>
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
 
 namespace mongo::sbe {
 SortStage::SortStage(std::unique_ptr<PlanStage> input,

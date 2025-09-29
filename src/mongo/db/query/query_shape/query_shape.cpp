@@ -44,9 +44,6 @@
 #include <cstdint>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 MONGO_FAIL_POINT_DEFINE(queryShapeCreationException);
 

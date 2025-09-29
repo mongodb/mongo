@@ -41,7 +41,6 @@
 
 #include <utility>
 
-#include <absl/container/inlined_vector.h>
 
 namespace mongo::sbe {
 UnwindStage::UnwindStage(std::unique_ptr<PlanStage> input,

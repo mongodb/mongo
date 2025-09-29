@@ -53,7 +53,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
 
 namespace mongo::stats {

@@ -46,10 +46,6 @@
 #include <limits>
 #include <utility>
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace sbe {

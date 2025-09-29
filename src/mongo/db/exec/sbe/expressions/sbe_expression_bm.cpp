@@ -63,7 +63,6 @@
 #include <vector>
 
 #include <benchmark/benchmark.h>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

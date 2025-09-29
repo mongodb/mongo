@@ -35,7 +35,6 @@
 
 #include <s2cellid.h>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/checked_cast.h"

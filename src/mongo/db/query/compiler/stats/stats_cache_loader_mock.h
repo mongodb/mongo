@@ -39,7 +39,6 @@
 #include "mongo/util/future.h"
 #include "mongo/util/modules.h"
 
-#include <boost/move/utility_core.hpp>
 
 namespace mongo::stats {
 

@@ -52,8 +52,6 @@
 #include <string>
 #include <utility>
 
-#include <absl/container/flat_hash_map.h>
-
 namespace mongo {
 namespace {
 

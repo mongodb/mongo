@@ -41,7 +41,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/str.h"
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 Counter64& planCacheTotalSizeEstimateBytes =

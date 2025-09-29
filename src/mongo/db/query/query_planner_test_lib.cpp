@@ -76,7 +76,6 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/flat_hash_map.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

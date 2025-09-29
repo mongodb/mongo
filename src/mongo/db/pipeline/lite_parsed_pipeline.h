@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <absl/container/node_hash_set.h>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/status.h"

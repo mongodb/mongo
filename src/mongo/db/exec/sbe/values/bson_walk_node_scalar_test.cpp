@@ -34,7 +34,6 @@
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/unittest/unittest.h"
 
-#include <boost/algorithm/string/join.hpp>
 
 namespace mongo::sbe {
 

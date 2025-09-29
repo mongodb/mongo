@@ -65,7 +65,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using namespace mongo;

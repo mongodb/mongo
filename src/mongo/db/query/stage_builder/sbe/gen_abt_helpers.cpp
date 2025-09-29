@@ -42,8 +42,6 @@
 #include <limits>
 #include <numeric>
 
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder {
 abt::ABT makeVariable(abt::ProjectionName var) {

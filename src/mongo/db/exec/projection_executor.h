@@ -49,7 +49,6 @@
 #include <set>
 
 #include <boost/intrusive_ptr.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>

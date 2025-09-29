@@ -42,7 +42,6 @@
 #include <memory>
 #include <string>
 
-#include <boost/move/utility_core.hpp>
 
 namespace mongo {
 namespace {

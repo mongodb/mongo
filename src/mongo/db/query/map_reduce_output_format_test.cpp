@@ -35,7 +35,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/unittest/unittest.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 
 using namespace std::literals::string_literals;

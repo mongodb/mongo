@@ -40,7 +40,6 @@
 
 #include <cmath>
 
-#include <boost/cstdint.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

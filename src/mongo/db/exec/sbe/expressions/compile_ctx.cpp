@@ -29,7 +29,6 @@
 
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 
-#include <absl/container/flat_hash_map.h>
 
 namespace mongo::sbe {
 

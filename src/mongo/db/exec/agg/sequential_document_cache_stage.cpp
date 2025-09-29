@@ -39,7 +39,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

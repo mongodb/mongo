@@ -38,9 +38,6 @@
 #include <cstdint>
 #include <limits>
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/numeric/conversion/converter_policies.hpp>
 
 /**
 These common operations - Addition, Subtraction and Multiplication - are used in both the VM and

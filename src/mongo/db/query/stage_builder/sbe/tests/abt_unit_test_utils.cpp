@@ -36,8 +36,6 @@
 #include <iostream>
 #include <utility>
 
-#include <absl/container/node_hash_map.h>
-#include <boost/optional/optional.hpp>
 
 namespace mongo::stage_builder::abt_lower {
 

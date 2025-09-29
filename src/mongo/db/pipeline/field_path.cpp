@@ -34,8 +34,6 @@
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
-#include <absl/container/node_hash_map.h>
-
 namespace mongo {
 
 namespace {

@@ -34,7 +34,6 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/stub_container.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

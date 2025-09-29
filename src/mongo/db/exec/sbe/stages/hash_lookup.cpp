@@ -39,7 +39,6 @@
 #include "mongo/db/exec/sbe/stages/stage_visitors.h"
 #include "mongo/db/query/stage_memory_limit_knobs/knobs.h"
 
-#include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 

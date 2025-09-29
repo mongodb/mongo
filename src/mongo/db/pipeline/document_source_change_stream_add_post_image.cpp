@@ -34,8 +34,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/str.h"
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {

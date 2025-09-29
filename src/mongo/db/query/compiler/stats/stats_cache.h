@@ -40,8 +40,6 @@
 
 #include <memory>
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
 
 namespace mongo::stats {

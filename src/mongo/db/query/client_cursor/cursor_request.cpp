@@ -37,9 +37,6 @@
 #include "mongo/idl/idl_parser.h"
 #include "mongo/util/assert_util.h"
 
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

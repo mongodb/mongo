@@ -36,8 +36,6 @@
 #include <memory>
 #include <ostream>
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
 
 using namespace mongo;
 

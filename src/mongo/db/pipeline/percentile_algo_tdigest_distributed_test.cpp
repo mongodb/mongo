@@ -42,8 +42,6 @@
 #include <random>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/random/normal_distribution.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

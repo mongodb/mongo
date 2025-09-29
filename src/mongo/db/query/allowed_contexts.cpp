@@ -34,7 +34,6 @@
 #include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

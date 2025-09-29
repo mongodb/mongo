@@ -44,8 +44,6 @@
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/util/assert_util.h"
 
-#include <absl/container/flat_hash_map.h>
-
 namespace mongo {
 
 namespace {

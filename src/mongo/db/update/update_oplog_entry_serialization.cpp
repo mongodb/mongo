@@ -38,7 +38,6 @@
 
 #include <string>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 

@@ -37,7 +37,6 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace expression_evaluation_test {

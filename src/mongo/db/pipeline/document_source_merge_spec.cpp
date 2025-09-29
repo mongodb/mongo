@@ -42,7 +42,6 @@
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/namespace_string_util.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 

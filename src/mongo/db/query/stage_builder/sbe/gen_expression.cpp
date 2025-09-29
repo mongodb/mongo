@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
 
-#include <absl/container/flat_hash_set.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>

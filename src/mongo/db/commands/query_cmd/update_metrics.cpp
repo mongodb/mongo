@@ -35,7 +35,6 @@
 
 #include <string>
 
-#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
 namespace mongo {

@@ -36,7 +36,6 @@
 
 #include <cstddef>
 
-#include <absl/container/inlined_vector.h>
 
 namespace mongo::sbe {
 

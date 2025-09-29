@@ -49,7 +49,6 @@
 #include <algorithm>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

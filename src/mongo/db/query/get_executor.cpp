@@ -29,18 +29,10 @@
 
 #include "mongo/db/query/get_executor.h"
 
-#include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
-#include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
-#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
-
-#include <absl/container/flat_hash_set.h>
-#include <absl/container/node_hash_map.h>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
@@ -84,6 +76,10 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/compiler/ce/exact/exact_cardinality.h"
+#include "mongo/db/query/compiler/ce/exact/exact_cardinality_impl.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator.h"
+#include "mongo/db/query/compiler/ce/sampling/sampling_estimator_impl.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_parser.h"
 #include "mongo/db/query/compiler/logical_model/projection/projection_policies.h"

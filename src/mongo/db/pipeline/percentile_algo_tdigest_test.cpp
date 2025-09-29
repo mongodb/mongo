@@ -30,8 +30,6 @@
 #include <cstdlib>
 #include <ctime>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 #include <boost/random/exponential_distribution.hpp>
 #include <boost/random/normal_distribution.hpp>
 #include <boost/random/uniform_real_distribution.hpp>

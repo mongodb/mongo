@@ -29,10 +29,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/value_lifetime.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-// IWYU pragma: no_include "ext/alloc_traits.h"
-
 namespace mongo::stage_builder {
 using namespace std::string_literals;
 

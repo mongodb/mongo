@@ -35,7 +35,6 @@
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/serialization_context.h"
 
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 using boost::intrusive_ptr;

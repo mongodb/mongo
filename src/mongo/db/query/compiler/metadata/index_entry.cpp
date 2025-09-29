@@ -34,8 +34,6 @@
 #include "mongo/db/matcher/expression.h"
 #include "mongo/util/assert_util.h"
 
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
 
 namespace mongo {
 

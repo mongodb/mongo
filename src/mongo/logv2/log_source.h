@@ -46,6 +46,7 @@
 #include <boost/log/keywords/severity.hpp>
 #include <boost/log/sources/basic_logger.hpp>
 #include <boost/log/sources/threading_models.hpp>
+#include <boost/move/utility_core.hpp>
 
 namespace mongo::logv2 {
 

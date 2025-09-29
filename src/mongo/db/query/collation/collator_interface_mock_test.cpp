@@ -42,10 +42,6 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 namespace {
 

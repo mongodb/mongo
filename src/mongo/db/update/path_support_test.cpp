@@ -58,7 +58,6 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace {

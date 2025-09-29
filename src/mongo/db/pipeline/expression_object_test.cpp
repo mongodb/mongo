@@ -51,7 +51,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 namespace ExpressionTests {

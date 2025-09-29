@@ -36,7 +36,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
-#include <boost/none.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {

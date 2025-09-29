@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
+
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include "mongo/base/status_with.h"

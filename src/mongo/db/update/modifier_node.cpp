@@ -46,7 +46,6 @@
 #include <cstddef>
 #include <memory>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 

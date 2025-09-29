@@ -69,9 +69,6 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe {

@@ -36,7 +36,6 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {
 

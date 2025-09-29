@@ -36,7 +36,6 @@
 #include "mongo/db/pipeline/document_source_coll_stats_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

@@ -48,7 +48,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/serialization_context.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 

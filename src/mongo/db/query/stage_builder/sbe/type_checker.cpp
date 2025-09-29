@@ -29,8 +29,6 @@
 
 #include "mongo/db/query/stage_builder/sbe/type_checker.h"
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/algebra/polyvalue.h"

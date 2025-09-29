@@ -43,7 +43,6 @@
 #include <tuple>
 #include <utility>
 
-#include <boost/optional.hpp>
 
 namespace mongo::sbe {
 

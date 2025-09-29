@@ -44,7 +44,6 @@
 #include <initializer_list>
 #include <limits>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 
 namespace mongo {

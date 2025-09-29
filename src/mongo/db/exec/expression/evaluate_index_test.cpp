@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include "mongo/bson/json.h"
 #include "mongo/config.h"  // IWYU pragma: keep

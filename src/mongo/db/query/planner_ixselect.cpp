@@ -32,10 +32,7 @@
 
 #include <s2cellid.h>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
+
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsontypes.h"

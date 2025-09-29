@@ -49,7 +49,6 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

@@ -39,8 +39,6 @@
 #include <cstddef>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
-
 namespace mongo {
 class CollatorInterface;
 }

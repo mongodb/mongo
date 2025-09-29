@@ -39,7 +39,6 @@
 #include <map>
 #include <set>
 
-#include <absl/container/node_hash_map.h>
 
 namespace mongo {
 

@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-#include <absl/container/flat_hash_map.h>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include "mongo/db/pipeline/document_source_match.h"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -38,7 +39,6 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/semantic_analysis.h"
 #include "mongo/db/query/allowed_contexts.h"
@@ -56,7 +56,6 @@
 #include <type_traits>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {

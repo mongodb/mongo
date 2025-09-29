@@ -53,7 +53,6 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/serialization_context.h"
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>

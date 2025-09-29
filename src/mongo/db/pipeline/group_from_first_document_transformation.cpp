@@ -33,7 +33,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/compiler/dependency_analysis/expression_dependencies.h"
 
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {

@@ -58,7 +58,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
 
 namespace mongo {
 namespace {

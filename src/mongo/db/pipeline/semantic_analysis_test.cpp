@@ -45,8 +45,6 @@
 #include <list>
 #include <memory>
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 
 namespace mongo {

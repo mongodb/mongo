@@ -37,8 +37,6 @@
 
 #include <utility>
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

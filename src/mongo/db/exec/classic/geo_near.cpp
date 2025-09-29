@@ -41,7 +41,7 @@
 
 #include <s2regionintersection.h>  // For s2 search
 
-#include <boost/container/small_vector.hpp>
+
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -74,9 +74,6 @@
 #include <s2cellunion.h>
 #include <s2latlng.h>
 #include <s2region.h>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

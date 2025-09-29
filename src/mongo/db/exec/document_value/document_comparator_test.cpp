@@ -40,8 +40,6 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
 
 namespace mongo {
 namespace {

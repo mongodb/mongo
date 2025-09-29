@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <absl/container/flat_hash_map.h>
+
 #include <boost/container/small_vector.hpp>
 #include <boost/smart_ptr.hpp>
 // IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
@@ -64,8 +64,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 

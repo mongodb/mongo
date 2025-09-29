@@ -36,7 +36,6 @@
 
 #include <memory>
 
-#include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

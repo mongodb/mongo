@@ -32,8 +32,6 @@
 #include <cstddef>
 #include <cstdint>
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"

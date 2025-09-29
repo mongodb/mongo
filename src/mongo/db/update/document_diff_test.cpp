@@ -43,7 +43,6 @@
 #include <random>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

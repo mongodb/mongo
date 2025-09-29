@@ -27,15 +27,12 @@
  *    it in the license file.
  */
 
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <boost/optional/optional.hpp>
+
 // IWYU pragma: no_include "ext/alloc_traits.h"
+#include "mongo/db/commands/query_cmd/current_op_common.h"
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
-#include "mongo/db/commands/query_cmd/current_op_common.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/command_generic_argument.h"

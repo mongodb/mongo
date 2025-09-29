@@ -41,7 +41,6 @@
 
 #include <memory>
 
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/none_t.hpp>
 

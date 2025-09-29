@@ -41,7 +41,6 @@
 #include <string>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
 
 namespace mongo::stats {
 using StatsPathString = std::pair<NamespaceString, std::string>;

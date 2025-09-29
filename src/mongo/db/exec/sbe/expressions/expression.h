@@ -47,7 +47,6 @@
 #include <vector>
 
 #include <absl/container/inlined_vector.h>
-#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 
 namespace mongo {

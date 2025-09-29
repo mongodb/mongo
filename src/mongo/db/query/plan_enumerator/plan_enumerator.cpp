@@ -30,14 +30,10 @@
 
 #include "mongo/db/query/plan_enumerator/plan_enumerator.h"
 
-#include <absl/meta/type_traits.h>
-// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
-#include <absl/container/node_hash_map.h>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
-#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
+
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

@@ -49,9 +49,6 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/inlined_vector.h>
-#include <absl/hash/hash.h>
 #include <boost/optional/optional.hpp>
 
 namespace mongo::sbe::vm {

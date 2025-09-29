@@ -49,7 +49,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/none.hpp>
 
 namespace mongo {
 class MultiPlanStage;

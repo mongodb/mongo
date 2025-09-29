@@ -62,8 +62,6 @@
 #include <utility>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 
 namespace mongo::sbe {
 

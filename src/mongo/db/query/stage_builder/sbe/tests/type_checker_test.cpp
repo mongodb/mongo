@@ -37,8 +37,6 @@
 #include "mongo/db/query/stage_builder/sbe/sbexpr.h"
 #include "mongo/unittest/unittest.h"
 
-#include <absl/container/node_hash_map.h>
-
 namespace mongo::stage_builder {
 namespace {
 

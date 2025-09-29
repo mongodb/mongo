@@ -44,7 +44,6 @@
 #include <cstring>
 #include <map>
 
-#include <absl/container/inlined_vector.h>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 

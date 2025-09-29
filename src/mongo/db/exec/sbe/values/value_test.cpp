@@ -42,7 +42,6 @@
 #include <initializer_list>
 #include <tuple>
 
-#include <absl/container/node_hash_map.h>
 
 namespace mongo::sbe {
 
