@@ -172,6 +172,8 @@ buildvariants:
       evergreen_remote_exec: on
       skip_debug_link: true
       remote_link: true
+      mciuploads_binary_permissions: private
+      mciuploads_binary_visibility: signed
     tasks:
       - name: run_unit_tests_TG
       - name: compile_test_parallel_core_stream_and_pretty_printer_tests_TG
@@ -460,6 +462,8 @@ buildvariants:
         --remote_execution_priority=1
       evergreen_remote_exec: on
       skip_debug_link: true
+      mciuploads_binary_permissions: private
+      mciuploads_binary_visibility: signed
     run_on:
       - amazon2023.3-arm64-xlarge
     tasks:
