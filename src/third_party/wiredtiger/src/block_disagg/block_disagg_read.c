@@ -138,7 +138,7 @@ reread:
           "%s: read failed for table ID %" PRIu64 ", page ID %" PRIu64 ", flags %" PRIx64
           ", lsn %" PRIu64 ", base_lsn %" PRIu64 ", size %" PRIu32 ", checksum %" PRIx32,
           block_disagg->name, block_disagg->tableid, page_id, flags, lsn, base_lsn, size, checksum);
-        WT_ERR(WT_NOTFOUND);
+        WT_ERR(EIO);
     }
 
     last = (int32_t)(*results_count - 1);

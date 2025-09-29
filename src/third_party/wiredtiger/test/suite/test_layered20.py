@@ -83,9 +83,6 @@ class test_layered20(wttest.WiredTigerTestCase, DisaggConfigMixin):
         DisaggConfigMixin.conn_extensions(self, extlist)
 
     def test_layered_read_write(self):
-        if platform.processor() == 's390x':
-            self.skipTest("FIXME-WT-15000: not working on zSeries")
-
         self.pr('CREATING')
         self.session.create(self.uri, self.session_create_config())
 

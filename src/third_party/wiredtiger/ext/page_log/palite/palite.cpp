@@ -1280,7 +1280,7 @@ public:
     }
 
     int
-    get_page_ids(uint64_t checkpoint_lsn, uint64_t table_id, WT_ITEM *page_ids, size_t *page_count)
+    get_page_ids(uint64_t checkpoint_lsn, WT_ITEM *page_ids, size_t *page_count)
     {
         Storage::Transaction txn = storage.begin_transaction();
         storage.get_page_ids(txn.conn, checkpoint_lsn, table_id, page_ids, page_count);
@@ -1337,10 +1337,10 @@ palite_handle_get(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *sess, uint64_t page_id,
 
 static int
 palite_handle_get_page_ids(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *sess, uint64_t checkpoint_lsn,
-  uint64_t table_id, WT_ITEM *page_ids, size_t *page_count)
+  WT_ITEM *page_ids, size_t *page_count)
 {
     return safe_call<PaliteHandle>(
-      sess, plh, &PaliteHandle::get_page_ids, checkpoint_lsn, table_id, page_ids, page_count);
+      sess, plh, &PaliteHandle::get_page_ids, checkpoint_lsn, page_ids, page_count);
 }
 
 static int

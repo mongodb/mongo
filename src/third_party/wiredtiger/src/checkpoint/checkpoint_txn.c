@@ -1654,12 +1654,11 @@ err:
      * disaggregated storage, even if there were no other changes.
      */
     WT_ACQUIRE_READ(num_meta_put, conn->disaggregated_storage.num_meta_put);
-    if (!failed && __wt_conn_is_disagg(session) &&
+    if (!failed && __wt_conn_is_disagg(session) && conn->layered_table_manager.leader &&
       conn->disaggregated_storage.num_meta_put_at_ckpt_begin == num_meta_put &&
-      ckpt_tmp_ts != conn->disaggregated_storage.last_checkpoint_timestamp) {
+      ckpt_tmp_ts != conn->disaggregated_storage.last_checkpoint_timestamp)
         WT_TRET(__wt_disagg_put_checkpoint_meta(
           session, conn->disaggregated_storage.last_checkpoint_root, 0, ckpt_tmp_ts));
-    }
 
     /*
      * Advance to the next checkpoint in disaggregated storage if we updated the checkpoint metadata

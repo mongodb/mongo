@@ -101,7 +101,11 @@ typedef struct CKPT_KEY {
     uint64_t checkpoint_timestamp;
 } CKPT_KEY;
 
-static bool palm_need_swap = true; /* TODO: derive this */
+#ifdef WORDS_BIGENDIAN
+static bool palm_need_swap = false;
+#else
+static bool palm_need_swap = true;
+#endif
 
 /*
  * Byte swap a page key so that it sorts in the expected order.
@@ -109,12 +113,12 @@ static bool palm_need_swap = true; /* TODO: derive this */
 static void
 swap_page_key(const PAGE_KEY *src, PAGE_KEY *dest)
 {
-    if (!palm_need_swap)
-        return;
-
     if (dest != src)
         /* Copy all values by default. */
         *dest = *src;
+
+    if (!palm_need_swap)
+        return;
 
     /*
      * We don't need to swap all the fields in the key, only the ones that we use in comparisons.
@@ -133,12 +137,12 @@ swap_page_key(const PAGE_KEY *src, PAGE_KEY *dest)
 static void
 swap_ckpt_key(const CKPT_KEY *src, CKPT_KEY *dest)
 {
-    if (!palm_need_swap)
-        return;
-
     if (dest != src)
         /* Copy all values by default. */
         *dest = *src;
+
+    if (!palm_need_swap)
+        return;
 
     /*
      * We don't need to swap all the fields in the key, only the ones that we use in comparisons.

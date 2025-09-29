@@ -901,6 +901,63 @@ __simplify_path(const char *path)
 }
 
 /*
+ * __fprintf_stderr --
+ *     Print to stderr.
+ */
+static int
+__fprintf_stderr(const char *msg)
+{
+    if (fprintf(stderr, "%s", msg) < 0)
+        return (EIO);
+    if (fflush(stderr) != 0)
+        return (EIO);
+    return (0);
+}
+
+/*
+ * wiredtiger_dump_error_log --
+ *     Dump any logged error messages into the provided function, one per line.
+ */
+int
+wiredtiger_dump_error_log(int (*callback)(const char *))
+{
+    WT_DECL_RET;
+    WT_ERROR_LOG_ENTRY *entry;
+    size_t buflen;
+    int i;
+    char *buf;
+
+    if (callback == NULL)
+        callback = __fprintf_stderr;
+
+    buf = NULL;
+    buflen = 4096;
+    WT_ERR_NOLOG(__wt_calloc_def(NULL, buflen, &buf));
+
+    if (error_log.count > WT_MAX_ERROR_LOG_MAX) {
+        WT_ERR_NOLOG(__wt_snprintf(buf, buflen, "%d errors occurred, only the last %d are shown\n",
+                       error_log.count, WT_MAX_ERROR_LOG_MAX) != 0);
+        WT_ERR_NOLOG(callback(buf));
+    }
+
+    for (i = error_log.head; i != error_log.tail; i = (i + 1) % WT_MAX_ERROR_LOG_MAX) {
+        entry = &error_log.log[i];
+        WT_ERR_NOLOG(__wt_snprintf(buf, buflen, "Error at %s:%d: \"%s\" failed with %s (%d)%s%s\n",
+          __simplify_path(entry->file), entry->line, entry->expr,
+          __wt_strerror(NULL, entry->error, NULL, 0), entry->error,
+          entry->suberror == WT_NONE ? "" : ", ",
+          entry->suberror == WT_NONE ? "" : __wt_strerror(NULL, entry->suberror, NULL, 0)));
+        WT_ERR_NOLOG(callback(buf));
+    }
+
+    __wt_error_log_clear(); /* Avoid double reporting the same errors. */
+
+err:
+    __wt_free(NULL, buf);
+    return (ret);
+}
+
+/*
  * __wt_error_log_to_handler --
  *     Print all entries from the error log to the event handler.
  */
@@ -911,30 +968,20 @@ __wt_error_log_to_handler(WT_SESSION_IMPL *session)
     int i;
 
     if (session == NULL) {
-        if (error_log.count > WT_MAX_ERROR_LOG_MAX)
-            fprintf(stderr, "%d errors occurred, only the last %d are shown\n", error_log.count,
-              WT_MAX_ERROR_LOG_MAX);
-        for (i = error_log.head; i != error_log.tail; i = (i + 1) % WT_MAX_ERROR_LOG_MAX) {
-            entry = &error_log.log[i];
-            fprintf(stderr, "Error at %s:%d: \"%s\" failed with %s (%d)%s%s\n",
-              __simplify_path(entry->file), entry->line, entry->expr,
-              __wt_strerror(NULL, entry->error, NULL, 0), entry->error,
-              entry->suberror == WT_NONE ? "" : ", ",
-              entry->suberror == WT_NONE ? "" : __wt_strerror(NULL, entry->suberror, NULL, 0));
-        }
-    } else {
-        if (error_log.count > WT_MAX_ERROR_LOG_MAX)
-            __wt_verbose_warning(session, WT_VERB_ERROR_RETURNS,
-              "%d errors occurred, only the last %d are shown", error_log.count,
-              WT_MAX_ERROR_LOG_MAX);
-        for (i = error_log.head; i != error_log.tail; i = (i + 1) % WT_MAX_ERROR_LOG_MAX) {
-            entry = &error_log.log[i];
-            __wt_err_func(session, entry->error, entry->func, entry->line, WT_VERB_ERROR_RETURNS,
-              "Error at %s:%d: \"%s\" failed%s%s", __simplify_path(entry->file), entry->line,
-              entry->expr, entry->suberror == WT_NONE ? "" : " with ",
-              entry->suberror == WT_NONE ? "" : __wt_strerror(session, entry->suberror, NULL, 0));
-        }
+        wiredtiger_dump_error_log(NULL);
+        return;
     }
 
-    __wt_error_log_clear(); /* Avoid double reporting on the same. */
+    if (error_log.count > WT_MAX_ERROR_LOG_MAX)
+        __wt_verbose_warning(session, WT_VERB_ERROR_RETURNS,
+          "%d errors occurred, only the last %d are shown", error_log.count, WT_MAX_ERROR_LOG_MAX);
+    for (i = error_log.head; i != error_log.tail; i = (i + 1) % WT_MAX_ERROR_LOG_MAX) {
+        entry = &error_log.log[i];
+        __wt_err_func(session, entry->error, entry->func, entry->line, WT_VERB_ERROR_RETURNS,
+          "Error at %s:%d: \"%s\" failed%s%s", __simplify_path(entry->file), entry->line,
+          entry->expr, entry->suberror == WT_NONE ? "" : " with ",
+          entry->suberror == WT_NONE ? "" : __wt_strerror(session, entry->suberror, NULL, 0));
+    }
+
+    __wt_error_log_clear(); /* Avoid double reporting the same errors. */
 }

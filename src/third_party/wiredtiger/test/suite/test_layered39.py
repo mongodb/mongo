@@ -58,9 +58,6 @@ class test_layered39(wttest.WiredTigerTestCase, DisaggConfigMixin):
         return val
 
     def test_layered39(self):
-        if platform.processor() == 's390x':
-            self.skipTest("FIXME-WT-15000: not working on zSeries")
-
         # Avoid checkpoint error with precise checkpoint
         self.conn.set_timestamp('stable_timestamp=1')
 

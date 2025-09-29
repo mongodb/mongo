@@ -78,6 +78,11 @@
             goto err;                                    \
         }                                                \
     } while (0)
+#define WT_ERR_NOLOG(a)       \
+    do {                      \
+        if ((ret = (a)) != 0) \
+            goto err;         \
+    } while (0)
 #define WT_ERR_MSG(session, v, ...)                                    \
     do {                                                               \
         ret = (v);                                                     \

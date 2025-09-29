@@ -145,12 +145,10 @@ __bmd_get_page_ids(
   WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *item, size_t *size, uint64_t checkpoint_lsn)
 {
     WT_BLOCK_DISAGG *block_disagg;
-    uint64_t table_id;
 
     /* FIXME-WT-15564: Check block is safe to cast as disagg block. */
     WT_ASSERT(session, F_ISSET(S2BT(session), WT_BTREE_DISAGGREGATED));
     block_disagg = (WT_BLOCK_DISAGG *)bm->block;
-    table_id = block_disagg->tableid;
 
     if (block_disagg->plhandle->plh_get_page_ids == NULL) {
         __wt_verbose_warning(
@@ -159,7 +157,7 @@ __bmd_get_page_ids(
     }
 
     WT_RET(block_disagg->plhandle->plh_get_page_ids(
-      block_disagg->plhandle, &session->iface, checkpoint_lsn, table_id, item, size));
+      block_disagg->plhandle, &session->iface, checkpoint_lsn, item, size));
 
     return (0);
 }

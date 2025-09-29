@@ -137,9 +137,6 @@ class test_layered38(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.assertEqual(count, 0)
 
     def test_gc_ingest_table_with_remove(self):
-        if platform.processor() == 's390x':
-            self.skipTest("FIXME-WT-15000: not working on zSeries")
-
         # Create the oplog
         oplog = Oplog(value_size=500)
 

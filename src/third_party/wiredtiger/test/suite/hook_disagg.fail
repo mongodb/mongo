@@ -10,7 +10,6 @@ test_bug005.py
 test_bug006.py
 test_bug010.py
 test_bug027.py
-test_bug033.py
 test_bulk01.py
 test_bulk02.py
 test_checkpoint06.py # FIXME: WT-15507
@@ -23,7 +22,6 @@ test_cursor02.py  # FIXME: WT-15291
 test_cursor03.py
 test_cursor05.py  # FIXME: WT-15291
 test_cursor06.py  # FIXME: WT-15417
-test_cursor12.py  # FIXME: WT-15410
 test_cursor17.py  # FIXME: WT-15418
 test_cursor21.py  # FIXME: WT-15369
 test_debug_mode08.py
@@ -67,9 +65,6 @@ test_prefetch02.py
 test_prepare03.py
 test_prepare11.py
 test_prepare13.py
-test_prepare22.py
-test_prepare23.py
-test_prepare27.py
 test_prepare28.py
 test_prepare29.py
 test_prepare_cursor01.py

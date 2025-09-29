@@ -50,6 +50,10 @@ class test_cache_evict_config01(wttest.WiredTigerTestCase):
             "cache_eviction_controls=[incremental_app_eviction=true,scrub_evict_under_target_limit=true,app_eviction_min_cache_fill_ratio=10]",
             "cache_eviction_controls=[incremental_app_eviction=true,scrub_evict_under_target_limit=false,app_eviction_min_cache_fill_ratio=25]",
             "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=true,app_eviction_min_cache_fill_ratio=50]",
+            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,cache_tolerance_for_app_eviction=0]",
+            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,cache_tolerance_for_app_eviction=100]",
+            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,cache_tolerance_for_app_eviction=25]",
+            "cache_eviction_controls=[incremental_app_eviction=false,scrub_evict_under_target_limit=false,cache_tolerance_for_app_eviction=20]",
         ]
 
         # Try different eviction failure reconfigurations.
@@ -57,6 +61,8 @@ class test_cache_evict_config01(wttest.WiredTigerTestCase):
             "cache_eviction_controls=[app_eviction_min_cache_fill_ratio=-1]",
             "cache_eviction_controls=[app_eviction_min_cache_fill_ratio=60]",
             "cache_eviction_controls=[app_eviction_min_cache_fill_ratio=110]",
+            "cache_eviction_controls=[cache_tolerance_for_app_eviction=-1]",
+            "cache_eviction_controls=[cache_tolerance_for_app_eviction=110]",
         ]
 
         for cfg in configs:

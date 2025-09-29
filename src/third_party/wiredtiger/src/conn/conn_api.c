@@ -2314,6 +2314,21 @@ __wti_cache_eviction_controls_config(WT_SESSION_IMPL *session, const char *cfg[]
 
     cache = S2C(session)->cache;
 
+    /*
+     * The cache tolerance is a percentage value with range 0 - 100, inclusive.
+     * Given input percentage is considered in multiples of 10 only, by applying floor().
+     * 00 < value < 10  -> 00
+     * 10 < value < 20  -> 10
+     * 20 < value < 30  -> 20
+     * ...
+     * 90 < value < 100 -> 90
+     * value is 100     -> 100
+     */
+    WT_RET(__wt_config_gets(
+      session, cfg, "cache_eviction_controls.cache_tolerance_for_app_eviction", &cval));
+    __wt_atomic_store8(&cache->cache_eviction_controls.cache_tolerance_for_app_eviction,
+      (((uint8_t)cval.val / 10) * 10));
+
     WT_RET(
       __wt_config_gets(session, cfg, "cache_eviction_controls.incremental_app_eviction", &cval));
     if (cval.val != 0)
