@@ -61,6 +61,8 @@ last-continuous:
       ticket: SERVER-95726
     - test_file: jstests/query_golden/distinct_index_eligibility_md.js
       ticket: SERVER-111486
+    - test_file: jstests/change_streams/events_containing_version_literals.js
+      ticket: SERVER-111406
   suites: null
 last-lts:
   all:
@@ -624,4 +626,6 @@ last-lts:
       ticket: SERVER-110058
     - test_file: jstests/core/query/notablescan_sbe_consistency.js
       ticket: SERVER-110058
+    - test_file: jstests/change_streams/events_containing_version_literals.js
+      ticket: SERVER-111406
   suites: null

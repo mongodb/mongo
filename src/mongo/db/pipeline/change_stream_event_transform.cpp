@@ -344,7 +344,28 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
             // indicates the delta oplog entry.
             Value oplogVersion =
                 input[repl::OplogEntry::kObjectFieldName][kUpdateOplogEntryVersionFieldName];
-            if (!oplogVersion.missing() && oplogVersion.getInt() == 2) {
+
+            // Check that the oplog entry format is as expected:
+            // - if there is an '_id' field, it is a replace.
+            // - if there is no '_id' field and the '$v' is 2, it is a delta (diff) update.
+            // - if there is no '_id' field and the '$v' is not 2, it is a modifier update.
+            uassert(6741200,
+                    str::stream() << "Expected _id field, or $v field missing, or $v equal to "
+                                  << static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1)
+                                  << " (kUpdateNodeV1) or "
+                                  << static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)
+                                  << " (kDeltaV2), but got oplog version $v: "
+                                  << oplogVersion.toString(),
+                    !id.missing() || oplogVersion.missing() ||
+                        oplogVersion.getInt() ==
+                            static_cast<int>(UpdateOplogEntryVersion::kUpdateNodeV1) ||
+                        oplogVersion.getInt() ==
+                            static_cast<int>(UpdateOplogEntryVersion::kDeltaV2));
+
+            // It is important to check for '_id' field first, because a replacement style update
+            // can still have a '$v' field in the object.
+            if (id.missing() && !oplogVersion.missing() &&
+                oplogVersion.getInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
                 // Parsing the delta oplog entry.
                 operationType = DocumentSourceChangeStream::kUpdateOpType;
                 Value diffObj = input[repl::OplogEntry::kObjectFieldName]
@@ -376,11 +397,6 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                                      {"truncatedArrays", std::move(deltaDesc.truncatedArrays)}});
                     }
                 }
-            } else if (!oplogVersion.missing() || id.missing()) {
-                // This is not a replacement op, and we did not see a valid update version number.
-                uasserted(6741200,
-                          str::stream() << "Unsupported or missing oplog version, $v: "
-                                        << oplogVersion.toString());
             } else {
                 operationType = DocumentSourceChangeStream::kReplaceOpType;
                 fullDocument = input[repl::OplogEntry::kObjectFieldName];
