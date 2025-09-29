@@ -52,6 +52,15 @@ filters:
   - "custom_write_concern.js":
     approvers:
       - 10gen/server-catalog-and-routing
+  - "shard_unsplittable_collection.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "create_unsplittable_collection.js":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
+  - "list_cluster_catalog*":
+    approvers:
+      - 10gen/server-catalog-and-routing-ddl
   - "check_metadata*":
     approvers:
       - 10gen/server-catalog-and-routing-ddl

@@ -14,6 +14,7 @@ import {configureFailPoint} from "jstests/libs/fail_point_util.js";
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 // Configure initial sharding cluster
 const st = new ShardingTest({});
@@ -665,7 +666,6 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
     const db = getNewDb();
     const kSourceCollName = "tracked_collection";
     const kNss = db.getName() + "." + kSourceCollName;
-    const kBucketNss = db.getName() + ".system.buckets." + kSourceCollName;
     const primaryShard = st.shard0;
 
     // Set a primary shard.
@@ -685,7 +685,10 @@ if (FeatureFlagUtil.isPresentAndEnabled(st.s, "CheckRangeDeletionsWithMissingSha
 
     // Update the granularity on the sharding catalog only and catch the inconsistency.
     assert.commandWorked(
-        configDB.collections.update({_id: kBucketNss}, {$set: {"timeseriesFields.granularity": "seconds"}}),
+        configDB.collections.update(
+            {_id: getTimeseriesCollForDDLOps(db, db[kSourceCollName]).getFullName()},
+            {$set: {"timeseriesFields.granularity": "seconds"}},
+        ),
     );
     let configTimeseries = Object.assign({}, localTimeseries);
     configTimeseries.granularity = "seconds";

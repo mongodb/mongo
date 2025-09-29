@@ -1503,6 +1503,9 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/*zone* @10gen/server-cluster-scalability @svc-auto-approve-bot
 /jstests/sharding/**/addShard* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/**/custom_write_concern.js @10gen/server-catalog-and-routing @svc-auto-approve-bot
+/jstests/sharding/**/shard_unsplittable_collection.js @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
+/jstests/sharding/**/create_unsplittable_collection.js @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
+/jstests/sharding/**/list_cluster_catalog* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /jstests/sharding/**/check_metadata* @10gen/server-catalog-and-routing-ddl @svc-auto-approve-bot
 /jstests/sharding/**/direct_shard* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /jstests/sharding/**/start_shard_draining* @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot

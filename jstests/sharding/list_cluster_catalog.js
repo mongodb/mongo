@@ -13,6 +13,7 @@
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const kOnlyUserDbsMatch = {
     "$match": {"$and": [{"db": {"$ne": "config"}}, {"db": {"$ne": "admin"}}]},
@@ -23,10 +24,6 @@ let cachedCatalog = {};
 
 function ns(dbName, collName) {
     return dbName + "." + collName;
-}
-
-function nsBucket(dbName, collName) {
-    return dbName + ".system.buckets." + collName;
 }
 
 function isSharded(nss) {
@@ -193,7 +190,9 @@ function cacheCatalog(conn, dbName, collName, primaryShard, shards, isTimeseries
 
     // store informations for the target nss in the sharding catalog.
     // Note for unsharded collection shardinginfo will be undefined.
-    let targetNs = isTimeseries ? nsBucket(dbName, collName) : ns(dbName, collName);
+    let targetNs = isTimeseries
+        ? getTimeseriesCollForDDLOps(conn, conn.getDB(dbName)[collName]).getFullName()
+        : ns(dbName, collName);
     cachedCatalog[targetNs] = {};
     cachedCatalog[targetNs].shardinginfo = conn
         .getDB("config")
@@ -245,7 +244,7 @@ function setupUnshardedCollections(conn, dbName, primaryShard) {
         assert.eq(getChunkSize(nss), undefined);
 
         if (collName == kTimeseriesCollName) {
-            let bucketNs = nsBucket(dbName, collName);
+            let bucketNs = getTimeseriesCollForDDLOps(conn, conn.getDB(dbName)[collName]).getFullName();
             assert.eq(isSharded(bucketNs), false);
             assert.eq(isTracked(bucketNs), false);
             assert.eq(getAutoMergingEnabled(bucketNs), undefined);
@@ -322,10 +321,12 @@ function setupShardedCollections(st, dbName, primaryShard) {
         }
 
         const isTimeseries = collName == kTimeseriesCollName;
-        cacheCatalog(st, dbName, collName, primaryShard, shardList, isTimeseries, false);
+        cacheCatalog(st.s, dbName, collName, primaryShard, shardList, isTimeseries, false);
 
         // Verify the helpers will report the correct information.
-        let targetNs = isTimeseries ? nsBucket(dbName, collName) : ns(dbName, collName);
+        let targetNs = isTimeseries
+            ? getTimeseriesCollForDDLOps(mongos, mongos.getDB(dbName)[collName]).getFullName()
+            : ns(dbName, collName);
         assert.eq(isSharded(targetNs), true);
         assert.eq(isTracked(targetNs), true);
         assert.eq(getAutoMergingEnabled(targetNs), collName != kNoAutoMerger);
@@ -371,7 +372,7 @@ function setupTrackedUnshardedCollections(st, dbName, primaryShard, toShard) {
             );
         }
 
-        cacheCatalog(st, dbName, collName, primaryShard, [toShard], false, false);
+        cacheCatalog(st.s, dbName, collName, primaryShard, [toShard], false, false);
 
         // Verify the helpers will report the correct information.
         assert.eq(isSharded(nss), false);

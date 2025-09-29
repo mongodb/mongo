@@ -9,7 +9,6 @@ import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 const dbName = "testDB";
 const collName = "testColl";
-const bucketsCollName = "system.buckets." + collName;
 const timeField = "time";
 const metaField = "hostid";
 const shardKey = {
@@ -27,8 +26,6 @@ const createIndexOnStaleRouter = (staleRouter) => {
 const st = new ShardingTest({mongos: 2, shards: 2, rs: {nodes: 2}});
 const mongos0 = st.s0.getDB(dbName);
 const mongos1 = st.s1.getDB(dbName);
-const shard0DB = st.shard0.getDB(dbName);
-const shard1DB = st.shard1.getDB(dbName);
 
 // Insert some dummy data using 'mongos1' as the router, so that the cache is
 // initialized on the mongos while the collection is unsharded.

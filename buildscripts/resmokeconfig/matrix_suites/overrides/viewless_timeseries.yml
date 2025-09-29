@@ -58,7 +58,11 @@
       roots:
         - jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
         - jstests/sharding/balancer_should_return_random_migrations_failpoint.js
+        - jstests/sharding/check_metadata_consistency.js
+        - jstests/sharding/create_unsplittable_collection.js
+        - jstests/sharding/list_cluster_catalog.js
         - jstests/sharding/remove_shard_with_unsharded.js
+        - jstests/sharding/shard_unsplittable_collection.js
         - jstests/sharding/*timeseries*/*.js
         - jstests/sharding/**/*timeseries*.js
 - name: only_validated_sharding_timeseries_tests_selector
@@ -69,7 +73,10 @@
         - jstests/sharding/analyze_shard_key/analyze_shard_key_cmd_validation.js
         - jstests/sharding/analyze_shard_key/timeseries.js
         - jstests/sharding/balancer_should_return_random_migrations_failpoint.js
+        - jstests/sharding/check_metadata_consistency.js
+        - jstests/sharding/create_unsplittable_collection.js
         - jstests/sharding/libs/timeseries_update_multi_util.js
+        - jstests/sharding/list_cluster_catalog.js
         - jstests/sharding/query/sample_timeseries.js
         - jstests/sharding/remove_shard_with_unsharded.js
         - jstests/sharding/resharding_timeseries/move_timeseries.js
@@ -82,6 +89,7 @@
         - jstests/sharding/resharding_timeseries/resharding_ts_resume_agg_token.js
         - jstests/sharding/resharding_timeseries/resharding_ts_txn_cloner.js
         - jstests/sharding/resharding_timeseries/unshard_timeseries.js
+        - jstests/sharding/shard_unsplittable_collection.js
         - jstests/sharding/timeseries/timeseries_balancer.js
         - jstests/sharding/timeseries/timeseries_buckets_find_and_modify.js
         - jstests/sharding/timeseries/timeseries_buckets_modification_with_id.js

@@ -8,6 +8,7 @@
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {findChunksUtil} from "jstests/sharding/libs/find_chunks_util.js";
+import {getTimeseriesCollForDDLOps} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const kDbName = "test";
 
@@ -24,7 +25,9 @@ function getNewCollName() {
 
 function checkCollAndChunks(collName, bucketsNs, unsplittable, shardKey, numChunks) {
     let configDb = st.s.getDB("config");
-    let nss = bucketsNs ? kDbName + ".system.buckets." + collName : kDbName + "." + collName;
+    let nss = bucketsNs
+        ? getTimeseriesCollForDDLOps(st.s, st.s.getDB(kDbName)[collName]).getFullName()
+        : kDbName + "." + collName;
 
     let coll = configDb.collections.findOne({_id: nss});
     assert.eq(coll._id, nss);
