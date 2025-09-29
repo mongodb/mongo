@@ -604,5 +604,54 @@ TEST(BSONObjBuilderTest, QueryConstraintLabelCompound) {
     ASSERT_BSONOBJ_EQ(BSON("ts" << GTE << 123 << LTE << 456),
                       BSON("ts" << BSON("$gte" << 123 << "$lte" << 456)));
 }
+
+TEST(BSONObjBuilderTest, AppendRenamed) {
+    auto docWithSingleChild = BSON("ts" << GTE << 123 << LTE << 456);
+    auto docWithTwoChildren = BSONObjBuilder{docWithSingleChild}.append("extra", 2).obj();
+
+    auto shapeWithSingleName = BSON("timestamp" << 1);
+    auto shapeWithTwoNames = BSONObjBuilder{shapeWithSingleName}.append("missing", 2).obj();
+
+    auto reshaped = BSON("timestamp" << GTE << 123 << LTE << 456);
+    auto reshapedWithExtra = BSONObjBuilder{reshaped}.append("extra", 2).obj();
+
+    // Rename a single element.
+    ASSERT_BSONOBJ_EQ(
+        reshaped,
+        BSONObjBuilder().appendElementsRenamed(docWithSingleChild, shapeWithSingleName).obj());
+
+    ASSERT_BSONOBJ_EQ(reshaped,
+                      BSONObjBuilder()
+                          .appendElementsRenamed(docWithSingleChild, shapeWithSingleName, false)
+                          .obj());
+
+    // Rename multiple elements on a single element object.
+    ASSERT_BSONOBJ_EQ(
+        reshaped,
+        BSONObjBuilder().appendElementsRenamed(docWithSingleChild, shapeWithTwoNames).obj());
+
+    ASSERT_BSONOBJ_EQ(
+        reshaped,
+        BSONObjBuilder().appendElementsRenamed(docWithSingleChild, shapeWithTwoNames, false).obj());
+
+    // Rename a single element on a two-element doc.
+    ASSERT_BSONOBJ_EQ(
+        reshapedWithExtra,
+        BSONObjBuilder().appendElementsRenamed(docWithTwoChildren, shapeWithSingleName).obj());
+
+    ASSERT_BSONOBJ_EQ(reshaped,
+                      BSONObjBuilder()
+                          .appendElementsRenamed(docWithTwoChildren, shapeWithSingleName, false)
+                          .obj());
+
+    // Rename an empty element.
+    ASSERT_BSONOBJ_EQ(BSONObj(),
+                      BSONObjBuilder().appendElementsRenamed(BSONObj(), shapeWithSingleName).obj());
+
+    ASSERT_BSONOBJ_EQ(
+        BSONObj(),
+        BSONObjBuilder().appendElementsRenamed(BSONObj(), shapeWithSingleName, false).obj());
+}
+
 }  // namespace
 }  // namespace mongo

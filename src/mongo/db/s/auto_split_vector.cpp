@@ -76,7 +76,7 @@ const int estimatedAdditionalBytesPerItemInBSONArray{
 constexpr int kMaxSplitPointsToReposition{3};
 
 BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
-    return key.replaceFieldNames(keyPattern).clientReadable();
+    return BSONObjBuilder().appendElementsRenamed(key, keyPattern).obj().clientReadable();
 }
 
 /*
@@ -109,7 +109,7 @@ std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const ShardKeyIndex& shardK
 auto orderShardKeyFields(const BSONObj& keyPattern, const BSONObj& key) {
     // Note: It is correct to hydrate the indexKey 'key' with 'keyPattern', because the index key
     // pattern is a prefix of 'keyPattern'.
-    return bson::extractElementsBasedOnTemplate(key.replaceFieldNames(keyPattern), keyPattern);
+    return BSONObjBuilder().appendElementsRenamed(key, keyPattern, false).obj();
 }
 
 }  // namespace

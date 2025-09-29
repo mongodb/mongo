@@ -492,7 +492,7 @@ struct CardinalityFrequencyMetrics {
 constexpr int kMaxBSONObjSizeMostCommonValues = BSONObjMaxUserSize - 1000 * 1024;
 
 /**
- * Creates a BSONObj by appending the fields in 'obj' to it. Upon encoutering a field whose size
+ * Creates a BSONObj by appending the fields in 'obj' to it. Upon encountering a field whose size
  * exceeds the remaining size, truncates it by setting its value to a BSONObj with a "type" field
  * and a "sizeBytes" field. If the field is of type of Object and the depth is 0, recurse to
  * truncate the subfields instead.
@@ -627,8 +627,9 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
 
         auto value = [&] {
             if (doc.hasField(kIndexKeyFieldName)) {
-                return bson::extractElementsBasedOnTemplate(
-                    doc.getObjectField(kIndexKeyFieldName).replaceFieldNames(shardKey), shardKey);
+                return BSONObjBuilder()
+                    .appendElementsRenamed(doc.getObjectField(kIndexKeyFieldName), shardKey, false)
+                    .obj();
             }
             if (doc.hasField(kDocFieldName)) {
                 return bson::extractElementsBasedOnTemplate(doc.getObjectField(kDocFieldName),
@@ -812,8 +813,8 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
 
             recordIds.push_back(recordId.getLong());
             if (!scannedMultipleShardKeys) {
-                auto currentShardKey = bson::extractElementsBasedOnTemplate(
-                    recordVal.replaceFieldNames(shardKey), shardKey);
+                auto currentShardKey =
+                    BSONObjBuilder().appendElementsRenamed(recordVal, shardKey, false).obj();
                 if (recordIds.size() == 1) {
                     firstShardKey = currentShardKey;
                 } else if (SimpleBSONObjComparator::kInstance.evaluate(firstShardKey !=

@@ -98,7 +98,10 @@ struct ClusterPipelineCommandD {
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) {
         // Replace clusterAggregate in the request body because the parser doesn't recognize it.
         auto modifiedRequestBody =
-            opMsgRequest.body.replaceFieldNames(BSON(AggregateCommandRequest::kCommandName << 1));
+            BSONObjBuilder()
+                .appendElementsRenamed(opMsgRequest.body,
+                                       BSON(AggregateCommandRequest::kCommandName << 1))
+                .obj();
         return aggregation_request_helper::parseFromBSON(
             modifiedRequestBody, opMsgRequest.validatedTenancyScope, explainVerbosity);
     }

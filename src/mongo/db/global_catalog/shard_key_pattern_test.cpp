@@ -970,5 +970,17 @@ TEST_F(ShardKeyPatternTest, IsExtendedBy) {
     ASSERT_FALSE(shardKeyPatternHashed3_1.isExtendedBy(shardKeyPatternHashed2_1));
 }
 
+TEST_F(ShardKeyPatternTest, CompareShardKeyGenerationAPIsOnDottedFields) {
+    auto shardKeyBSON = BSON("a.b.c" << 1);
+    ShardKeyPattern shardKeyPattern(shardKeyBSON);
+    auto doc = BSON("a" << BSON("b.c" << 1 << "b" << BSON("c" << 2)));
+
+    auto resultUsingInner = BSON("a.b.c" << 2);
+    // This one is based on getFieldDottedOrArray in path_internal.cpp
+    ASSERT_BSONOBJ_EQ(resultUsingInner, shardKeyPattern.extractShardKeyFromDoc(doc));
+    // This one is used by getDocumentKey in op_observer_util.cpp
+    ASSERT_BSONOBJ_EQ(resultUsingInner, bson::extractElementsBasedOnTemplate(doc, shardKeyBSON));
+}
+
 }  // namespace
 }  // namespace mongo

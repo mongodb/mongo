@@ -56,7 +56,7 @@ inline BSONObj replaceCommandNameWithClusterCommandName(BSONObj cmdObj) {
             fmt::format("Cannot use unsupported command {} with cluster transaction API", cmdName),
             newNameIt != clusterCommandTranslations.end());
 
-    return cmdObj.replaceFieldNames(BSON(newNameIt->second << 1));
+    return BSONObjBuilder().appendElementsRenamed(cmdObj, BSON(newNameIt->second << 1)).obj();
 }
 
 }  // namespace mongo::cluster::cmd::translations

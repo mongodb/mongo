@@ -54,18 +54,16 @@ const BSONElement kNullElt = kNullObj.firstElement();
 }  // namespace
 
 BSONElement extractElementAtDottedPath(const BSONObj& obj, StringData path) {
-    BSONElement e = obj.getField(path);
-    if (e.eoo()) {
-        size_t dot_offset = path.find('.');
-        if (dot_offset != std::string::npos) {
-            StringData left = path.substr(0, dot_offset);
-            StringData right = path.substr(dot_offset + 1);
-            BSONObj sub = obj.getObjectField(left);
-            return sub.isEmpty() ? BSONElement() : extractElementAtDottedPath(sub, right);
-        }
+    size_t dot_offset = path.find('.');
+
+    if (dot_offset == std::string::npos) {
+        return obj.getField(path);
     }
 
-    return e;
+    StringData left = path.substr(0, dot_offset);
+    StringData right = path.substr(dot_offset + 1);
+    BSONObj sub = obj.getObjectField(left);
+    return sub.isEmpty() ? BSONElement() : extractElementAtDottedPath(sub, right);
 }
 
 BSONElement extractElementAtOrArrayAlongDottedPath(const BSONObj& obj, const char*& path) {

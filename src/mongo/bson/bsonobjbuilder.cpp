@@ -194,6 +194,25 @@ Derived& BSONObjBuilderBase<Derived, B>::appendElements(const BSONObj& x) {
     return static_cast<Derived&>(*this);
 }
 
+/* add all the fields from the object specified to this object, replacing each
+ * field name with the corresponding field name in the 'newNames' object.
+ */
+template <class Derived, class B>
+Derived& BSONObjBuilderBase<Derived, B>::appendElementsRenamed(const BSONObj& x,
+                                                               const BSONObj& newNames,
+                                                               bool keepTail) {
+    BSONObjIterator it(x);
+    for (BSONObjIterator nIter(newNames); it.more() && nIter.more();) {
+        appendAs(it.next(), nIter.next().fieldName());
+    }
+    if (keepTail) {
+        while (it.more()) {
+            append(it.next());
+        }
+    }
+    return static_cast<Derived&>(*this);
+}
+
 /* add all the fields from the object specified to this object if they don't exist */
 template <class Derived, class B>
 Derived& BSONObjBuilderBase<Derived, B>::appendElementsUnique(const BSONObj& x) {

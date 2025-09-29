@@ -642,12 +642,6 @@ public:
      */
     BSONObj clientReadable() const;
 
-    /**
-     * Return new object with the field names replaced by those in the
-     * passed object.
-     */
-    BSONObj replaceFieldNames(const BSONObj& obj) const;
-
     static BSONObj stripFieldNames(const BSONObj& obj);
 
     bool hasFieldNames() const;

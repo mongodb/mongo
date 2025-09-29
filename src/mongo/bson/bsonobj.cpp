@@ -516,23 +516,6 @@ BSONObj BSONObj::clientReadable() const {
     return b.obj();
 }
 
-BSONObj BSONObj::replaceFieldNames(const BSONObj& names) const {
-    BSONObjBuilder b;
-    BSONObjIterator i(*this);
-    BSONObjIterator j(names);
-    BSONElement f = j.next();
-    while (i.more()) {
-        BSONElement e = i.next();
-        if (!f.eoo()) {
-            b.appendAs(e, f.fieldName());
-            f = j.next();
-        } else {
-            b.append(e);
-        }
-    }
-    return b.obj();
-}
-
 BSONObj BSONObj::stripFieldNames(const BSONObj& obj) {
     if (!obj.hasFieldNames())
         return obj;

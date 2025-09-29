@@ -171,6 +171,15 @@ public:
     /** add all the fields from the object specified to this object */
     Derived& appendElements(const BSONObj& x);
 
+    /**
+     * Add all the fields from `x` to this object, replacing each field name with the corresponding
+     * field name in the `newNames` object. If `keepTail` is set to true, and the `newNames` object
+     * contains fewer entries than the `x` object, the fields in `x` that have no matching entry in
+     * `newNames` will be added with their original field names. If `keepTail` is set to false,
+     * these extra fields are not appended.
+     */
+    Derived& appendElementsRenamed(const BSONObj& x, const BSONObj& newNames, bool keepTail = true);
+
     /** add all the fields from the object specified to this object if they don't exist already */
     Derived& appendElementsUnique(const BSONObj& x);
 
