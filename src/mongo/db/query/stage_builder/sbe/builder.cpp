@@ -38,6 +38,7 @@
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/sort_spec.h"
+#include "mongo/db/exec/sbe/stages/extract_field_paths.h"
 #include "mongo/db/exec/sbe/stages/search_cursor.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
@@ -80,6 +81,7 @@
 #include "mongo/db/query/stage_builder/sbe/gen_accumulator.h"
 #include "mongo/db/query/stage_builder/sbe/gen_coll_scan.h"
 #include "mongo/db/query/stage_builder/sbe/gen_expression.h"
+#include "mongo/db/query/stage_builder/sbe/gen_extract_field_paths.h"
 #include "mongo/db/query/stage_builder/sbe/gen_filter.h"
 #include "mongo/db/query/stage_builder/sbe/gen_helpers.h"
 #include "mongo/db/query/stage_builder/sbe/gen_index_scan.h"
@@ -895,7 +897,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              &_sortSpecMap,
              _cq.getExpCtx(),
              _cq.getExpCtx()->getNeedsMerge(),
-             _cq.getExpCtx()->getAllowDiskUse()) {
+             _cq.getExpCtx()->getAllowDiskUse(),
+             _cq.getExpCtx()->getIfrContext()) {
     // Initialize '_data->queryCollator'.
     _data->queryCollator = cq.getCollatorShared();
 
@@ -2948,6 +2951,27 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildProjectionImpl(
                     exprPathSlotMap[exprPath] = slot;
                 }
             }
+        }
+    }
+
+    // Collect required paths.
+    std::vector<const Expression*> expressions;
+    for (const auto& exprPath : exprPaths) {
+        expressions.push_back(plan->pathExprMap[exprPath]);
+    }
+    boost::optional<PlanStageReqs> extractFieldPathsReqs =
+        makeExtractFieldPathsPlanStageReqs(_state, expressions, outputs);
+    // Build extract field paths stage.
+    if (extractFieldPathsReqs.has_value()) {
+        auto [outStage, extractionOutputs] =
+            buildExtractFieldPaths(std::move(stage), _state, outputs, *extractFieldPathsReqs);
+        stage = std::move(outStage);
+        // Extend outputs with all slots from field path extraction stage.
+        for (auto& p : extractionOutputs.getSlotNameToIdMap()) {
+            const PlanStageSlots::UnownedSlotName& slotName = p.first;
+            auto name = PlanStageSlots::OwnedSlotName(slotName.first, slotName.second);
+            const SbSlot& slot = p.second;
+            outputs.set(std::move(name), slot);
         }
     }
 

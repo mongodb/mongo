@@ -2331,7 +2331,8 @@ public:
                  nullptr /* sortSpecMap */,
                  _expCtx,
                  false /* needsMerge */,
-                 false /* allowDiskUse */} {}
+                 false /* allowDiskUse */,
+                 _expCtx->getIfrContext()} {}
 
     AccumulationStatement makeAccumulationStatement(StringData accumName) {
         return makeAccumulationStatement(BSON("unused" << BSON(accumName << "unused")));

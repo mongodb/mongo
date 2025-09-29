@@ -586,6 +586,11 @@ public:
         return copy;
     }
 
+    // Returns the number of slots requested.
+    bool size() const {
+        return _data->slotNameSet.size();
+    }
+
     // Returns true if this PlanStageReqs has an explicit requirement for 'name'.
     bool has(const UnownedSlotName& name) const {
         return _data->slotNameSet.contains(name);
@@ -668,6 +673,12 @@ public:
     // order.
     std::vector<std::string> getSortKeys() const {
         return getOfType(kSortKey);
+    }
+
+    // Returns a list of all strings N where 'has({kPathExpr, N})' is true, sorted in lexicographic
+    // order.
+    std::vector<std::string> getPathExprs() const {
+        return getOfType(kPathExpr);
     }
 
     // Returns a FieldSet containing all strings N where 'has({kField, N})' is true plus all
@@ -1021,6 +1032,10 @@ private:
 
     std::pair<SbStage, PlanStageSlots> buildProjection(const QuerySolutionNode* root,
                                                        const PlanStageReqs& reqs);
+
+
+    std::pair<SbStage, PlanStageSlots> buildExtractFieldPathsStage(const QuerySolutionNode* root,
+                                                                   const PlanStageReqs& reqs);
 
     std::pair<SbStage, PlanStageSlots> buildOr(const QuerySolutionNode* root,
                                                const PlanStageReqs& reqs);

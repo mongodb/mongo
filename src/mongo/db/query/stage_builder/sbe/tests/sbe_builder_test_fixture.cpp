@@ -235,8 +235,8 @@ void GoldenSbeExprBuilderTestFixture::setUp() {
                    &_sortSpecMap,
                    _expCtx,
                    false /* needsMerge */,
-                   false /* allowDiskUse */
-    );
+                   false /* allowDiskUse */,
+                   _expCtx->getIfrContext());
 }
 
 void GoldenSbeExprBuilderTestFixture::runTest(stage_builder::SbExpr sbExpr,

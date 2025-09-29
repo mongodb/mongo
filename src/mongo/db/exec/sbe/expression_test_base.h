@@ -81,7 +81,8 @@ protected:
                  nullptr /* sortSpecMap */,
                  _expCtx,
                  false /* needsMerge */,
-                 false /* allowDiskUse */} {
+                 false /* allowDiskUse */,
+                 _expCtx->getIfrContext()} {
         _ctx.root = &_emptyStage;
     }
 

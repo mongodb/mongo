@@ -173,6 +173,7 @@ std::pair<SbStage, SbSlotVector> buildBlockToRow(SbStage stage,
 
     // Remove all the slots that should not be propagated.
     outputs.clear(PlanStageSlots::kBlockSelectivityBitmap);
+    outputs.clear(PlanStageSlots::kResult);
     for (const auto& name : outputsToRemove) {
         outputs.clear(name);
     }

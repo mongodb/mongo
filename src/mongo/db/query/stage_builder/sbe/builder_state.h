@@ -77,7 +77,8 @@ struct StageBuilderState {
                       SortSpecMap* sortSpecMap,
                       boost::intrusive_ptr<ExpressionContext> expCtx,
                       bool needsMerge,
-                      bool allowDiskUse)
+                      bool allowDiskUse,
+                      IncrementalFeatureRolloutContext& ifrContext)
         : slotIdGenerator{slotIdGenerator},
           frameIdGenerator{frameIdGenerator},
           spoolIdGenerator{spoolIdGenerator},
@@ -91,7 +92,8 @@ struct StageBuilderState {
           yieldPolicy{yieldPolicy},
           expCtx{expCtx},
           needsMerge{needsMerge},
-          allowDiskUse{allowDiskUse} {}
+          allowDiskUse{allowDiskUse},
+          ifrContext(ifrContext) {}
 
     StageBuilderState(const StageBuilderState& other) = delete;
 
@@ -175,6 +177,8 @@ struct StageBuilderState {
 
     // A flag to indicate the user allows disk use for spilling.
     bool allowDiskUse;
+
+    IncrementalFeatureRolloutContext& ifrContext;
 
     SimpleBSONObjMap<sbe::value::SlotId> keyPatternToSlotMap;
 };  // struct StageBuilderState

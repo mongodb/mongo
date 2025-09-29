@@ -124,10 +124,6 @@ PlanState ExtractFieldPathsStage::getNext() {
     }
 
     auto [inputTag, inputVal] = _inputAccessor->getViewOfValue();
-    // TODO SERVER-110872 Remove this restriction
-    tassert(10984202,
-            "ExtractFieldPathsStage currently only supports TypeTags::bsonObject as input",
-            inputTag == value::TypeTags::bsonObject);
     value::walkObj<value::ScalarProjectionPositionInfoRecorder>(
         _root.get(),
         inputTag,
