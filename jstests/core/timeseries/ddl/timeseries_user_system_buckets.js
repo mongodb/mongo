@@ -13,11 +13,11 @@
  *   # Running shardCollection instead of createCollection returns different error types which are
  *   # not expected by the test
  *   assumes_unsharded_collection,
- *   does_not_support_viewless_timeseries_yet,
  *  ]
  */
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 const tsOptions = {
     timeField: "timestamp",
@@ -115,14 +115,10 @@ db.dropDatabase();
     });
 
     jsTest.log("Case collection: timeseries / collection: timeseries.");
-    runTest(
-        () => {
-            createWorked(kColl, tsOptions);
-            createWorked(kColl, tsOptions);
-        },
-        // On 7.0 this test case wrongly fails with NamespaceExists and should not be tested.
-        "7.1", // minRequiredVersion
-    );
+    runTest(() => {
+        createWorked(kColl, tsOptions);
+        createWorked(kColl, tsOptions);
+    });
 
     jsTest.log("Case collection: timeseries / collection: timeseries with different options.");
     runTest(() => {
@@ -139,17 +135,20 @@ db.dropDatabase();
         // Creation of bucket namespace is not idempotent before 8.0 (SERVER-89827)
         "8.0", // minRequiredVersion
     );
-    if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections")) {
-        jsTest.log("Case collection: timeseries / collection: bucket timeseries with different options.");
-        runTest(() => {
-            createWorked(kColl, tsOptions);
-            createFailed(kBucket, tsOptions2, ErrorCodes.NamespaceExists);
-        });
-    }
+    jsTest.log("Case collection: timeseries / collection: bucket timeseries with different options.");
+    runTest(() => {
+        createWorked(kColl, tsOptions);
+        if (areViewlessTimeseriesEnabled(db)) {
+            // TODO SERVER-101597 creation of system.buckets collections with TS options in FCV 9.0 must fail
+            createWorked(kBucket, tsOptions2);
+        } else {
+            createFailed(kColl, tsOptions2, ErrorCodes.NamespaceExists);
+        }
+    });
 }
 
 // Case prexisting bucket collection timeseries.
-if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollections")) {
+{
     jsTest.log("Case collection: bucket timeseries / collection: standard.");
     runTest(() => {
         createWorked(kBucket, tsOptions);
@@ -178,7 +177,12 @@ if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollection
     jsTest.log("Case collection: bucket timeseries / collection: timeseries with different options.");
     runTest(() => {
         createWorked(kBucket, tsOptions);
-        createFailed(kColl, tsOptions2, ErrorCodes.NamespaceExists);
+        if (areViewlessTimeseriesEnabled(db)) {
+            // TODO SERVER-101597 creation of system.buckets collections with TS options in FCV 9.0 must fail
+            createWorked(kColl, tsOptions2);
+        } else {
+            createFailed(kColl, tsOptions2, ErrorCodes.NamespaceExists);
+        }
     });
 
     jsTest.log("Case collection: bucket timeseries / collection: bucket timeseries with different options.");
@@ -200,11 +204,7 @@ if (!FeatureFlagUtil.isPresentAndEnabled(db, "CreateViewlessTimeseriesCollection
 
 {
     jsTest.log("Creation of unsharded bucket collections without timeseries options is not permitted.");
-    runTest(
-        () => {
-            createFailed(kBucket, {}, ErrorCodes.IllegalOperation);
-        },
-        // TODO BACKPORT-20546: Remove minRequired version once the backport is completed.
-        "8.1", // minRequiredVersion
-    );
+    runTest(() => {
+        createFailed(kBucket, {}, ErrorCodes.IllegalOperation);
+    });
 }
