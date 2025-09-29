@@ -127,9 +127,6 @@ public:
     // Gets the aggregate configuration for all process health environment.
     const FaultManagerConfig& getConfig() const;
 
-    // Gets the timestamp of the last transition
-    Date_t getLastTransitionTime() const;
-
     /**
      * Generate the `serverStatus` section for the fault manager.
      * @param appendDetails is true when the section is generated with:

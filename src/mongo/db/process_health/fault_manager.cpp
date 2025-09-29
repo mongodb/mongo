@@ -498,12 +498,6 @@ FaultState FaultManager::getFaultState() const {
     return state();
 }
 
-Date_t FaultManager::getLastTransitionTime() const {
-    // This is called indirectly by a server status section, so we must lock.
-    stdx::lock_guard lock(_mutex);
-    return _lastTransitionTime;
-}
-
 FaultConstPtr FaultManager::currentFault() const {
     // This is called indirectly by a server status section, so we must lock.
     stdx::lock_guard lock(_mutex);
@@ -727,10 +721,12 @@ void FaultManager::appendDescription(BSONObjBuilder* result, bool appendDetails)
     static constexpr auto kDurationThreshold = Hours{24};
     const auto now = _svcCtx->getFastClockSource()->now();
     StringBuilder faultStateStr;
+
+    std::lock_guard lock(_mutex);
     faultStateStr << getFaultState();
 
     result->append("state", faultStateStr.str());
-    result->appendDate("enteredStateAtTime", getLastTransitionTime());
+    result->appendDate("enteredStateAtTime", _lastTransitionTime);
 
     auto fault = currentFault();
     if (fault) {
