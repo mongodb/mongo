@@ -35,6 +35,7 @@
 #include "mongo/db/query/find.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -92,7 +93,7 @@ extern FailPoint failGetMoreAfterCursorCheckout;
 /**
  * Suite of find/getMore related functions used in both the mongod and mongos query paths.
  */
-class FindCommon {
+class MONGO_MOD_NEEDS_REPLACEMENT FindCommon {
 public:
     // The maximum amount of user data to return to a client in a single batch.
     //

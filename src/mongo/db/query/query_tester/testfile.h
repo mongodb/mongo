@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <fstream>
 #include <string>

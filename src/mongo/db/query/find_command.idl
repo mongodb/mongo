@@ -33,6 +33,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/namespace_string.h"
+    mod_visibility: pub
 
 imports:
     - "mongo/crypto/fle_field_schema.idl"

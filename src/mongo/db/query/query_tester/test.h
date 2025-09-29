@@ -32,6 +32,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/query/util/jparse_util.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/util/modules.h"
 
 #include <filesystem>
 #include <fstream>

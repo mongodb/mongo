@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/client/dbclient_connection.h"
+#include "mongo/util/modules.h"
 
 #include <string>
 

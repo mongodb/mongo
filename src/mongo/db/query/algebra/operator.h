@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/query/algebra/polyvalue.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <span>

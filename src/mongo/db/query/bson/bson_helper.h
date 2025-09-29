@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -44,7 +45,7 @@ inline BSONFieldValue<BSONArray> makeOperator(std::string op, const auto&... arg
 /** $or helper: BSON(OR(BSON("x" << GT << 7), BSON("y" << LT << 6)));
  * becomes   : {$or: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
  */
-BSONFieldValue<BSONArray> OR(const auto&... args) {
+MONGO_MOD_PUB BSONFieldValue<BSONArray> OR(const auto&... args) {
     return bson_helper_details::makeOperator("$or", args...);
 }
 
@@ -52,7 +53,7 @@ BSONFieldValue<BSONArray> OR(const auto&... args) {
  * $and helper: BSON(AND(BSON("x" << GT << 7), BSON("y" << LT << 6)));
  * becomes   : {$and: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
  */
-inline BSONFieldValue<BSONArray> AND(const auto&... args) {
+MONGO_MOD_PUB inline BSONFieldValue<BSONArray> AND(const auto&... args) {
     return bson_helper_details::makeOperator("$and", args...);
 }
 
@@ -60,7 +61,7 @@ inline BSONFieldValue<BSONArray> AND(const auto&... args) {
  * $nor helper: BSON(NOR(BSON("x" << GT << 7), BSON("y" << LT << 6)));
  * becomes   : {$nor: [{x: {$gt: 7}}, {y: {$lt: 6}}]}
  */
-inline BSONFieldValue<BSONArray> NOR(const auto&... args) {
+MONGO_MOD_PUB inline BSONFieldValue<BSONArray> NOR(const auto&... args) {
     return bson_helper_details::makeOperator("$nor", args...);
 }
 

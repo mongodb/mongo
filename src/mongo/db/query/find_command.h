@@ -31,10 +31,11 @@
 
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
-class FindCommandRequest : public FindCommandRequestBase {
+class MONGO_MOD_PUB FindCommandRequest : public FindCommandRequestBase {
 public:
     explicit FindCommandRequest(
         NamespaceStringOrUUID nssOrUUID,

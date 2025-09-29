@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/query/query_request_helper.h"
+    mod_visibility: pub
 
 imports:
     - "mongo/db/basic_types.idl"

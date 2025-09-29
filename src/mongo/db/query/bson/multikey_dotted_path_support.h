@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/multikey_paths.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 

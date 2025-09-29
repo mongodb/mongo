@@ -32,6 +32,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
@@ -39,7 +40,7 @@ namespace mongo {
  * Represents options passed to the explain command (aside from the command which is being explained
  * and its parameters).
  */
-class ExplainOptions {
+class MONGO_MOD_PUB ExplainOptions {
 public:
     /**
      * The various supported verbosity levels for explain. The order is significant: the enum values

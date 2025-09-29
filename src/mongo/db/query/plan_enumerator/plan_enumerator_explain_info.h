@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/modules.h"
+
 namespace mongo {
 
 // The information in this struct is used for classic-engine explains.

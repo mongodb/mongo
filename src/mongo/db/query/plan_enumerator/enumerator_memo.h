@@ -31,6 +31,7 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/index_tag.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <map>
