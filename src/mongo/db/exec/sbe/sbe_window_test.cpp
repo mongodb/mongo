@@ -552,4 +552,35 @@ TEST_F(WindowStageTest, ForceSpillWindowTest) {
     ASSERT_GT(static_cast<const WindowStats*>(windowStage->getSpecificStats())->peakTrackedMemBytes,
               0);
 }
+
+TEST_F(WindowStageTest, ClosedBeforeOpenWindowTest) {
+    auto ctx = makeCompileCtx();
+    auto [dataTag, dataVal] =
+        stage_builder::makeValue(BSON_ARRAY(BSON_ARRAY("1" << 1 << 2 << 100)));
+    auto [slots, inputStage] = generateVirtualScanMulti(4, dataTag, dataVal);
+    value::SlotVector partitionSlots{slots[0]};
+    auto boundSlot1 = slots[1];
+    auto boundSlot2 = slots[2];
+    auto valueSlot = slots[3];
+    value::SlotVector forwardSlots{valueSlot};
+    std::vector<WindowOffset> windowOffsets{
+        {boundSlot1, boundSlot2, boost::none, boost::none},
+    };
+
+    auto [windowStage, windowSlots] = addWindowStage(std::move(inputStage),
+                                                     std::move(partitionSlots),
+                                                     std::move(forwardSlots),
+                                                     valueSlot,
+                                                     std::move(windowOffsets),
+                                                     boost::none /* collatorSlot */,
+                                                     true /* allowDiskUse */);
+
+    windowStage->attachToOperationContext(operationContext());
+    windowStage->prepare(*ctx);
+
+    // Close without open() to emulate a situiation where open() failed for an earlier stage.
+    windowStage->close();
+
+    assertFinalMemoryTrackerState(&windowStage->getMemoryTracker(), true /*allowZeroInUseMemory*/);
+}
 }  // namespace mongo::sbe

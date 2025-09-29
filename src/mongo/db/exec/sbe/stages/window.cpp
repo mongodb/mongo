@@ -82,6 +82,7 @@ WindowStage::WindowStage(std::unique_ptr<PlanStage> input,
 
     _records.reserve(_batchSize);
     _recordBuffers.reserve(_batchSize);
+    _windowIdRanges.assign(_windows.size(), std::make_pair(1, 0));
 }
 
 std::unique_ptr<PlanStage> WindowStage::clone() const {
@@ -540,8 +541,7 @@ value::SlotAccessor* WindowStage::getAccessor(CompileCtx& ctx, value::SlotId slo
 }
 
 void WindowStage::setPartition(int id) {
-    _windowIdRanges.clear();
-    _windowIdRanges.resize(_windows.size(), std::make_pair(id, id - 1));
+    _windowIdRanges.assign(_windows.size(), std::make_pair(id, id - 1));
 
     // The initializer codes may depend on buffered values in slot accessors. As such, we set
     // accessors for the current document before running any of the initializer codes.
@@ -584,8 +584,7 @@ void WindowStage::open(bool reOpen) {
     // Set our initial partiton, and initialize '_windowIdRanges' accordingly such that we can
     // estimate our memory usage after fetching the first row.
     _nextPartitionId = 1;
-    _windowIdRanges.clear();
-    _windowIdRanges.resize(_windows.size(), std::make_pair(1, 0));
+    _windowIdRanges.assign(_windows.size(), std::make_pair(1, 0));
 }
 
 PlanState WindowStage::getNext() {
