@@ -72,6 +72,7 @@ mongo_cc_library(
         "util.h",
     ],
     deps = [
+        ":ftdc_collection_metrics",
         "//src/mongo/bson:bson_validate",
         "//src/mongo/bson/util:bson_extract",
         "//src/mongo/db:server_base",
@@ -186,6 +187,7 @@ mongo_cc_library(
 mongo_cc_unit_test(
     name = "db_ftdc_test",
     srcs = [
+        "collection_metrics_test.cpp",
         "collector_test.cpp",
         "compressor_test.cpp",
         "controller_test.cpp",
@@ -204,5 +206,19 @@ mongo_cc_unit_test(
         "//src/mongo/db:service_context_test_fixture",
         "//src/mongo/db/auth:authmocks",
         "//src/mongo/util:clock_source_mock",
+    ],
+)
+
+mongo_cc_library(
+    name = "ftdc_collection_metrics",
+    srcs = [
+        "collection_metrics.cpp",
+    ],
+    hdrs = [
+        "collection_metrics.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo/db:service_context",
     ],
 )
