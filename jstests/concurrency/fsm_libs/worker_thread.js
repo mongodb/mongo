@@ -145,7 +145,7 @@ export const workerThread = (function () {
                     const printArgs = Array.from(arguments);
                     const prefix = "[tid:" + args.tid + connectionDesc + "]";
                     printArgs.unshift(prefix);
-                    return printOriginal.apply(this, printArgs);
+                    return printOriginal(printArgs.join(" "));
                 };
 
                 jsTestLog = function (msg) {
