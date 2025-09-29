@@ -194,10 +194,26 @@ function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
      * maximum of 50 milliseconds.
      */
     function setFastGetMoreEnabled(node) {
-        assert.commandWorked(
-            node.adminCommand(
-                {configureFailPoint: 'setSmallOplogGetMoreMaxTimeMS', mode: 'alwaysOn'}),
-            `Failed to enable setSmallOplogGetMoreMaxTimeMS failpoint.`);
+        assert.soon(
+            () => {
+                try {
+                    assert.commandWorked(
+                        node.adminCommand({
+                            configureFailPoint: "setSmallOplogGetMoreMaxTimeMS",
+                            mode: "alwaysOn"
+                        }),
+                        `Failed to enable setSmallOplogGetMoreMaxTimeMS failpoint.`,
+                    );
+                    return true;
+                } catch (e) {
+                    if (isNetworkError(e)) {
+                        return false;
+                    }
+                    throw e;
+                }
+            },
+            `Failed to set failpoint "setSmallOplogGetMoreMaxTimeMS" on ${tojson(node.host)}`,
+        );
     }
 
     /**
