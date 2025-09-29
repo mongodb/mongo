@@ -97,6 +97,7 @@ selector:
     - jstests/core/**/update_array_offset_positional.js
     - jstests/core/**/update_arrayFilters.js
     - jstests/core/**/update_find_and_modify_id.js
+    - jstests/core/**/update_metrics.js
     - jstests/core/**/update_modifier_pop.js
     - jstests/core/**/update_dollar_fields.js
     - jstests/core/**/update_fail_halts_modifications.js
