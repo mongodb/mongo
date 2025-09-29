@@ -46,6 +46,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <memory>
@@ -57,7 +58,7 @@
 
 namespace mongo {
 
-class CompactStructuredEncryptionDataCoordinator final
+class MONGO_MOD_PUB CompactStructuredEncryptionDataCoordinator final
     : public RecoverableShardingDDLCoordinator<CompactStructuredEncryptionDataState,
                                                CompactStructuredEncryptionDataPhaseEnum> {
 public:

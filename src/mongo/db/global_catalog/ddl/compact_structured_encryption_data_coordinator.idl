@@ -39,6 +39,7 @@ enums:
     CompactStructuredEncryptionDataPhase:
         description: "The current phase of the compactStructuredEncryptionData pipeline"
         type: string
+        mod_visibility: private
         values:
             kUnset: "unset"
             kRenameEcocForCompact: "rename-ecoc-for-compact"
@@ -51,6 +52,7 @@ structs:
             "Represents the state of the compactStructuredEncryptionData pipeline
             for protocol version 2"
         strict: false
+        mod_visibility: pub
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
         fields:

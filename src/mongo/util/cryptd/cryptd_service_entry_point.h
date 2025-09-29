@@ -32,6 +32,7 @@
 #include "mongo/transport/client_transport_observer.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session_manager_common.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

@@ -38,6 +38,7 @@ enums:
     CleanupStructuredEncryptionDataPhase:
         description: "The current phase of the cleanupStructuredEncryptionData pipeline"
         type: string
+        mod_visibility: private
         values:
             kUnset: "unset"
             kRenameEcocForCleanup: "rename-collections-for-cleanup"
@@ -51,6 +52,7 @@ structs:
             "Represents the state of the cleanupStructuredEncryptionData pipeline
             for protocol version 2"
         strict: false
+        mod_visibility: pub
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
         fields:

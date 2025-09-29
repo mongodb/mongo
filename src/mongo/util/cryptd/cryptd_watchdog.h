@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/service_context.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

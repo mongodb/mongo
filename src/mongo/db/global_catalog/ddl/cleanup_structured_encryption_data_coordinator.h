@@ -46,6 +46,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <set>
@@ -54,7 +55,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 class CleanupStructuredEncryptionDataCoordinator final
     : public RecoverableShardingDDLCoordinator<CleanupStructuredEncryptionDataState,
@@ -115,4 +116,4 @@ private:
 };
 
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

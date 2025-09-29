@@ -42,12 +42,13 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/util/modules.h"
 
 #include <cstdint>
 #include <utility>
 #include <vector>
 
-namespace mongo {
+namespace MONGO_MOD_PRIVATE mongo {
 
 class FLEQueryInterfaceMock : public FLEQueryInterface {
 public:
@@ -104,4 +105,4 @@ private:
     repl::StorageInterface* _storage;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PRIVATE mongo

@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <numeric>
@@ -49,8 +50,7 @@
 
 namespace mongo {
 
-struct EncryptedStateCollectionsNamespaces {
-
+struct MONGO_MOD_PUB EncryptedStateCollectionsNamespaces {
     static StatusWith<EncryptedStateCollectionsNamespaces> createFromDataCollection(
         const Collection& edc);
 
@@ -66,12 +66,14 @@ using FLECleanupESCDeleteQueue = std::priority_queue<PrfBlock>;
 /**
  * Validate a compact request has the right encryption tokens.
  */
-void validateCompactRequest(const CompactStructuredEncryptionData& request, const Collection& edc);
+MONGO_MOD_PUB void validateCompactRequest(const CompactStructuredEncryptionData& request,
+                                          const Collection& edc);
 
 /**
  * Validate a cleanup request has the right encryption tokens.
  */
-void validateCleanupRequest(const CleanupStructuredEncryptionData& request, const Collection& edc);
+MONGO_MOD_PUB void validateCleanupRequest(const CleanupStructuredEncryptionData& request,
+                                          const Collection& edc);
 
 
 void processFLECompactV2(OperationContext* opCtx,

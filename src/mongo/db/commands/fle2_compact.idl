@@ -38,6 +38,7 @@ structs:
     CompactStructuredEncryptionDataCommandReply:
         description: "Reply from the {compactStructuredEncryptionData: ...} command"
         strict: true
+        mod_visibility: private
         is_command_reply: true
         fields:
             stats: CompactStats
@@ -49,6 +50,7 @@ commands:
         api_version: ""
         namespace: concatenate_with_db
         strict: true
+        mod_visibility: pub
         reply_type: CompactStructuredEncryptionDataCommandReply
         fields:
             compactionTokens:
