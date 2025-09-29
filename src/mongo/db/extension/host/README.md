@@ -33,3 +33,30 @@ aggregation stages through the host portal.
 If there are any issues while loading an extension, an error will be logged and startup will fail.
 If a node successfully starts up, that means all extensions requested through the `loadExtensions`
 startup option were successfully loaded, and we will log a success message.
+
+## Extension Configuration Files
+
+Each extension loaded at startup must have:
+
+1. A `SharedLibrary` file (`*.so`) - the compiled extension
+2. A configuration file (`<extensionName>.conf`) - located under `/etc/mongo/extensions`.
+
+Configuration files use YAML syntax and must define:
+
+1. `sharedLibraryPath`: The path to the extensions `SharedLibrary` (`.so`) file.
+2. `extensionOptions`: Key-value pairs of extension-specific options, passed to the extension during
+   initialization via the `MongoExtensionHostPortal`.
+
+For example:
+
+```yml
+# /etc/mongo/extensions/toaster.conf
+sharedLibraryPath: /path/to/toaster.so
+extensionOptions:
+  maxHeat: 5
+  allowBagels: true
+```
+
+At startup, the host will first load a `.conf` file, then use its `sharedLibraryPath` to access and
+load the `SharedLibrary` file that represents the extension and pass the corresponding
+`extensionOptions` to its initialization function.
