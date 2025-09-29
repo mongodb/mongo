@@ -293,10 +293,6 @@ std::unique_ptr<CanonicalQuery> parseCanonicalQuery(
         distinctRequest.getSampleId(),
         isDistinctMultiplanningEnabled ? boost::make_optional(projection) : boost::none));
 
-    if (auto collator = expCtx->getCollator()) {
-        cq->setCollator(collator->clone());
-    }
-
     return cq;
 }
 

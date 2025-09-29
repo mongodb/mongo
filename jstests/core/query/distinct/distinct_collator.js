@@ -9,7 +9,7 @@
  */
 
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
-const coll = assertDropAndRecreateCollection(db, jsTestName());
+let coll = assertDropAndRecreateCollection(db, jsTestName());
 
 let docs = [];
 docs.push({_id: {a: []}});
@@ -59,4 +59,15 @@ locales.forEach((locale) => {
     }
 });
 
-coll.drop();
+// Verify that $sortArray can be used in distinct command.
+coll = assertDropAndRecreateCollection(db, jsTestName());
+coll.insert({array: ["yellow", "red"]});
+coll.insert({array: ["red", "yellow"]});
+assert.commandWorked(
+    db.runCommand({
+        distinct: jsTestName(),
+        key: "array",
+        query: {$expr: {$sortArray: {input: "$array", sortBy: -1}}},
+        collation: {locale: "el"},
+    }),
+);
