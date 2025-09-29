@@ -30,10 +30,10 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/extension/host_adapter/extension_status.h"
 #include "mongo/db/extension/host_adapter/handle.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
+#include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/util/modules.h"
 
 #include <absl/base/nullability.h>
@@ -85,11 +85,6 @@ public:
     }
 
     /**
-     * Return the expanded pipeline BSON vector for this stage.
-     */
-    std::vector<BSONObj> getExpandedPipelineVec() const;
-
-    /**
      * Parse the user provided stage definition for this stage descriptor.
      *
      * stageBson contains a BSON document with a single (stageName, stageDefinition) element
@@ -112,6 +107,37 @@ protected:
         tassert(10930104,
                 "ExtensionAggregationStageDescriptor 'parse' is null",
                 vtable.parse != nullptr);
+    }
+};
+
+/**
+ * ExtensionAggregationStageParseNodeHandle is a wrapper around a
+ * MongoExtensionAggregationStageParseNode.
+ */
+class ExtensionAggregationStageParseNodeHandle
+    : public OwnedHandle<::MongoExtensionAggregationStageParseNode> {
+public:
+    ExtensionAggregationStageParseNodeHandle(
+        absl::Nonnull<::MongoExtensionAggregationStageParseNode*> parseNode)
+        : OwnedHandle<::MongoExtensionAggregationStageParseNode>(parseNode) {
+        _assertValidVTable();
+    }
+
+    // TODO(SERVER-111368): Add getQueryShape().
+
+    /**
+     * Gets the expanded pipeline BSON vector for this stage.
+     */
+    std::vector<BSONObj> getExpandedPipelineVec() const;
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10977601,
+                "ExtensionAggregationStageParseNode 'get_query_shape' is null",
+                vtable.get_query_shape != nullptr);
+        tassert(10977602,
+                "ExtensionAggregationStageParseNode 'expand' is null",
+                vtable.expand != nullptr);
     }
 };
 }  // namespace mongo::extension::host_adapter

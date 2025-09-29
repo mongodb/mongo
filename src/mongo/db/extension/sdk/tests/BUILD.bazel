@@ -5,6 +5,7 @@ package(default_visibility = ["//visibility:public"])
 mongo_cc_unit_test(
     name = "extension_sdk_test",
     srcs = [
+        "aggregation_stage_test.cpp",
         "byte_buf_utils_test.cpp",
         "extension_status_test.cpp",
         "handle_test.cpp",
@@ -14,6 +15,7 @@ mongo_cc_unit_test(
     tags = ["mongo_unittest_second_group"],
     deps = [
         "//src/mongo:base",
+        "//src/mongo/db/extension/host_adapter:extensions_host_adapter",
         "//src/mongo/db/extension/sdk:sdk_cpp",
     ],
 )

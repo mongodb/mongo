@@ -29,10 +29,21 @@
 #include "mongo/db/extension/host_adapter/aggregation_stage.h"
 
 #include "mongo/db/extension/sdk/byte_buf.h"
+#include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 
 namespace mongo::extension::host_adapter {
-std::vector<BSONObj> ExtensionAggregationStageDescriptorHandle::getExpandedPipelineVec() const {
+
+ExtensionLogicalAggregationStageHandle ExtensionAggregationStageDescriptorHandle::parse(
+    BSONObj stageBson) const {
+    ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
+    // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
+    sdk::enterC(
+        [&]() { return vtable().parse(get(), sdk::objAsByteView(stageBson), &logicalStagePtr); });
+    return ExtensionLogicalAggregationStageHandle(logicalStagePtr);
+}
+
+std::vector<BSONObj> ExtensionAggregationStageParseNodeHandle::getExpandedPipelineVec() const {
     ::MongoExtensionByteBuf* buf;
     const auto& vtbl = vtable();
     auto* ptr = get();
@@ -48,15 +59,5 @@ std::vector<BSONObj> ExtensionAggregationStageDescriptorHandle::getExpandedPipel
     BSONArray arr(ownedBob);
     auto wrappedPipeline = BSON("pipeline" << arr);
     return parsePipelineFromBSON(wrappedPipeline.firstElement());
-}
-
-ExtensionLogicalAggregationStageHandle ExtensionAggregationStageDescriptorHandle::parse(
-    BSONObj stageBson) const {
-    ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
-    const auto& vtbl = vtable();
-    auto* ptr = get();
-    // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
-    sdk::enterC([&]() { return vtbl.parse(ptr, sdk::objAsByteView(stageBson), &logicalStagePtr); });
-    return ExtensionLogicalAggregationStageHandle(logicalStagePtr);
 }
 }  // namespace mongo::extension::host_adapter

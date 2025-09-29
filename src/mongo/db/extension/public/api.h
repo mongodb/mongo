@@ -192,15 +192,6 @@ typedef struct MongoExtensionAggregationStageDescriptorVTable {
     MongoExtensionStatus* (*parse)(const MongoExtensionAggregationStageDescriptor* descriptor,
                                    MongoExtensionByteView stageBson,
                                    struct MongoExtensionLogicalAggregationStage** logicalStage);
-
-    /**
-     * Populates MongoExtensionByteBuf pointer with the stage's expanded pipeline as serialized BSON
-     * if it desugars. If the stage doesn't desugar, the pointer is not populated.
-     *
-     * Both the returned MongoExtensionStatus and expandedPipelineBSON are owned by the caller.
-     */
-    MongoExtensionStatus* (*expand)(const MongoExtensionAggregationStageDescriptor* descriptor,
-                                    MongoExtensionByteBuf** expandedPipelineBSON);
 } MongoExtensionAggregationStageDescriptorVTable;
 
 /**
@@ -222,6 +213,41 @@ typedef struct MongoExtensionLogicalAggregationStageVTable {
      */
     void (*destroy)(MongoExtensionLogicalAggregationStage* logicalStage);
 } MongoExtensionLogicalAggregationStageVTable;
+
+/**
+ * A MongoExtensionAggregationStageParseNode is representative of an aggregation
+ * stage that has undergone a preliminary parse focusing on syntax validation (i.e., no expression
+ * context). A parse node is responsible for validating syntax, generating a query shape, and
+ * expanding into one or more nodes which can participate in the next phase of validation.
+ */
+typedef struct MongoExtensionAggregationStageParseNode {
+    const struct MongoExtensionAggregationStageParseNodeVTable* const vtable;
+} MongoExtensionAggregationStageParseNode;
+
+/**
+ * Virtual function table for MongoExtensionAggregationStageParseNode.
+ */
+typedef struct MongoExtensionAggregationStageParseNodeVTable {
+    /**
+     * Destroys object and frees related resources.
+     */
+    void (*destroy)(MongoExtensionAggregationStageParseNode* parseNode);
+
+    /**
+     * Populates the ByteBuf with the stage's query shape as serialized BSON. Ownership is
+     * transferred to the caller.
+     */
+    MongoExtensionStatus* (*get_query_shape)(
+        const MongoExtensionAggregationStageParseNode* parseNode,
+        MongoExtensionByteBuf** queryShape);
+
+    /**
+     * Populates ByteBuf with the stage's expansion. Ownership is transferred to the
+     * caller.
+     */
+    MongoExtensionStatus* (*expand)(const MongoExtensionAggregationStageParseNode* parseNode,
+                                    MongoExtensionByteBuf** expansionArray);
+} MongoExtensionAggregationStageParseNodeVTable;
 
 /**
  * MongoExtensionHostPortal serves as the entry point for extensions to integrate with the

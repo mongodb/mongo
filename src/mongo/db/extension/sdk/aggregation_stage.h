@@ -31,6 +31,7 @@
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/byte_buf.h"
 #include "mongo/db/extension/sdk/extension_status.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/modules.h"
 
 #include <memory>
@@ -38,6 +39,7 @@
 #include <string_view>
 
 namespace mongo::extension::sdk {
+
 /**
  * LogicalAggregationStage is the base class for implementing the
  * ::MongoExtensionLogicalAggregationStage interface by an extension.
@@ -71,7 +73,7 @@ public:
 
 private:
     static void _extDestroy(::MongoExtensionLogicalAggregationStage* extlogicalStage) noexcept {
-        delete static_cast<extension::sdk::ExtensionLogicalAggregationStage*>(extlogicalStage);
+        delete static_cast<ExtensionLogicalAggregationStage*>(extlogicalStage);
     }
 
     static const ::MongoExtensionLogicalAggregationStageVTable VTABLE;
@@ -99,12 +101,6 @@ public:
 
     virtual std::unique_ptr<class LogicalAggregationStage> parse(BSONObj stageBson) const = 0;
 
-    // This function should only be called on a kDesugar descriptor and must be overridden by
-    // kDesugar stages. If the stage desugars into nothing, return an empty BSONArray.
-    virtual BSONArray expand() const {
-        tasserted(11038200, "expand() must be overridden for kDesugar stages.");
-    }
-
 protected:
     AggregationStageDescriptor(std::string name, ::MongoExtensionAggregationStageType type)
         : _name(std::move(name)), _type(type) {}
@@ -121,8 +117,8 @@ protected:
  * C++ context to the C API context.
  *
  * This abstraction is required to ensure we maintain the public
- * ::MongoExtensionAggregationStageDescriptor interface and layout as dictacted by the public API.
- * Any polymorphic bevahiour must be deferred to and implemented by the AggregationStageDescriptor.
+ * ::MongoExtensionAggregationStageDescriptor interface and layout as dictated by the public API.
+ * Any polymorphic behavior must be deferred to and implemented by the AggregationStageDescriptor.
  */
 class ExtensionAggregationStageDescriptor final
     : public ::MongoExtensionAggregationStageDescriptor {
@@ -132,6 +128,7 @@ public:
 
     ~ExtensionAggregationStageDescriptor() = default;
 
+private:
     const AggregationStageDescriptor& getImpl() const {
         return *_descriptor;
     }
@@ -140,18 +137,17 @@ public:
         return *_descriptor;
     }
 
-private:
     static ::MongoExtensionByteView _extGetName(
         const ::MongoExtensionAggregationStageDescriptor* descriptor) noexcept {
         return stringViewAsByteView(
-            static_cast<const extension::sdk::ExtensionAggregationStageDescriptor*>(descriptor)
+            static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
                 ->getImpl()
                 .getName());
     }
 
     static ::MongoExtensionAggregationStageType _extGetType(
         const ::MongoExtensionAggregationStageDescriptor* descriptor) noexcept {
-        return static_cast<const extension::sdk::ExtensionAggregationStageDescriptor*>(descriptor)
+        return static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
             ->getImpl()
             .getType();
     }
@@ -160,42 +156,91 @@ private:
         const ::MongoExtensionAggregationStageDescriptor* descriptor,
         ::MongoExtensionByteView stageBson,
         ::MongoExtensionLogicalAggregationStage** logicalStage) noexcept {
-        return extension::sdk::enterCXX([&]() {
+        return enterCXX([&]() {
             auto logicalStagePtr =
-                static_cast<const extension::sdk::ExtensionAggregationStageDescriptor*>(descriptor)
+                static_cast<const ExtensionAggregationStageDescriptor*>(descriptor)
                     ->getImpl()
                     .parse(bsonObjFromByteView(stageBson));
 
             *logicalStage =
-                std::make_unique<mongo::extension::sdk::ExtensionLogicalAggregationStage>(
-                    std::move(logicalStagePtr))
+                std::make_unique<ExtensionLogicalAggregationStage>(std::move(logicalStagePtr))
                     .release();
-        });
-    }
-
-    static ::MongoExtensionStatus* _extExpand(
-        const ::MongoExtensionAggregationStageDescriptor* descriptor,
-        ::MongoExtensionByteBuf** expandedPipelineBSON) noexcept {
-        return extension::sdk::enterCXX([&]() {
-            *expandedPipelineBSON = nullptr;
-
-            const auto& impl =
-                static_cast<const extension::sdk::ExtensionAggregationStageDescriptor*>(descriptor)
-                    ->getImpl();
-
-            tassert(11038201,
-                    "Only kDesugar stages can override expand(). It is invalid to call expand() on "
-                    "any other stage type.",
-                    impl.getType() == ::MongoExtensionAggregationStageType::kDesugar);
-
-            // Only update expandedPipelineBSON with real memory once we have a successful code
-            // path.
-            auto tmp = std::make_unique<VecByteBuf>(impl.expand());
-            *expandedPipelineBSON = tmp.release();
         });
     }
 
     static const ::MongoExtensionAggregationStageDescriptorVTable VTABLE;
     std::unique_ptr<AggregationStageDescriptor> _descriptor;
+};
+
+/**
+ * AggregationStageParseNode is the base class for implementing the
+ * ::MongoExtensionAggregationStageParseNode interface by an extension.
+ *
+ * An extension aggregation stage parse node must provide a specialization of this base class and
+ * expose it to the host as an ExtensionAggregationStageParseNode.
+ */
+class AggregationStageParseNode {
+public:
+    virtual ~AggregationStageParseNode() = default;
+
+    // TODO(SERVER-111368): Add getQueryShape().
+
+    virtual BSONArray expand() const = 0;
+};
+
+/**
+ * ExtensionAggregationStageParseNode is a boundary object representation of a
+ * ::MongoExtensionAggregationStageParseNode. It is meant to abstract away the C++ implementation by
+ * the extension, and provides the interface at the API boundary which will be called upon by the
+ * host. The static VTABLE member points to static methods which ensure the correct conversion from
+ * C++ context to the C API context.
+ *
+ * This abstraction is required to ensure we maintain the public
+ * ::MongoExtensionAggregationStageParseNode interface and layout as dictated by the public API.
+ * Any polymorphic behavior must be deferred to and implemented by the AggregationStageParseNode.
+ */
+class ExtensionAggregationStageParseNode final : public ::MongoExtensionAggregationStageParseNode {
+public:
+    ExtensionAggregationStageParseNode(std::unique_ptr<AggregationStageParseNode> parseNode)
+        : ::MongoExtensionAggregationStageParseNode(&VTABLE), _parseNode(std::move(parseNode)) {}
+
+    ~ExtensionAggregationStageParseNode() = default;
+
+private:
+    const AggregationStageParseNode& getImpl() const {
+        return *_parseNode;
+    }
+
+    AggregationStageParseNode& getImpl() {
+        return *_parseNode;
+    }
+
+    static void _extDestroy(::MongoExtensionAggregationStageParseNode* parseNode) noexcept {
+        delete static_cast<ExtensionAggregationStageParseNode*>(parseNode);
+    }
+
+    static ::MongoExtensionStatus* _extGetQueryShape(
+        const ::MongoExtensionAggregationStageParseNode* parseNode,
+        ::MongoExtensionByteBuf** queryShape) noexcept {
+        // TODO(SERVER-111368): Implement.
+        MONGO_UNIMPLEMENTED;
+    };
+
+    static ::MongoExtensionStatus* _extExpand(
+        const ::MongoExtensionAggregationStageParseNode* parseNode,
+        ::MongoExtensionByteBuf** expandedPipelineBson) noexcept {
+        return enterCXX([&]() {
+            *expandedPipelineBson = nullptr;
+
+            const auto& impl =
+                static_cast<const ExtensionAggregationStageParseNode*>(parseNode)->getImpl();
+
+            auto tmp = std::make_unique<VecByteBuf>(impl.expand());
+            *expandedPipelineBson = tmp.release();
+        });
+    }
+
+    static const ::MongoExtensionAggregationStageParseNodeVTable VTABLE;
+    std::unique_ptr<AggregationStageParseNode> _parseNode;
 };
 }  // namespace mongo::extension::sdk
