@@ -349,7 +349,9 @@ std::unique_ptr<EExpression> EPrimBinary::clone() const {
     if (_nodes.size() == 2) {
         return std::make_unique<EPrimBinary>(_op, _nodes[0]->clone(), _nodes[1]->clone());
     } else {
-        invariant(_nodes.size() == 3);
+        tassert(11093400,
+                "Unexpected number of nodes in binary primitive operation",
+                _nodes.size() == 3);
         return std::make_unique<EPrimBinary>(
             _op, _nodes[0]->clone(), _nodes[1]->clone(), _nodes[2]->clone());
     }
@@ -358,7 +360,7 @@ std::unique_ptr<EExpression> EPrimBinary::clone() const {
 vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
     const bool hasCollatorArg = (_nodes.size() == 3);
 
-    invariant(!hasCollatorArg || isComparisonOp(_op));
+    tassert(11093401, "Operation is not a comparison", !hasCollatorArg || isComparisonOp(_op));
 
     if (_op == EPrimBinary::logicAnd) {
         auto clauses = collectAndClauses();
@@ -461,7 +463,7 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
 }
 
 std::vector<const EExpression*> EPrimBinary::collectOrClauses() const {
-    invariant(_op == EPrimBinary::Op::logicOr);
+    tassert(11093402, "Unexpected operation type", _op == EPrimBinary::Op::logicOr);
 
     auto expandPredicate = [](const EExpression* expr) {
         const EPrimBinary* binaryExpr = expr->as<EPrimBinary>();
@@ -487,7 +489,7 @@ std::vector<DebugPrinter::Block> EPrimBinary::debugPrint() const {
     bool hasCollatorArg = (_nodes.size() == 3);
     std::vector<DebugPrinter::Block> ret;
 
-    invariant(!hasCollatorArg || isComparisonOp(_op));
+    tassert(11093403, "Operation is not a comparison", !hasCollatorArg || isComparisonOp(_op));
 
     ret.emplace_back("(`");
     DebugPrinter::addBlocks(ret, _nodes[0]->debugPrint());

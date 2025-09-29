@@ -120,7 +120,7 @@ protected:
      */
     void validateNodes() {
         for (auto& node : _nodes) {
-            invariant(node);
+            tassert(11093404, "Unexpected empty node in expression", node);
         }
     }
 
@@ -406,7 +406,7 @@ public:
         _nodes.emplace_back(std::move(rhs));
 
         if (collator) {
-            invariant(isComparisonOp(_op));
+            tassert(11093405, "Operation is not a comparison", isComparisonOp(_op));
             _nodes.emplace_back(std::move(collator));
         }
 

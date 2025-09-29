@@ -97,7 +97,7 @@ void RuntimeEnvironment::resetSlot(value::SlotId slot,
                                    value::Value val,
                                    bool owned) {
     // With intra-query parallelism enabled the global environment can hold only read-only values.
-    invariant(!_isSmp);
+    tassert(11093406, "Cannot reset slot because parallelism is enabled", !_isSmp);
 
     if (auto it = _accessors.find(slot); it != _accessors.end()) {
         it->second.reset(owned, tag, val);
