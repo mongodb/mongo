@@ -56,16 +56,24 @@ structs:
         # C++ code. The API compatibility checker does not enforce stability of the types of these fields,
         # only of their names (i.e. that none are removed or have their name changed).
         fields:
+            # The only value supported today is "1".
             apiVersion:
                 type: string
                 forward_to_shards: false
                 optional: true
                 stability: "stable"
+            # When set to true, this causes commands outside the declared API version to return an
+            # APIStrictError and causes indexes unsupported by the current API version to be
+            # ignored by the query planner. If this field is specified, 'apiVersion' must also be
+            # specified.
             apiStrict:
                 type: bool
                 forward_to_shards: false
                 optional: true
                 stability: "stable"
+            # When set to true, this causes commands and behaviours that are deprecated in the
+            # current API version to return an APIDeprecationError. If this field is specified,
+            # 'apiVersion' must also be specified.
             apiDeprecationErrors:
                 type: bool
                 forward_to_shards: false
