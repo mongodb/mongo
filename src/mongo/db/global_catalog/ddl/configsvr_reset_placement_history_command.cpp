@@ -43,7 +43,6 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/sharding_environment/sharding_feature_flags_gen.h"
 #include "mongo/db/topology/cluster_role.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
@@ -96,6 +95,15 @@ public:
             // been initialized yet.
             // TODO Revisit this invariant once this workflow gets integrated into addShard.
             invariant(!VersionContext::getDecoration(opCtx).isInitialized());
+
+            if (const auto fcvSnapshot = fcvRegion->acquireFCVSnapshot();
+                !feature_flags::gFeatureFlagChangeStreamPreciseShardTargeting.isEnabled(
+                    VersionContext::getDecoration(opCtx), fcvSnapshot)) {
+                uasserted(ErrorCodes::CommandNotSupported,
+                          "Unable to initialize config.placementHistory under the currently active "
+                          "FCV version");
+            }
+
             InitializePlacementHistoryCoordinatorDocument coordinatorDoc;
             coordinatorDoc.setShardingDDLCoordinatorMetadata(
                 {{NamespaceString::kConfigsvrPlacementHistoryNamespace,

@@ -365,14 +365,16 @@ export let MongosAPIParametersUtil = (function () {
         },
         {
             commandName: "resetPlacementHistory",
-            run: {
+            // The command is expected to fail when the featureFlagChangeStreamPreciseShardTargeting is disabled.
+            skip: "SERVER-73741 Re-enable execution once 9.0 becomes last-lts.",
+            /* run: {
                 inAPIVersion1: false,
                 configServerCommandName: "_configsvrResetPlacementHistory",
                 runsAgainstAdminDb: true,
                 permittedInTxn: false,
                 permittedOnShardedCollection: true,
                 command: () => ({resetPlacementHistory: 1}),
-            },
+            },*/
         },
         {
             commandName: "setAuditConfig",

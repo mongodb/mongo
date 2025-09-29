@@ -1348,9 +1348,9 @@ const allCommands = {
         command: {replSetResizeOplog: 1, minRetentionHours: 1},
     },
     resetPlacementHistory: {
-        command: {resetPlacementHistory: 1},
-        isShardedOnly: true,
-        isAdminCommand: true,
+        // The command is expected to fail when the featureFlagChangeStreamPreciseShardTargeting is disabled.
+        // TODO SERVER-73741 Re-enable execution once 9.0 becomes last-lts.
+        skip: "Cannot run while downgrading",
     },
     reshardCollection: {skip: cannotRunWhileDowngrading},
     revokePrivilegesFromRole: {

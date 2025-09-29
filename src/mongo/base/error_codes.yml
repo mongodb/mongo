@@ -947,6 +947,8 @@ error_codes:
       categories: [NonResumableChangeStreamError],
     }
 
+  - {code: 465, name: PlacementHistoryInitializationInProgress}
+
   # Error codes 4000-8999 are reserved.
 
   # Non-sequential error codes for compatibility only)

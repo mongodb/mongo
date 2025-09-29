@@ -1,192 +1,32 @@
 /**
- * Performs a series of placement-changing commands (DDLs and chunk migrations) while
- * resetPlacementHistory may be run in parallel. After tearing down the test, the
- * check_routing_table_consistency hook will verify that the content config.placementHistory will
- * still be consistent with the rest of the catalog.
+ * Executes a series of placement-changing DDLs while resetPlacementHistory runs in parallel.
+ * After tearing down the test, the check_routing_table_consistency hook will verify that
+ * the content config.placementHistory will still be consistent with the rest of the catalog.
  *
  * @tags: [
- *   requires_fcv_71,
+ *   featureFlagChangeStreamPreciseShardTargeting,
  *   requires_sharding,
- *   assumes_balancer_off,
- *   does_not_support_causal_consistency,
- *   does_not_support_add_remove_shards,
- *   # The mechanism to pick a random collection is not resilient to stepdowns
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
  *  ]
  */
 
-import {ChunkHelper} from "jstests/concurrency/fsm_workload_helpers/chunks.js";
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {uniformDistTransitions} from "jstests/concurrency/fsm_workload_helpers/state_transition_utils.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/ddl/random_ddl/random_ddl_operations.js";
 
-export const $config = (function () {
-    const testCollectionsState = "testCollectionsState";
-    const resetPlacementHistoryState = "resetPlacementHistoryState";
-    const resetPlacementHistoryStateId = "x";
-    const numThreads = 12;
-    const numTestCollections = numThreads + 5;
+export const $config = extendWorkload($baseConfig, function ($config, $super) {
+    // Use multiple databases to increase the chance of collisions when running resetPlacementHistory.
+    $config.data.dbCount = 3;
 
-    function getConfig(db) {
-        return db.getSiblingDB("config");
-    }
+    // Metadata consistency checks are not relevant to qualify the behavior of resetPlacementHistory and may be avoided.
+    delete $config.states.checkDatabaseMetadataConsistency;
+    delete $config.states.checkCollectionMetadataConsistency;
 
-    /**
-     * Used to guarantee that a namespace isn't targeted by multiple FSM thread at the same time.
-     */
-    function acquireCollectionName(db, mustBeAlreadyCreated = true) {
-        let acquiredCollDoc = null;
-        assert.soon(function () {
-            const query = {acquired: false};
-            if (mustBeAlreadyCreated) {
-                query.created = true;
-            }
-            acquiredCollDoc = db[testCollectionsState].findAndModify({
-                query: query,
-                sort: {lastAcquired: 1},
-                update: {$set: {acquired: true, lastAcquired: new Date()}},
-            });
-            return acquiredCollDoc !== null;
-        });
-        return acquiredCollDoc.collName;
-    }
-
-    function releaseCollectionName(db, collName, wasDropped = false) {
-        // in case of collection dropped, leave a chance of reusing the same name during the next
-        // shardCollection
-        const newExtension = wasDropped && Math.random() < 0.5 ? "e" : "";
-        const match = db[testCollectionsState].findAndModify({
-            query: {collName: collName, acquired: true},
-            update: {$set: {collName: collName + newExtension, acquired: false, created: !wasDropped}},
-        });
-        assert(match !== null);
-    }
-
-    let states = {
-        shardCollection: function (db, _, connCache) {
-            // To avoid starvation problems during the execution of the FSM, it is OK to pick
-            // up an already sharded collection.
-            const collName = acquireCollectionName(db, false /*mustBeAlreadyCreated*/);
-            try {
-                jsTestLog(`Beginning shardCollection state for ${collName}`);
-                assert.commandWorked(db.adminCommand({shardCollection: db[collName].getFullName(), key: {_id: 1}}));
-                jsTestLog(`shardCollection state for ${collName} completed`);
-            } finally {
-                releaseCollectionName(db, collName);
-            }
-        },
-
-        dropCollection: function (db, _, connCache) {
-            // To avoid starvation problems during the execution of the FSM, it is OK to pick
-            // up an already dropped collection.
-            const collName = acquireCollectionName(db, false /*mustBeAlreadyCreated*/);
-            try {
-                jsTestLog(`Beginning dropCollection state for ${collName}`);
-                // Avoid checking the outcome, as the drop may result into a no-op.
-                db[collName].drop();
-                jsTestLog(`dropCollection state for ${collName} completed`);
-            } finally {
-                releaseCollectionName(db, collName, true /*wasDropped*/);
-            }
-        },
-
-        renameCollection: function (db, _, connCache) {
-            const collName = acquireCollectionName(db);
-            const renamedCollName = collName + "_renamed";
-            try {
-                jsTestLog(`Beginning renameCollection state for ${collName}`);
-                assert.commandWorked(db[collName].renameCollection(renamedCollName));
-                // reverse the rename before leaving the state.
-                assert.commandWorked(db[renamedCollName].renameCollection(collName));
-                jsTestLog(`renameCollection state for ${collName} completed`);
-            } finally {
-                releaseCollectionName(db, collName);
-            }
-        },
-
-        moveChunk: function (db, _, connCache) {
-            const collName = acquireCollectionName(db);
-            try {
-                jsTestLog(`Beginning moveChunk state for ${collName}`);
-                const collUUID = getConfig(db).collections.findOne({_id: db[collName].getFullName()}).uuid;
-                assert(collUUID);
-                const shards = getConfig(db).shards.find().toArray();
-                const chunkToMove = getConfig(db).chunks.findOne({uuid: collUUID});
-                const destination = shards.filter((s) => s._id !== chunkToMove.shard)[
-                    Math.floor(Math.random() * (shards.length - 1))
-                ];
-                ChunkHelper.moveChunk(db, collName, [chunkToMove.min, chunkToMove.max], destination._id, true);
-                jsTestLog(`moveChunk state for ${collName} completed`);
-            } finally {
-                releaseCollectionName(db, collName);
-            }
-        },
-
-        resetPlacementHistory: function (db, collName, connCache) {
-            jsTestLog(`Beginning resetPlacementHistory state`);
-            assert.commandWorked(db.adminCommand({resetPlacementHistory: 1}));
-            jsTestLog(`resetPlacementHistory state completed`);
-        },
+    $config.states.resetPlacementHistory = function (db, collName, connCache) {
+        jsTest.log.info(`Executing resetPlacementHistory`);
+        assert.commandWorked(db.adminCommand({resetPlacementHistory: 1}));
+        jsTest.log.info(`resetPlacementHistory completed`);
     };
 
-    let transitions = {
-        shardCollection: {
-            shardCollection: 0.22,
-            dropCollection: 0.22,
-            renameCollection: 0.22,
-            moveChunk: 0.22,
-            resetPlacementHistory: 0.12,
-        },
-        dropCollection: {
-            shardCollection: 0.22,
-            dropCollection: 0.22,
-            renameCollection: 0.22,
-            moveChunk: 0.22,
-            resetPlacementHistory: 0.12,
-        },
-        renameCollection: {
-            shardCollection: 0.22,
-            dropCollection: 0.22,
-            renameCollection: 0.22,
-            moveChunk: 0.22,
-            resetPlacementHistory: 0.12,
-        },
-        moveChunk: {
-            shardCollection: 0.22,
-            dropCollection: 0.22,
-            renameCollection: 0.22,
-            moveChunk: 0.22,
-            resetPlacementHistory: 0.12,
-        },
-        resetPlacementHistory: {
-            shardCollection: 0.22,
-            dropCollection: 0.22,
-            renameCollection: 0.22,
-            moveChunk: 0.22,
-        },
-    };
-
-    let setup = function (db, _, cluster) {
-        for (let i = 0; i < numTestCollections; ++i) {
-            db[testCollectionsState].insert({
-                collName: `testColl_${i}`,
-                acquired: false,
-                lastAcquired: new Date(),
-                created: false,
-            });
-        }
-
-        db[resetPlacementHistoryState].insert({_id: resetPlacementHistoryStateId, ongoing: false});
-    };
-
-    let teardown = function (db, collName, cluster) {};
-
-    return {
-        threadCount: numThreads,
-        iterations: 32,
-        startState: "shardCollection",
-        states: states,
-        transitions: transitions,
-        setup: setup,
-        teardown: teardown,
-        passConnectionCache: true,
-    };
-})();
+    $config.transitions = uniformDistTransitions($config.states);
+    return $config;
+});

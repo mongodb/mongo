@@ -87,20 +87,22 @@ public:
             const auto& types = request().getTypes();
             IDLParserContext parserContext(Request::kTypesFieldName);
 
-            // Exclude add and remove shard from this since it is used to drain operations for add
-            // and remove shard.
             ShardingDDLCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
                 opCtx, [&](const ShardingDDLCoordinator& coordinatorInstance) -> bool {
                     const auto opType = coordinatorInstance.operationType();
+                    // Disregard DDL types that use this command as part of their workflow.
                     if (opType == DDLCoordinatorTypeEnum::kRemoveShardCommit ||
-                        opType == DDLCoordinatorTypeEnum::kAddShard) {
+                        opType == DDLCoordinatorTypeEnum::kAddShard ||
+                        opType == DDLCoordinatorTypeEnum::kInitializePlacementHistory) {
                         return false;
                     }
+                    // If the submitter specified a subset of types, only join those.
                     if (types) {
                         return std::ranges::any_of(*types, [&](StringData type) {
                             return DDLCoordinatorType_parse(type, parserContext) == opType;
                         });
                     }
+                    // Join all other types.
                     return true;
                 });
 

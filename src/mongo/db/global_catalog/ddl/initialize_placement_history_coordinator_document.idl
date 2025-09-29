@@ -43,8 +43,11 @@ enums:
         type: string
         values:
             kUnset: "unset"
-            kExecute: "execute"
-            kPostExecution: "postExecution"
+            kBlockDDLs: "blockDDLs"
+            kDefineInitializationTime: "defineInitializationTime"
+            kUnblockDDLs: "unblockDDLs"
+            kComputeInitialization: "computeInitialization"
+            kFinalize: "finalize"
 
 structs:
     InitializePlacementHistoryCoordinatorDocument:

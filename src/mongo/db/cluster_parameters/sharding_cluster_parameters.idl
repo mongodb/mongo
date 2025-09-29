@@ -91,6 +91,18 @@ structs:
                 type: bool
                 default: false
 
+    PlacementHistoryInitializationInProgressParam:
+        description: >-
+            Reflects whether the config server is currently managing a request to initialize the content of config.placementHistory.
+        inline_chained_structs: true
+        chained_structs:
+            ClusterServerParameter: clusterServerParameter
+        fields:
+            inProgress:
+                description: "True when there's an ongoing operation to initialize config.placementHistory, False otherwise."
+                type: bool
+                default: false
+
 server_parameters:
     shardedClusterCardinalityForDirectConns:
         description: >-
@@ -137,3 +149,14 @@ server_parameters:
         redact: false
         condition:
             min_fcv: 8.2
+
+    placementHistoryInitializationInProgress:
+        description: >-
+            Reflects whether the config server is currently managing a request to initialize the content of config.placementHistory.
+        set_at: cluster
+        omit_in_ftdc: false
+        cpp_vartype: PlacementHistoryInitializationInProgressParam
+        cpp_varname: placementHistoryInitializationInProgress
+        redact: false
+        condition:
+            min_fcv: 8.3

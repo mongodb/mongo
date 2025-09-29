@@ -431,6 +431,12 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx,
                 // Backoff
                 opCtx->sleepFor(Seconds(1));
                 continue;
+            } catch (const ExceptionFor<ErrorCodes::PlacementHistoryInitializationInProgress>&) {
+                LOGV2_WARNING(10899800,
+                              "Cannot start sharding DDL coordinator because an initialization of "
+                              "config.placementHistory is in progress. Will retry after backoff.");
+                opCtx->sleepFor(Seconds(1));
+                continue;
             } catch (const DBException& ex) {
                 LOGV2_ERROR(5390512,
                             "Failed to create instance of sharding DDL coordinator",
@@ -462,18 +468,34 @@ void ShardingDDLCoordinatorService::checkIfConflictsWithOtherInstances(
     auto coorMetadata = extractShardingDDLCoordinatorMetadata(initialState);
     const auto& opType = coorMetadata.getId().getOperationType();
     if (opType != DDLCoordinatorTypeEnum::kRemoveShardCommit &&
-        opType != DDLCoordinatorTypeEnum::kAddShard) {
+        opType != DDLCoordinatorTypeEnum::kAddShard &&
+        opType != DDLCoordinatorTypeEnum::kInitializePlacementHistory) {
 
-        auto* addOrRemoveShardInProgressParam =
-            ServerParameterSet::getClusterParameterSet()
-                ->get<ClusterParameterWithStorage<AddOrRemoveShardInProgressParam>>(
-                    "addOrRemoveShardInProgress");
-        const auto addOrRemoveShardInProgressVal =
-            addOrRemoveShardInProgressParam->getValue(boost::none).getInProgress();
+        const auto addOrRemoveShardInProgress = [] {
+            auto* clusterParameter =
+                ServerParameterSet::getClusterParameterSet()
+                    ->get<ClusterParameterWithStorage<AddOrRemoveShardInProgressParam>>(
+                        "addOrRemoveShardInProgress");
+            return clusterParameter->getValue(boost::none).getInProgress();
+        }();
 
         uassert(ErrorCodes::AddOrRemoveShardInProgress,
                 "Cannot start ShardingDDLCoordinator because a topology change is in progress",
-                !addOrRemoveShardInProgressVal);
+                !addOrRemoveShardInProgress);
+
+        const auto placementHistoryInitializationInProgress = [] {
+            auto* clusterParameter =
+                ServerParameterSet::getClusterParameterSet()
+                    ->get<
+                        ClusterParameterWithStorage<PlacementHistoryInitializationInProgressParam>>(
+                        "placementHistoryInitializationInProgress");
+            return clusterParameter->getValue(boost::none).getInProgress();
+        }();
+
+        uassert(ErrorCodes::PlacementHistoryInitializationInProgress,
+                "Cannot start ShardingDDLCoordinator because an initialization of "
+                "config.placementHistory is in progress",
+                !placementHistoryInitializationInProgress);
     }
 }
 

@@ -2,7 +2,9 @@
  * Test that reset placement history loads the correct snapshot. This is actually a test for
  * ensuring that an aggregation run on a local shard with snapshot read concern will only see the
  * snapshot data.
- * ]
+ * @tags: [
+ *   featureFlagChangeStreamPreciseShardTargeting,
+ *  ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";

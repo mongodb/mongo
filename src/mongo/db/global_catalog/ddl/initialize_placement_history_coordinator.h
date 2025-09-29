@@ -54,9 +54,9 @@ private:
         return InitializePlacementHistoryPhase_serializer(phase);
     }
 
-    bool _mustAlwaysMakeProgress() override {
-        return _doc.getPhase() > Phase::kUnset;
-    }
+    std::set<NamespaceString> _getAdditionalLocksToAcquire(OperationContext* opCtx) override;
+
+    bool _mustAlwaysMakeProgress() override;
 
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;

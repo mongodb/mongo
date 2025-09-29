@@ -31,11 +31,82 @@
 
 #include "mongo/db/global_catalog/ddl/placement_history_cleaner.h"
 #include "mongo/db/global_catalog/ddl/sharding_catalog_manager.h"
+#include "mongo/db/global_catalog/ddl/sharding_util.h"
+#include "mongo/db/global_catalog/ddl/shardsvr_join_ddl_coordinators_request_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-namespace {}  // namespace
+namespace {
+
+void joinDDLCoordinators(OperationContext* opCtx) {
+    ShardsvrJoinDDLCoordinators joinDDLsRequest;
+    joinDDLsRequest.setDbName(DatabaseName::kAdmin);
+
+    const auto allReplicaSets = [&] {
+        auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+        // A dedicated config server can also coordinate DDL operations; include it if not already
+        // present.
+        if (auto configShardId = Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId();
+            std::find(shardIds.begin(), shardIds.end(), configShardId) == shardIds.end()) {
+            shardIds.emplace_back(std::move(configShardId));
+        }
+        return shardIds;
+    }();
+
+    const auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    sharding_util::sendCommandToShards(
+        opCtx, DatabaseName::kAdmin, joinDDLsRequest.toBSON(), allReplicaSets, executor);
+}
+
+void broadcastHistoryInitializationState(OperationContext* opCtx, bool isInProgress) {
+    ConfigsvrSetClusterParameter setClusterParameterReq(
+        BSON("placementHistoryInitializationInProgress" << BSON("inProgress" << isInProgress)));
+    setClusterParameterReq.setDbName(DatabaseName::kAdmin);
+    setClusterParameterReq.set_compatibleWithTopologyChange(true);
+
+    while (true) {
+        try {
+            DBDirectClient client(opCtx);
+            BSONObj res;
+            client.runCommand(DatabaseName::kAdmin, setClusterParameterReq.toBSON(), res);
+            uassertStatusOK(getStatusFromWriteCommandReply(res));
+            break;
+        } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
+            // The error can be caused by a concurrent request targeting an unrelated cluster
+            // parameter; retry until succeeding.
+            opCtx->sleepFor(Milliseconds(500));
+            continue;
+        }
+    }
+}
+
+void blockAndDrainConflictingDDLs(OperationContext* opCtx) {
+    // Perform a preliminary draining as a best effort to complete long running DDLs without
+    // blocking the execution of regular ones.
+    joinDDLCoordinators(opCtx);
+    // Declare the initialization of config.placementHistory as "in progress" to disable the
+    // instantiation of new incompatible DDL coordinators.
+    broadcastHistoryInitializationState(opCtx, true);
+    // Drain Incompatible DDL coordinators that are still inflight.
+    joinDDLCoordinators(opCtx);
+}
+
+void unblockConflictingDDLs(OperationContext* opCtx) {
+    broadcastHistoryInitializationState(opCtx, false /*isInProgress*/);
+}
+}  // namespace
+
+bool InitializePlacementHistoryCoordinator::_mustAlwaysMakeProgress() {
+    return _doc.getPhase() > Phase::kUnset;
+}
+
+std::set<NamespaceString> InitializePlacementHistoryCoordinator::_getAdditionalLocksToAcquire(
+    OperationContext* opCtx) {
+    // The execution of this coordinator requires a stable topology on multiple phases.
+    // Request the acquisition of an X lock on config.shards to block shard add/remove operations.
+    return {NamespaceString::kConfigsvrShardsNamespace};
+}
 
 ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -44,23 +115,32 @@ ExecutorFuture<void> InitializePlacementHistoryCoordinator::_runImpl(
         .then([this, anchor = shared_from_this()] {
             auto opCtxHolder = makeOperationContext();
             auto* opCtx = opCtxHolder.get();
-            // TODO SERVER-109079: Reject requests when the config server isn't running under a
-            // compatible FCV version.
-
             // Ensure that there is no concurrent access from the periodic cleaning job (which may
             // have been re-activated during the execution of this Coordinator during a node step
             // up).
             PlacementHistoryCleaner::get(opCtx)->pause();
         })
-        .then(_buildPhaseHandler(Phase::kExecute,
+        .then(_buildPhaseHandler(Phase::kBlockDDLs,
+                                 [](auto* opCtx) { blockAndDrainConflictingDDLs(opCtx); }))
+        .then(_buildPhaseHandler(Phase::kDefineInitializationTime,
                                  [](auto* opCtx) {
+                                     // TODO SERVER-109002 Block chunk migration commits and set the
+                                     // init time as the current VectorClock::configTime.
+                                 }))
+        .then(_buildPhaseHandler(Phase::kUnblockDDLs,
+                                 [](auto* opCtx) { unblockConflictingDDLs(opCtx); }))
+        .then(_buildPhaseHandler(Phase::kComputeInitialization,
+                                 [](auto* opCtx) {
+                                     // TODO SERVER-109002
+                                     // - Apply the chosen init time to generate the placement
+                                     // history snapshot;
+                                     // - Handle 'SnapshotTooOld' errors.
                                      ShardingCatalogManager::get(opCtx)->initializePlacementHistory(
                                          opCtx);
                                  }))
-        .then(_buildPhaseHandler(Phase::kPostExecution, [](auto* opCtx) {
+        .then(_buildPhaseHandler(Phase::kFinalize, [](auto* opCtx) {
             PlacementHistoryCleaner::get(opCtx)->resume(opCtx);
         }));
 }
-
 
 }  // namespace mongo

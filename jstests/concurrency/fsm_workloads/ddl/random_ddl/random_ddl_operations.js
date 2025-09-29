@@ -15,10 +15,10 @@ export const $config = (function () {
         collPrefix: "sharded_coll_",
         collCount: 2,
         getRandomDb: function (db) {
-            return db.getSiblingDB(data.dbPrefix + Random.randInt(data.dbCount));
+            return db.getSiblingDB(this.dbPrefix + Random.randInt(this.dbCount));
         },
         getRandomCollection: function (db) {
-            return db[data.collPrefix + Random.randInt(data.collCount)];
+            return db[this.collPrefix + Random.randInt(this.collCount)];
         },
         getRandomShard: function (connCache) {
             const shards = Object.keys(connCache.shards);
@@ -40,26 +40,26 @@ export const $config = (function () {
 
     let states = {
         create: function (db, collName, connCache) {
-            db = data.getRandomDb(db);
-            const coll = data.getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
             const fullNs = coll.getFullName();
 
             jsTestLog("Executing create state: " + fullNs);
             assert.commandWorked(db.adminCommand({shardCollection: fullNs, key: {_id: 1}, unique: false}));
         },
         drop: function (db, collName, connCache) {
-            db = data.getRandomDb(db);
-            const coll = data.getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
 
             jsTestLog("Executing drop state: " + coll.getFullName());
 
             assert.commandWorked(db.runCommand({drop: coll.getName()}));
         },
         rename: function (db, collName, connCache) {
-            db = data.getRandomDb(db);
-            const srcColl = data.getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const srcColl = this.getRandomCollection(db);
             const srcCollName = srcColl.getFullName();
-            const destCollNS = data.getRandomCollection(db).getFullName();
+            const destCollNS = this.getRandomCollection(db).getFullName();
             const destCollName = destCollNS.split(".")[1];
 
             jsTestLog("Executing rename state:" + srcCollName + " to " + destCollNS);
@@ -70,16 +70,16 @@ export const $config = (function () {
             ]);
         },
         movePrimary: function (db, collName, connCache) {
-            db = data.getRandomDb(db);
-            const shardId = data.getRandomShard(connCache);
+            db = this.getRandomDb(db);
+            const shardId = this.getRandomShard(connCache);
 
             jsTestLog("Executing movePrimary state: " + db.getName() + " to " + shardId);
             const res = db.adminCommand({movePrimary: db.getName(), to: shardId});
-            assert.commandWorkedOrFailedWithCode(res, data.kMovePrimaryAllowedErrorCodes);
+            assert.commandWorkedOrFailedWithCode(res, this.kMovePrimaryAllowedErrorCodes);
         },
         collMod: function (db, collName, connCache) {
-            db = data.getRandomDb(db);
-            const coll = data.getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
 
             jsTestLog("Executing collMod state: " + coll.getFullName());
             assert.commandWorkedOrFailedWithCode(db.runCommand({collMod: coll.getName(), validator: {a: {$gt: 0}}}), [
@@ -88,14 +88,14 @@ export const $config = (function () {
             ]);
         },
         checkDatabaseMetadataConsistency: function (db, collName, connCache) {
-            db = data.getRandomDb(db);
+            db = this.getRandomDb(db);
             jsTestLog("Executing checkMetadataConsistency state for database: " + db.getName());
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         checkCollectionMetadataConsistency: function (db, collName, connCache) {
-            db = data.getRandomDb(db);
-            const coll = data.getRandomCollection(db);
+            db = this.getRandomDb(db);
+            const coll = this.getRandomCollection(db);
             jsTestLog("Executing checkMetadataConsistency state for collection: " + coll.getFullName());
             const inconsistencies = coll.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
@@ -142,8 +142,8 @@ export const $config = (function () {
     };
 
     let setup = function (db, collName, cluster) {
-        for (let i = 0; i < data.dbCount; i++) {
-            const dbName = data.dbPrefix + i;
+        for (let i = 0; i < this.dbCount; i++) {
+            const dbName = this.dbPrefix + i;
             const newDb = db.getSiblingDB(dbName);
             newDb.adminCommand({enablesharding: dbName});
         }
