@@ -151,11 +151,13 @@ TEST_F(RateLimiterTest, RateLimitIsValidAfterQueueing) {
         ASSERT_EQ(numAdmitted.load(), burstSize + maxQueueDepth);
         ASSERT_EQ(numRejected.load(), numThreads - (burstSize + maxQueueDepth));
 
-        // We also expect the token bucket balance to be ~0, because all threads have waited for the
-        // correct amount of time.
-        ASSERT_APPROX_EQUAL(rateLimiter.tokenBalance(), 0, .1);
+        // We also expect the token bucket balance to be between ~0-1, as the token was returned to
+        // the bucket and some additional time may have passed due to the fuzziness of the token
+        // bucket.
+        assertApproxEqualUnevenBounds(rateLimiter.tokenBalance(), -0.1, 1.1);
 
-        // And finally, a new token acquisition will take approx. 1/refreshRate seconds.
+        // And finally, a new token acquisition will take approx. 0 - 1/refreshRate seconds,
+        // accounting for fuzziness of the token bucket.
         auto expectedFinalMillis = (1 / refreshRate) * 1000;
         auto finalStartTicks = tickSource->getTicks();
         ASSERT_OK(rateLimiter.acquireToken(clientsWithOps[numThreads].second.get()));
@@ -165,7 +167,13 @@ TEST_F(RateLimiterTest, RateLimitIsValidAfterQueueing) {
               "Elapsed vs. expected elapsed millis",
               "elapsed"_attr = finalElapsed,
               "expected"_attr = expectedFinalMillis);
-        ASSERT_APPROX_EQUAL(durationCount<Milliseconds>(finalElapsed), expectedFinalMillis, 500);
+        // We use uneven bounds here to account for the fact that the token bucket is imprecise-- if
+        // it dispensed tokens at a lower rate than specified earlier in the test, there may already
+        // be a token available now, and so sleep time is 0. The important assertion here is that we
+        // didn't wait for longer than 1 token period (with fuzzy bounds due to possible slow
+        // machines).
+        assertApproxEqualUnevenBounds(
+            durationCount<Milliseconds>(finalElapsed), 0, expectedFinalMillis + 500);
     });
 }
 
