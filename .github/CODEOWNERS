@@ -11,3 +11,14 @@ jstests/
 /src/mongo/dbtests/
 /src/mongo/**/*_test.cpp
 /src/mongo/**/*_bm.cpp
+
+# Exclude coverity-related files from server-release approvals
+bazel/coverity/
+bazel/coverity/coverity_toolchain.BUILD
+bazel/coverity/coverity_toolchain.bzl
+bazel/coverity/generate_coverity_targets.py
+evergreen/coverity_build.sh
+etc/coverity.yml
+etc/coverity_parse_warnings.conf
+etc/evergreen_yml_components/tasks/coverity_tasks.yml
+etc/evergreen_yml_components/variants/coverity.yml
