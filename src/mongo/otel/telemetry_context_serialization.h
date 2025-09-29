@@ -29,22 +29,39 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/otel/telemetry_context.h"
 
 namespace mongo {
 namespace otel {
 
+#ifdef MONGO_CONFIG_OTEL
+
 /**
- * TelemetryContext is an interface that wraps OpenTelemetry's Context to allow for propagation of
- * state across OpenTelemetry functionality.
+ * Converts a TelemetryContext to and from its representation as a BSON object.
  */
-class TelemetryContext {
+class TelemetryContextSerializer {
 public:
-    virtual ~TelemetryContext() = default;
-    virtual StringData type() const {
-        return "TelemetryContext";
-    };
+    static std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson);
+    static BSONObj toBSON(const std::shared_ptr<TelemetryContext>& context);
 };
+
+#else
+
+/**
+ * Converts a TelemetryContext to and from its representation as a BSON object.
+ */
+class TelemetryContextSerializer {
+public:
+    static std::shared_ptr<TelemetryContext> fromBSON(const BSONObj& bson) {
+        return std::make_shared<TelemetryContext>();
+    }
+    static BSONObj toBSON(const std::shared_ptr<TelemetryContext>& context) {
+        return BSONObj();
+    }
+};
+
+#endif
 
 }  // namespace otel
 }  // namespace mongo

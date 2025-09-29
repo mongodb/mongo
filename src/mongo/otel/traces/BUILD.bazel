@@ -46,7 +46,7 @@ mongo_cc_library(
         ":tracing_base",
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/otel",
+        "//src/mongo/otel:otel_base",
     ] + select(
         {
             "@//bazel/config:build_otel_enabled": [
@@ -80,7 +80,7 @@ mongo_cc_library(
         ":tracing_base",
         "//src/mongo/base:system_error",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/otel",
+        "//src/mongo/otel:otel_base",
         "//src/third_party/opentelemetry-cpp/api",
         "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_file_exporter",
         "//src/third_party/opentelemetry-cpp/exporters/otlp:otlp_http_exporter",

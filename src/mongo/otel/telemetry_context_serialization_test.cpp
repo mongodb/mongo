@@ -27,24 +27,40 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/otel/telemetry_context_serialization.h"
 
-#include "mongo/base/string_data.h"
+#include "mongo/otel/traces/span/span_telemetry_context_impl.h"
+#include "mongo/unittest/unittest.h"
+
+#include <memory>
 
 namespace mongo {
 namespace otel {
+namespace {
 
-/**
- * TelemetryContext is an interface that wraps OpenTelemetry's Context to allow for propagation of
- * state across OpenTelemetry functionality.
- */
-class TelemetryContext {
-public:
-    virtual ~TelemetryContext() = default;
-    virtual StringData type() const {
-        return "TelemetryContext";
-    };
-};
+using DefaultSpan = opentelemetry::trace::DefaultSpan;
 
+class TelemetryContextSerializationTest : public unittest::Test {};
+
+TEST_F(TelemetryContextSerializationTest, NoOpSerializeToBSON) {
+    std::shared_ptr<TelemetryContext> context = std::make_shared<TelemetryContext>();
+    BSONObj bson = TelemetryContextSerializer::toBSON(context);
+    ASSERT_BSONOBJ_EQ(bson, BSONObj());
+}
+
+TEST_F(TelemetryContextSerializationTest, NoOpSerializeFromBSON) {
+    BSONObj bson = BSON("key" << "value");
+    std::shared_ptr<TelemetryContext> context = TelemetryContextSerializer::fromBSON(bson);
+    ASSERT_EQ(context->type(), "SpanTelemetryContextImpl");
+
+    auto spanContext = std::dynamic_pointer_cast<traces::SpanTelemetryContextImpl>(context);
+    ASSERT_EQ(spanContext->shouldKeepSpan(), false);
+
+    auto defaultSpan = std::dynamic_pointer_cast<DefaultSpan>(spanContext->getSpan());
+
+    ASSERT_NOT_EQUALS(defaultSpan, nullptr);
+}
+
+}  // namespace
 }  // namespace otel
 }  // namespace mongo
