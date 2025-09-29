@@ -202,7 +202,7 @@ common --flag_alias=dtlto=//bazel/config:dtlto
 # Current Profiles:
 # fastbuild
 # dbg
-# dbg_san
+# dbg_aubsan
 # dbg_tsan
 # opt
 
