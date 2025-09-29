@@ -277,41 +277,109 @@ private:
         size_t id;
 
         // State 1 - No Data
-        {
-            stdx::lock_guard lk(_mutex);
+        stdx::unique_lock lk(_mutex);
 
-            // No clean up needed because we never ran or recorded anything
-            if (_inShutdown) {
-                return _shutdownStatus;
-            }
+        // No clean up needed because we never ran or recorded anything
+        if (_inShutdown) {
+            return _shutdownStatus;
+        }
 
-            id = _id++;
+        id = _id++;
 
-            _cbHandles.emplace(
-                std::piecewise_construct, std::forward_as_tuple(id), std::forward_as_tuple());
-        };
+        _cbHandles.emplace(
+            std::piecewise_construct, std::forward_as_tuple(id), std::forward_as_tuple());
 
         if (MONGO_unlikely(ScopedTaskExecutorHangBeforeSchedule.shouldFail())) {
             ScopedTaskExecutorHangBeforeSchedule.setMode(FailPoint::off);
-
+            lk.unlock();
             ScopedTaskExecutorHangExitBeforeSchedule.pauseWhileSet();
+            lk.lock();
+        }
+
+        static_assert(std::is_same_v<Work, CallbackFn> ||
+                      std::is_same_v<Work, const RemoteCommandCallbackFn&>);
+
+        // Allocate memory to hold the moved work, but don't move it yet,
+        // so TaskExecutor::schedule() works correctly if swCbHandle
+        // returns an error.
+
+        struct MoveState {
+            MoveState(std::unique_ptr<CallbackFn> mem,
+                      CallbackFn&& from,
+                      stdx::unique_lock<stdx::mutex>& _lk)
+                : work(std::move(mem)), moveFrom(std::move(from)), lk(_lk) {}
+
+            // Dummy copy constructor so the variant has a copy constructor
+            // for the RemoteCommandCallbackFn case. Should never be called.
+            MoveState(const MoveState& ms) : moveFrom(std::move(ms.moveFrom)), lk(ms.lk) {
+                MONGO_UNREACHABLE;
+            }
+            MoveState(MoveState&& ms)
+                : work(std::move(ms.work)),
+                  moveFrom(std::move(ms.moveFrom)),
+                  lk(ms.lk),
+                  tid(ms.tid) {}
+
+            MoveState& operator=(const MoveState&) = delete;
+            MoveState& operator=(MoveState&&) = delete;
+
+            std::unique_ptr<CallbackFn> work;
+            CallbackFn&& moveFrom;
+            stdx::unique_lock<stdx::mutex>& lk;
+            std::thread::id tid{stdx::this_thread::get_id()};
+        };
+        std::variant<RemoteCommandCallbackFn, MoveState> state;
+        CallbackFn* moveTo = nullptr;
+
+        if constexpr (std::is_same_v<Work, CallbackFn>) {
+            auto mem = std::make_unique<CallbackFn>();
+            moveTo = mem.get();
+            state.template emplace<MoveState>(  // NOLINT(bugprone-use-after-move)
+                std::move(mem),                 // NOLINT(bugprone-use-after-move)
+                std::move(work),                // NOLINT(bugprone-use-after-move)
+                lk);
+        } else {
+            state.template emplace<RemoteCommandCallbackFn>(work);
+            lk.unlock();
         }
 
         // State 2 - Indeterminate state.  We don't know yet if the task will get scheduled.
         auto swCbHandle = std::forward<ScheduleCall>(schedule)(
-            [id, work = std::forward<Work>(work), self = shared_self()](const auto& cargs) {
+            [id, state = std::move(state), self = shared_self()](const auto& cargs) {
                 using ArgsT = std::decay_t<decltype(cargs)>;
 
-                stdx::unique_lock<stdx::mutex> lk(self->_mutex);
+                stdx::unique_lock<stdx::mutex> lk(self->_mutex, stdx::defer_lock);
+                std::unique_lock<stdx::mutex>* useLock = nullptr;
+
+                if constexpr (std::is_same_v<Work, CallbackFn>) {
+                    // check for inline execution, tid check must be first
+                    const MoveState& mstate = std::get<MoveState>(state);
+                    CallbackFn& moveTo = *(mstate.work.get());
+                    if (mstate.tid == stdx::this_thread::get_id() && !moveTo) {
+                        // we're inline, do the move and borrow the lock
+                        moveTo = std::move(mstate.moveFrom);
+                        useLock = &mstate.lk;
+                    }
+                }
+
+                if (!useLock) {
+                    // not inline under the lock, do our own locking
+                    lk.lock();
+                    useLock = &lk;
+                }
 
                 auto doWorkAndNotify = [&](const ArgsT& x) noexcept {
-                    lk.unlock();
-                    work(x);
-                    lk.lock();
+                    useLock->unlock();
+                    if constexpr (std::is_same_v<Work, CallbackFn>) {
+                        (*std::get<MoveState>(state).work.get())(x);
+                    } else {
+                        (std::get<RemoteCommandCallbackFn>(state))(x);
+                    }
+                    useLock->lock();
 
                     // After we've run the task, we erase and notify.  Sometimes that happens
                     // before we stash the cbHandle.
-                    self->_eraseAndNotifyIfNeeded(lk, id);
+                    self->_eraseAndNotifyIfNeeded(*useLock, id);
                 };
 
                 if (!self->_inShutdown) {
@@ -335,9 +403,17 @@ private:
                 doWorkAndNotify(args);
             });
 
-        ScopedTaskExecutorHangAfterSchedule.pauseWhileSet();
+        // We must do the move before dropping the lock, so the
+        // callback blocks until the work is moved.
+        if constexpr (std::is_same_v<Work, CallbackFn>) {
+            if (swCbHandle.isOK() && work)            // NOLINT(bugprone-use-after-move)
+                *moveTo = std::move(work);            // NOLINT(bugprone-use-after-move)
+            invariant(!!swCbHandle.isOK() == !work);  // NOLINT(bugprone-use-after-move)
+            lk.unlock();
+        }
 
-        stdx::unique_lock lk(_mutex);
+        ScopedTaskExecutorHangAfterSchedule.pauseWhileSet();
+        lk.lock();
 
         if (!swCbHandle.isOK()) {
             // State 2.b - Failed to schedule

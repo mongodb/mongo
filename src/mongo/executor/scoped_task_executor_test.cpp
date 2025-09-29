@@ -321,6 +321,33 @@ TEST_F(ScopedTaskExecutorTest, scheduleLoseRaceWithShutdownOfUnderlying) {
     scheduler.join();
 }
 
+// Alternative version, schedule() instead of scheduleWork()
+TEST_F(ScopedTaskExecutorTest, scheduleLoseRaceWithShutdownOfUnderlyingAlt) {
+    auto& bfp = ScopedTaskExecutorHangBeforeSchedule;
+    auto& efp = ScopedTaskExecutorHangExitBeforeSchedule;
+    bfp.setMode(FailPoint::alwaysOn);
+    efp.setMode(FailPoint::alwaysOn);
+
+    stdx::thread scheduler([&] {
+        // schedule() runs the callback inline when we're in shutdown
+        auto self_id = stdx::this_thread::get_id();
+        bool did_run = false;
+        getExecutor()->schedule([&](Status status) {
+            invariant(stdx::this_thread::get_id() == self_id);
+            did_run = true;
+        });
+        invariant(did_run);
+    });
+
+    (bfp).pauseWhileSet();
+
+    shutdownUnderlying();
+
+    efp.setMode(FailPoint::off);
+
+    scheduler.join();
+}
+
 TEST_F(ScopedTaskExecutorTest, DestructionShutsDown) {
     auto pf = makePromiseFuture<void>();
 
