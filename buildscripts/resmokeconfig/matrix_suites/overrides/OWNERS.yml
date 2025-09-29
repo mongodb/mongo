@@ -45,3 +45,6 @@ filters:
   - "replica_sets_kill_secondary.yml":
     approvers:
       - 10gen/server-replication
+  - "recordids_replicated.yml":
+    approvers:
+      - 10gen/server-collection-write-path

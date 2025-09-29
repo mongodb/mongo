@@ -77,3 +77,6 @@ filters:
   - "replica_sets_kill_secondaries_jscore_passthrough.yml":
     approvers:
       - 10gen/server-replication
+  - "replica_sets_recordids_replicated_jscore_passthrough.yml":
+    approvers:
+      - 10gen/server-collection-write-path
