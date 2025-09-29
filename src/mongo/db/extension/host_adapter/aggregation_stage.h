@@ -140,4 +140,34 @@ protected:
                 vtable.expand != nullptr);
     }
 };
+
+/**
+ * ExtensionAggregationStageAstNodeHandle is an owned handle wrapper around a
+ * MongoExtensionAggregationStageAstNode.
+ */
+class ExtensionAggregationStageAstNodeHandle
+    : public OwnedHandle<::MongoExtensionAggregationStageAstNode> {
+public:
+    ExtensionAggregationStageAstNodeHandle(::MongoExtensionAggregationStageAstNode* ptr)
+        : OwnedHandle<::MongoExtensionAggregationStageAstNode>(ptr) {
+        _assertValidVTable();
+    }
+
+    /**
+     * Returns a logical stage with the stage's runtime implementation of the optimization
+     * interface.
+     *
+     * On success, the logical stage is returned and belongs to the caller.
+     * On failure, the error triggers an assertion.
+     *
+     */
+    ExtensionLogicalAggregationStageHandle bind() const;
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(
+            11113700, "ExtensionAggregationStageAstNode 'bind' is null", vtable.bind != nullptr);
+    }
+};
+
 }  // namespace mongo::extension::host_adapter

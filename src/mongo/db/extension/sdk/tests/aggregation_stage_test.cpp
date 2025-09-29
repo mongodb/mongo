@@ -66,6 +66,18 @@ public:
     }
 };
 
+class NoOpAggregationStageAstNode : public extension::sdk::AggregationStageAstNode {
+public:
+    std::unique_ptr<extension::sdk::LogicalAggregationStage> bind() const override {
+        return std::make_unique<NoOpLogicalAggregationStage>();
+    }
+
+
+    static inline std::unique_ptr<extension::sdk::AggregationStageAstNode> make() {
+        return std::make_unique<NoOpAggregationStageAstNode>();
+    }
+};
+
 class DesugarAsMatchAndLimitDescriptor : public extension::sdk::AggregationStageDescriptor {
 public:
     static inline const std::string kStageName = "$matchLimitDesugarExtension";
@@ -173,6 +185,20 @@ public:
     };
 };
 
+class AstNodeVTableTest : public unittest::Test {
+public:
+    class TestAstNodeVTableHandle
+        : public extension::host_adapter::ExtensionAggregationStageAstNodeHandle {
+    public:
+        TestAstNodeVTableHandle(absl::Nonnull<::MongoExtensionAggregationStageAstNode*> astNode)
+            : extension::host_adapter::ExtensionAggregationStageAstNodeHandle(astNode) {};
+
+        void assertVTableConstraints(const VTable_t& vtable) {
+            _assertVTableConstraints(vtable);
+        }
+    };
+};
+
 TEST(AggregationStageTest, DesugarStaticDescriptorTest) {
     auto matchLimitDesugarStaticDescriptor = extension::sdk::ExtensionAggregationStageDescriptor{
         DesugarAsMatchAndLimitDescriptor::make()};
@@ -235,6 +261,26 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602")
 
     auto vtable = handle.vtable();
     vtable.expand = nullptr;
+    handle.assertVTableConstraints(vtable);
+};
+
+TEST(AggregationStageTest, NoOpAggregationStageAstNodeTest) {
+    auto noOpAggregationStageAstNode =
+        std::make_unique<extension::sdk::ExtensionAggregationStageAstNode>(
+            NoOpAggregationStageAstNode::make());
+    auto handle = extension::host_adapter::ExtensionAggregationStageAstNodeHandle{
+        noOpAggregationStageAstNode.release()};
+
+    [[maybe_unused]] auto logicalStageHandle = handle.bind();
+}
+
+DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTable, "11113700") {
+    auto noOpAstNode = std::make_unique<extension::sdk::ExtensionAggregationStageAstNode>(
+        NoOpAggregationStageAstNode::make());
+    auto handle = TestAstNodeVTableHandle{noOpAstNode.release()};
+
+    auto vtable = handle.vtable();
+    vtable.bind = nullptr;
     handle.assertVTableConstraints(vtable);
 };
 }  // namespace

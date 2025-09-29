@@ -250,6 +250,32 @@ typedef struct MongoExtensionAggregationStageParseNodeVTable {
 } MongoExtensionAggregationStageParseNodeVTable;
 
 /**
+ * An AggregationStageAstNode describes an aggregation stage that has been parsed and expanded into
+ * a form that can participate in lite-parsed validation.
+ */
+typedef struct MongoExtensionAggregationStageAstNode {
+    const struct MongoExtensionAggregationStageAstNodeVTable* const vtable;
+} MongoExtensionAggregationStageAstNode;
+
+/**
+ * Virtual function table for MongoExtensionAggregationStageAstNode.
+ */
+typedef struct MongoExtensionAggregationStageAstNodeVTable {
+    /**
+     * Destroy `astNode` and free any related resources.
+     */
+    void (*destroy)(MongoExtensionAggregationStageAstNode* astNode);
+
+    /**
+     * Populates `logicalStage` with the stage's runtime implementation of the optimization
+     * interface, ownership of which is transferred to the caller. This step should be called after
+     * validating `astNode` and is used when converting into an optimizable stage.
+     */
+    MongoExtensionStatus* (*bind)(const MongoExtensionAggregationStageAstNode* astNode,
+                                  MongoExtensionLogicalAggregationStage** logicalStage);
+} MongoExtensionAggregationStageAstNodeVTable;
+
+/**
  * MongoExtensionHostPortal serves as the entry point for extensions to integrate with the
  * server. It exposes a function pointer, registerStageDescriptor, which allows extensions to
  * register custom aggregation stages.

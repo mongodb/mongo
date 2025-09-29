@@ -60,4 +60,13 @@ std::vector<BSONObj> ExtensionAggregationStageParseNodeHandle::getExpandedPipeli
     auto wrappedPipeline = BSON("pipeline" << arr);
     return parsePipelineFromBSON(wrappedPipeline.firstElement());
 }
+
+ExtensionLogicalAggregationStageHandle ExtensionAggregationStageAstNodeHandle::bind() const {
+    ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
+
+    // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
+    sdk::enterC([&]() { return vtable().bind(get(), &logicalStagePtr); });
+
+    return ExtensionLogicalAggregationStageHandle(logicalStagePtr);
+}
 }  // namespace mongo::extension::host_adapter

@@ -243,4 +243,70 @@ private:
     static const ::MongoExtensionAggregationStageParseNodeVTable VTABLE;
     std::unique_ptr<AggregationStageParseNode> _parseNode;
 };
+
+/**
+ * AggregationStageAstNode is the base class for implementing the
+ * ::MongoExtensionAggregationStageAstNode interface by an extension.
+ *
+ * An extension must provide a specialization of this base class, and
+ * expose it to the host as a ExtensionAggregationStageAstNode.
+ */
+class AggregationStageAstNode {
+public:
+    AggregationStageAstNode() = default;
+    virtual ~AggregationStageAstNode() = default;
+
+    virtual std::unique_ptr<extension::sdk::LogicalAggregationStage> bind() const = 0;
+};
+
+/**
+ * ExtensionAggregationStageAstNode is a boundary object representation of a
+ * ::MongoExtensionAggregationStageAstNode. It is meant to abstract away the C++ implementation
+ * by the extension, and provides the interface at the API boundary which will be called upon by the
+ * host. The static VTABLE member points to static methods which ensure the correct conversion from
+ * C++ context to the C API context.
+ *
+ * This abstraction is required to ensure we maintain the public
+ * ::MongoExtensionAggregationStageAstNode interface and layout as dictated by the public API.
+ * Any polymorphic behavior must be deferred to and implemented by the underlying
+ * AggregationStageAstNode.
+ */
+class ExtensionAggregationStageAstNode final : public ::MongoExtensionAggregationStageAstNode {
+public:
+    ExtensionAggregationStageAstNode(std::unique_ptr<AggregationStageAstNode> astNode)
+        : ::MongoExtensionAggregationStageAstNode{&VTABLE}, _astNode(std::move(astNode)) {}
+    ~ExtensionAggregationStageAstNode() = default;
+
+private:
+    const AggregationStageAstNode& getImpl() const {
+        return *_astNode;
+    }
+
+    AggregationStageAstNode& getImpl() {
+        return *_astNode;
+    }
+
+    static void _extDestroy(::MongoExtensionAggregationStageAstNode* extAstNode) noexcept {
+        delete static_cast<extension::sdk::ExtensionAggregationStageAstNode*>(extAstNode);
+    }
+
+    static ::MongoExtensionStatus* _extBind(
+        const ::MongoExtensionAggregationStageAstNode* astNode,
+        ::MongoExtensionLogicalAggregationStage** logicalStage) noexcept {
+        return extension::sdk::enterCXX([&]() {
+            auto logicalStagePtr =
+                static_cast<const extension::sdk::ExtensionAggregationStageAstNode*>(astNode)
+                    ->getImpl()
+                    .bind();
+
+            *logicalStage =
+                std::make_unique<mongo::extension::sdk::ExtensionLogicalAggregationStage>(
+                    std::move(logicalStagePtr))
+                    .release();
+        });
+    }
+
+    static const MongoExtensionAggregationStageAstNodeVTable VTABLE;
+    std::unique_ptr<AggregationStageAstNode> _astNode;
+};
 }  // namespace mongo::extension::sdk

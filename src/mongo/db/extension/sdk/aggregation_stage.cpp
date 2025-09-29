@@ -43,4 +43,8 @@ const ::MongoExtensionAggregationStageParseNodeVTable ExtensionAggregationStageP
     .get_query_shape = &ExtensionAggregationStageParseNode::_extGetQueryShape,
     .expand = &ExtensionAggregationStageParseNode::_extExpand};
 
+const ::MongoExtensionAggregationStageAstNodeVTable ExtensionAggregationStageAstNode::VTABLE = {
+    .destroy = &ExtensionAggregationStageAstNode::_extDestroy,
+    .bind = &ExtensionAggregationStageAstNode::_extBind};
+
 }  // namespace mongo::extension::sdk
