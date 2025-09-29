@@ -82,7 +82,7 @@ class ResmokeShimContext:
         # Attempt a clean shutdown, producing python stacktraces and generating core dumps for
         # any still running process. It is likely that most programs will have terminated before
         # core dumps can be produced, since Bazel sends SIGTERM to all processes, not just this one.
-        # TODO: SERVER-109274
+        # Individual timeouts per test are depended upon for useful core dumps of test processes.
         pid = os.getpid()
         p = psutil.Process(pid)
         signal_python(new_resmoke_logger(), p.name, pid)

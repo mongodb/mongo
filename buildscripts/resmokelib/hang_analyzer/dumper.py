@@ -6,22 +6,30 @@ import logging
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import time
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from distutils import spawn
 from io import StringIO
 from typing import List, Tuple
 
+import psutil
 from opentelemetry import trace
 from opentelemetry.trace.status import StatusCode
 
 from buildscripts.resmokelib import config as resmoke_config
-from buildscripts.resmokelib.hang_analyzer.process import call, callo, find_program
+from buildscripts.resmokelib.hang_analyzer.process import (
+    call,
+    callo,
+    find_program,
+    resume_process,
+    signal_process,
+)
 from buildscripts.resmokelib.hang_analyzer.process_list import Pinfo
 from buildscripts.resmokelib.utils.otel_utils import get_default_current_span
 from buildscripts.simple_report import Report, Result
@@ -30,12 +38,13 @@ Dumpers = namedtuple("Dumpers", ["dbg", "jstack"])
 TRACER = trace.get_tracer("resmoke")
 
 
-def get_dumpers(root_logger: logging.Logger, dbg_output: str):
+def get_dumpers(root_logger: logging.Logger, dbg_output: str, include_terminating=False):
     """
     Return OS-appropriate dumpers.
 
     :param root_logger: Top-level logger
     :param dbg_output: 'stdout' or 'file'
+    :param include_terminating: If dumpers that terminate processes should be included.
     """
 
     dbg = None
@@ -49,6 +58,18 @@ def get_dumpers(root_logger: logging.Logger, dbg_output: str):
     elif sys.platform == "darwin":
         dbg = LLDBDumper(root_logger, dbg_output)
         jstack = JstackDumper()
+
+    if include_terminating:
+        if not dbg.find_debugger():
+            root_logger.info(
+                "No debugger found. Will send SIGABRT to terminate processes to allow the OS to generate a core dump."
+            )
+            dbg = SigabrtDumper(root_logger, dbg_output)
+        elif os.getenv("ASAN_OPTIONS") or os.getenv("TSAN_OPTIONS"):
+            root_logger.info(
+                "ASAN_OPTIONS or TSAN_OPTIONS is set. Will send SIGABRT rather than attaching with a debugger to avoid high memory usage and bloated core dump size."
+            )
+            dbg = SigabrtDumper(root_logger, dbg_output)
 
     return Dumpers(dbg=dbg, jstack=jstack)
 
@@ -70,73 +91,109 @@ class Dumper(metaclass=ABCMeta):
         self._root_logger = root_logger
         self._dbg_output = dbg_output
 
-    @abstractmethod
-    def dump_info(
-        self,
-        pinfo: Pinfo,
-        take_dump: bool,
-    ):
+        if resmoke_config.EVERGREEN_TASK_ID is None:
+            # Set 24 hours time out for hang analyzer being run in locally
+            self._time_limit = timedelta(days=1)
+        else:
+            # Timeout for dumping is 12mins (out of total 15mins for the entire hang-analyzer) in Evergreen
+            self._time_limit = timedelta(minutes=12)
+
+    def dump_info(self, pinfo: Pinfo, take_dump: bool):
         """
         Perform dump for a process.
 
         :param pinfo: A Pinfo describing the process
         :param take_dump: Whether to take a core dump
         """
-        raise NotImplementedError("dump_info must be implemented in OS-specific subclasses")
+        if self._time_limit <= timedelta(0):
+            self._root_logger.warning(
+                "Skipping dumping of %s processes with PIDs %s because the time limit expired.",
+                pinfo.name,
+                str(pinfo.pidv),
+            )
+            return
+
+        start_time = datetime.now()
+
+        self._dump_impl(pinfo, take_dump)
+
+        elapsed = datetime.now() - start_time
+        self._time_limit -= elapsed
 
     @abstractmethod
-    def get_dump_ext(self):
-        """Return the dump file extension."""
-        raise NotImplementedError("get_dump_ext must be implemented in OS-specific subclasses")
-
-    @abstractmethod
-    def _find_debugger(self):
-        """Find the installed debugger."""
-        raise NotImplementedError("_find_debugger must be implemented in OS-specific subclasses")
-
-    @abstractmethod
-    def _prefix(self):
-        """Return the commands to set up a debugger process."""
-        raise NotImplementedError("_prefix must be implemented in OS-specific subclasses")
-
-    @abstractmethod
-    def _process_specific(self, pinfo: Pinfo, take_dump: bool, logger: logging.Logger = None):
+    def _dump_impl(self, pinfo: Pinfo, take_dump: bool):
         """
-        Return the commands that attach to each process, dump info and detach.
+        Perform dump for a process.
 
         :param pinfo: A Pinfo describing the process
         :param take_dump: Whether to take a core dump
-        :param logger: Logger to output dump info to
         """
-        raise NotImplementedError("_process_specific must be implemented in OS-specific subclasses")
+        raise NotImplementedError("_dump_impl must be implemented in OS-specific subclasses")
 
     @abstractmethod
-    def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str):
+    def find_debugger(self):
+        """Find the installed debugger."""
+        raise NotImplementedError("find_debugger must be implemented in OS-specific subclasses")
+
+
+class SigabrtDumper(Dumper):
+    """
+    A platform independent dumper that simply sends SIGABRT to the process, allowing
+    the OS the opportunity to generate a core dump. Note this will almost always
+    terminate the process.
+    """
+
+    def _dump_impl(self, pinfo: Pinfo, take_dump: bool):
         """
-        Analyzes the inputted core dumps.
+        Perform dump for a process.
 
-        :param core_file_dir: Directory to be scanned for core dumps
-        :param install_dir: Directory to be scanned for binaries and debugsymbols
+        :param pinfo: A Pinfo describing the process
+        :param take_dump: Whether to take a core dump
         """
-        raise NotImplementedError("analyze_cores must be implemented in OS-specific subclasses")
 
-    @abstractmethod
-    def _postfix(self):
-        """Return the commands to exit the debugger."""
-        raise NotImplementedError("_postfix must be implemented in OS-specific subclasses")
+        if take_dump:
+            processes = []
+            for pid in pinfo.pidv:
+                processes.append(psutil.Process(pid))
+                self._root_logger.info(f"Sending SIGABRT to {pid}")
+                signal_process(self._root_logger, pid, signal.SIGABRT)
+                resume_process(self._root_logger, pinfo.name, pid)
 
-    @abstractmethod
-    def get_binary_from_core_dump(self, core_file_path):
-        """Return the name of the binary that created the input core dump."""
-        raise NotImplementedError(
-            "get_binary_from_core_dump must be implemented in OS-specific subclasses"
+            self.wait_for_processes(processes)
+
+    def wait_for_processes(self, processes):
+        self._root_logger.info("Waiting for processes to end after SIGABRT")
+
+        start_time = datetime.now()
+        alive = []
+        while datetime.now() - start_time < self._time_limit:
+            alive = []
+            # This loop filters out processes that have ended or become a zombie
+            for p in processes:
+                if p.is_running() and p.status() != psutil.STATUS_ZOMBIE:
+                    alive.append(p)
+
+            # Update the processes list with only the ones left alive
+            processes = alive
+
+            # All the processes have ended
+            if not alive:
+                return
+
+            time.sleep(1)
+
+        self._root_logger.warning(
+            f"The following processes took too long to end after SIGABRT: {alive}"
         )
+
+    def find_debugger(self):
+        return None
 
 
 class WindowsDumper(Dumper):
     """WindowsDumper class."""
 
-    def _find_debugger(self):
+    def find_debugger(self):
         """Find the installed debugger."""
         # We are looking for c:\Program Files (x86)\Windows Kits\8.1\Debuggers\x64
         debugger = "cdb.exe"
@@ -212,9 +269,9 @@ class WindowsDumper(Dumper):
 
         return cmds
 
-    def dump_info(self, pinfo, take_dump):
+    def _dump_impl(self, pinfo, take_dump):
         """Dump useful information to the console."""
-        dbg = self._find_debugger()
+        dbg = self.find_debugger()
 
         if dbg is None:
             self._root_logger.warning("Debugger not found, skipping dumping of %s", str(pinfo.pidv))
@@ -230,7 +287,11 @@ class WindowsDumper(Dumper):
             process = Pinfo(name=pinfo.name, pidv=pid)
             cmds = self._prefix() + self._process_specific(process, take_dump) + self._postfix()
 
-            call([dbg, "-c", ";".join(cmds), "-p", str(pid)], logger)
+            call(
+                [dbg, "-c", ";".join(cmds), "-p", str(pid)],
+                logger,
+                timeout_seconds=self._time_limit.total_seconds(),
+            )
 
             self._root_logger.info("Done analyzing %s process with PID %d", pinfo.name, pid)
 
@@ -274,7 +335,7 @@ class WindowsDumper(Dumper):
         binary_path = binary_files[0]
         symbol_path = binary_path.replace(".exe", ".pdb")
 
-        dbg = self._find_debugger()
+        dbg = self.find_debugger()
 
         if dbg is None:
             self._root_logger.warning("Debugger not found, skipping dumping of %s", filename)
@@ -300,22 +361,16 @@ class WindowsDumper(Dumper):
         """Return the dump file extension."""
         return "mdmp"
 
-    def get_binary_from_core_dump(self, core_file_path):
-        raise NotImplementedError("get_binary_from_core_dump is not implemented on windows")
-
 
 # LLDB dumper is for MacOS X
 class LLDBDumper(Dumper):
     """LLDBDumper class."""
 
     @staticmethod
-    def _find_debugger():
+    def find_debugger():
         """Find the installed debugger."""
         debugger = "lldb"
         return find_program(debugger, ["/usr/bin"])
-
-    def _prefix(self):
-        pass
 
     def _process_specific(self, pinfo, take_dump, logger=None):
         """Return the commands that attach to each process, dump info and detach."""
@@ -358,9 +413,9 @@ class LLDBDumper(Dumper):
 
         return cmds
 
-    def dump_info(self, pinfo, take_dump):
+    def _dump_impl(self, pinfo, take_dump):
         """Dump info."""
-        dbg = self._find_debugger()
+        dbg = self.find_debugger()
         logger = _get_process_logger(self._dbg_output, pinfo.name)
 
         if dbg is None:
@@ -401,7 +456,7 @@ class LLDBDumper(Dumper):
         # Works on in MacOS 10.9 & later
         # call([dbg] +  list( itertools.chain.from_iterable([['-o', b] for b in cmds])), logger)
         call(["cat", tf.name], logger)
-        call([dbg, "--source", tf.name], logger)
+        call([dbg, "--source", tf.name], logger, timeout_seconds=self._time_limit.total_seconds())
 
         self._root_logger.info(
             "Done analyzing %s processes with PIDs %s", pinfo.name, str(pinfo.pidv)
@@ -415,9 +470,6 @@ class LLDBDumper(Dumper):
                     need_sigabrt[pid] = files[pid]
             if need_sigabrt:
                 raise DumpError(need_sigabrt)
-
-    def analyze_cores(self, core_file_dir: str, install_dir: str, analysis_dir: str):
-        raise NotImplementedError("analyze_cores is not implemented on macos")
 
     def get_dump_ext(self):
         """Return the dump file extension."""
@@ -438,26 +490,7 @@ class LLDBDumper(Dumper):
 class GDBDumper(Dumper):
     """GDBDumper class."""
 
-    def __init__(
-        self, root_logger: logging.Logger, dbg_output: str, timeout_seconds_for_gdb_process=720
-    ):
-        """Initialize GDBDumper."""
-        if resmoke_config.EVERGREEN_TASK_ID is None:
-            # Set 24 hours time out for hang analyzer being run in locally
-            timeout_seconds_for_gdb_process = 86400
-        # Timeout for hang analyzer, default timeout is 12mins(out of total 15mins) in Evergreen
-        self._timeout_seconds_for_gdb_process = timeout_seconds_for_gdb_process
-        super().__init__(root_logger, dbg_output)
-
-    def get_timeout_secs(self):
-        """Returns the remaining time left before we timeout."""
-        return self._timeout_seconds_for_gdb_process
-
-    def _reduce_timeout_for_gdb_process(self, timeout_period: int):
-        """Reduce timeout for remaining gdb processes."""
-        self._timeout_seconds_for_gdb_process -= timeout_period
-
-    def _find_debugger(self):
+    def find_debugger(self):
         """Find the installed debugger."""
         debugger = "gdb"
         return find_program(
@@ -570,23 +603,14 @@ class GDBDumper(Dumper):
         cmds = ["set confirm off", "quit"]
         return cmds
 
-    def dump_info(self, pinfo, take_dump):
+    def _dump_impl(self, pinfo, take_dump):
         """Dump info."""
 
-        dbg = self._find_debugger()
+        dbg = self.find_debugger()
         logger = self._root_logger
-        _start_time = datetime.now()
 
         if dbg is None:
             self._root_logger.warning("Debugger not found, skipping dumping of %s", str(pinfo.pidv))
-            return
-
-        if self._timeout_seconds_for_gdb_process <= 0:
-            self._root_logger.warning(
-                "Skipping dumping of %s processes with PIDs %s because the time limit expired",
-                pinfo.name,
-                str(pinfo.pidv),
-            )
             return
 
         self._root_logger.info(
@@ -614,12 +638,10 @@ class GDBDumper(Dumper):
                 + skip_reading_symbols_on_take_dump
                 + list(itertools.chain.from_iterable([["-ex", b] for b in cmds])),
                 logger,
-                self._timeout_seconds_for_gdb_process,
+                self._time_limit.total_seconds(),
                 pinfo,
             )
 
-        time_period = (datetime.now() - _start_time).total_seconds()
-        self._reduce_timeout_for_gdb_process(time_period)
         self._root_logger.info(
             "Done analyzing %s processes with PIDs %s", pinfo.name, str(pinfo.pidv)
         )
@@ -718,7 +740,7 @@ class GDBDumper(Dumper):
         gdb_index_cache: str,
     ) -> Tuple[int, str]:  # returns (exit_code, test_status)
         cmds = []
-        dbg = self._find_debugger()
+        dbg = self.find_debugger()
         readelf = find_program("eu-readelf", ["/opt/mongodbtoolchain/v5/bin", "/usr/bin"])
         basename = os.path.basename(core_file_path)
         if dbg is None:
@@ -818,7 +840,7 @@ class GDBDumper(Dumper):
         return "core"
 
     def get_binary_from_core_dump(self, core_file_path):
-        dbg = self._find_debugger()
+        dbg = self.find_debugger()
         if dbg is None:
             raise RuntimeError("Debugger not found, can't run get_binary_from_core_dump")
         process = subprocess.run(
@@ -856,14 +878,14 @@ class JstackDumper(object):
     """JstackDumper class."""
 
     @staticmethod
-    def _find_debugger():
+    def find_debugger():
         """Find the installed jstack debugger."""
         debugger = "jstack"
         return find_program(debugger, ["/usr/bin"])
 
     def dump_info(self, root_logger, dbg_output, pid, process_name):
         """Dump java thread stack traces to the console."""
-        jstack = self._find_debugger()
+        jstack = self.find_debugger()
         logger = _get_process_logger(dbg_output, process_name, pid=pid)
 
         if jstack is None:

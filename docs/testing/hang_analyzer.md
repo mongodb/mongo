@@ -70,4 +70,5 @@ Platform-specific concerns for data collection are handled by dumper objects in
 - Linux: See `GDBDumper`
 - MacOS: See `LLDBDumper`
 - Windows: See `WindowsDumper` and `JstackWindowsDumper`
+- Platform independent fallback: See `SigabrtDumper`
 - Java (non-Windows): `JstackDumper`

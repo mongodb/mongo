@@ -44,7 +44,7 @@ TestData.cleanUpCoreDumpsFromExpectedCrash = true;
                 // On ASAN/TSAN builds, the processes have a lot of shadow memory that gdb
                 // likes to include in the core dumps. We send a SIGABRT to the processes
                 // on these builds because the kernel knows how to get rid of the shadow memory.
-                return anyLineMatches(lines, /Attempting to send SIGABRT from resmoke/);
+                return anyLineMatches(lines, /Sending SIGABRT to/);
             });
         } else {
             assert.soon(() => {

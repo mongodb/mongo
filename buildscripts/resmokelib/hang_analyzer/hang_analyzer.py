@@ -17,8 +17,8 @@ import platform
 import re
 import signal
 import sys
-import time
 import traceback
+from typing import List
 
 import distro
 import psutil
@@ -33,7 +33,7 @@ class HangAnalyzer(Subcommand):
 
     def __init__(self, options: dict, task_id=None, logger=None, **_kwargs):
         """
-        Configure processe lists based on options.
+        Configure process lists based on options.
 
         :param options: Options as parsed by parser.py
         :param logger: Logger to be used. If not specified, one will be created.
@@ -41,7 +41,7 @@ class HangAnalyzer(Subcommand):
         """
         self.options = options
         self.root_logger = None
-        self.interesting_processes = [
+        self.interesting_processes: List[str] = [
             # Remove "python", "java" from the list to avoid hang analyzer multiple invocations
             "mongo",
             "mongod",
@@ -49,8 +49,8 @@ class HangAnalyzer(Subcommand):
             "_test",
             "dbtest",
         ]
-        self.go_processes = []
-        self.process_ids = []
+        self.go_processes: List[str] = []
+        self.process_ids: List[int] = []
 
         def configure_task_id():
             run_tid = resmoke_config.EVERGREEN_TASK_ID
@@ -87,7 +87,11 @@ class HangAnalyzer(Subcommand):
 
         self._log_system_info()
 
-        dumpers = dumper.get_dumpers(self.root_logger, self.options["debugger_output"])
+        dumpers = dumper.get_dumpers(
+            self.root_logger,
+            self.options["debugger_output"],
+            include_terminating=self.options["kill_processes"],
+        )
 
         processes = process_list.get_processes(
             self.process_ids,
@@ -122,71 +126,23 @@ class HangAnalyzer(Subcommand):
             take_core_processes = [
                 pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)
             ]
-            if os.getenv("ASAN_OPTIONS") or os.getenv("TSAN_OPTIONS"):
-                quit_processes: list[psutil.Process] = []
-                for pinfo in take_core_processes:
-                    for pid in pinfo.pidv:
-                        # The mongo signal processing thread needs to be resumed to handle the SIGABRT.
-                        quit_process = psutil.Process(pid)
-                        process.resume_process(self.root_logger, pinfo.name, pid)
-                        self.root_logger.info(
-                            "Process %d may be running a sanitizer which uses a large amount of virtual memory.",
-                            pid,
-                        )
-                        self.root_logger.info(
-                            "Attempting to send SIGABRT from resmoke to capture a more manageable sized core dump"
-                        )
-                        process.signal_process(self.root_logger, pid, signal.SIGABRT)
-                        quit_processes.append(quit_process)
-                self.root_logger.info("Waiting for all processes to end after SIGABRT")
-                assert isinstance(dumpers.dbg, dumper.GDBDumper)
-                timeout = dumpers.dbg.get_timeout_secs()
-                start_time = time.time()
-                # Wait until all processes successfully end
-                while True:
-                    alive_processes = []
-                    # This loop filters out processes that have ended or become a zombie
-                    for quit_process in quit_processes:
-                        if (
-                            quit_process.is_running()
-                            and quit_process.status() != psutil.STATUS_ZOMBIE
-                        ):
-                            alive_processes.append(quit_process)
+            for pinfo in take_core_processes:
+                if self._check_enough_free_space():
+                    try:
+                        dumpers.dbg.dump_info(pinfo, take_dump=True)
+                    except dumper.DumpError as err:
+                        self.root_logger.error(err.message)
+                        dump_pids = {**err.dump_pids, **dump_pids}
+                    except Exception as err:
+                        self.root_logger.info("Error encountered when invoking debugger %s", err)
 
-                    # Update the quit_processes list with only the ones left alive
-                    quit_processes = alive_processes
-
-                    # All the processes have ended
-                    if not alive_processes:
-                        break
-
-                    if time.time() - start_time > timeout:
-                        raise RuntimeError(
-                            f"The following processes took too long to end after SIGABRT: {alive_processes}"
-                        )
-
-                    time.sleep(0.1)
-                self.root_logger.info("Finished waiting for all processes to end.")
-            else:
-                for pinfo in take_core_processes:
-                    if self._check_enough_free_space():
-                        try:
-                            dumpers.dbg.dump_info(pinfo, take_dump=True)
-                        except dumper.DumpError as err:
-                            self.root_logger.error(err.message)
-                            dump_pids = {**err.dump_pids, **dump_pids}
-                        except Exception as err:
-                            self.root_logger.info(
-                                "Error encountered when invoking debugger %s", err
-                            )
-
-                            trapped_exceptions.append(traceback.format_exc())
-                    else:
-                        self.root_logger.info(
-                            "Not enough space for a core dump, skipping %s processes with PIDs %s",
-                            pinfo.name,
-                            str(pinfo.pidv),
-                        )
+                        trapped_exceptions.append(traceback.format_exc())
+                else:
+                    self.root_logger.info(
+                        "Not enough space for a core dump, skipping %s processes with PIDs %s",
+                        pinfo.name,
+                        str(pinfo.pidv),
+                    )
 
         # Dump info of all processes, except python & java.
         for pinfo in [pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)]:
