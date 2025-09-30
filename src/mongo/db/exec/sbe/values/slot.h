@@ -296,7 +296,7 @@ private:
 class SwitchAccessor final : public SlotAccessor {
 public:
     SwitchAccessor(std::vector<SlotAccessor*> accessors) : _accessors(std::move(accessors)) {
-        invariant(!_accessors.empty());
+        tassert(11093601, "Vector of SlotAccessor must not be empty", !_accessors.empty());
     }
 
     std::pair<TypeTags, Value> getViewOfValue() const override {
@@ -307,7 +307,7 @@ public:
     }
 
     void setIndex(size_t index) {
-        invariant(index < _accessors.size());
+        tassert(11093602, "Index out of bounds", index < _accessors.size());
         _index = index;
     }
 
@@ -552,7 +552,7 @@ public:
     }
 
     BSONObj getOwnedBSONObj() {
-        invariant(_tag == TypeTags::bsonObject);
+        tassert(11093603, "Expected bsonObject tag type", _tag == TypeTags::bsonObject);
         if (!_hasBsonObj) {
             if (!_owned) {
                 std::tie(_tag, _val) = copyValue(_tag, _val);

@@ -178,7 +178,7 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelFi
     // Caller should always ask us to extract a top level field that's in the reqs.  We could
     // relax this if needed, and return a bunch of Nothing CellBlocks, but it's a non-use case
     // for now.
-    invariant(node != _root.getChildren.end());
+    tassert(11093600, "Top level field doesn't exist", node != _root.getChildren.end());
 
     for (size_t i = 0; i < tags.size(); ++i) {
         for (auto& rec : _filterPositionInfoRecorders) {

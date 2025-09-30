@@ -219,6 +219,8 @@ public:
     }
 
 private:
+    TsBlock(bool owned, TypeTags blockTag, Value blockVal);
+
     void ensureDeblocked();
 
     /**
@@ -241,9 +243,9 @@ private:
     // track of whether the underlying buffer '_blockVal' is owned or not via '_blockOwned'.
     //
     // If the '_blockVal' is not owned, this TsBlock is valid only as long as the underlying BSON.
-    bool _blockOwned;
-    TypeTags _blockTag;
-    Value _blockVal;
+    const bool _blockOwned;
+    const TypeTags _blockTag;
+    const Value _blockVal;
 
     // The number of values in this block.
     size_t _count;

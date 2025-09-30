@@ -962,7 +962,9 @@ void readKeyStringValueIntoAccessors(const SortedDataKeyValueView& keyString,
         keepReading = key_string::readValue(
             &reader, &typeBitsReader, inverted, keyString.getVersion(), &valBuilder);
 
-        invariant(componentIndex < Ordering::kMaxCompoundIndexKeys || !keepReading);
+        tassert(11093607,
+                "Reached 'kMaxCompoundIndexKeys' components, but still reading index keys",
+                componentIndex < Ordering::kMaxCompoundIndexKeys || !keepReading);
 
         // If 'indexKeysToInclude' indicates that this index key component is not part of the
         // projection, remove it from the list of values that will be fed to the 'accessors'
