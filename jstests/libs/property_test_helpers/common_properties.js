@@ -2,6 +2,7 @@
  * Common properties our property-based tests may use. Intended to be paired with the `testProperty`
  * interface in property_testing_utils.js.
  */
+import {FixtureHelpers} from "jstests/libs/fixture_helpers.js";
 import {runDeoptimized} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 
 // Returns different query shapes using the first parameters plugged in.
@@ -115,5 +116,81 @@ export function createCacheCorrectnessProperty(controlColl, experimentColl, stat
         }
 
         return {passed: true};
+    };
+}
+
+function runSetParamCommand(db, cmd) {
+    FixtureHelpers.runCommandOnAllShards({db: db.getSiblingDB("admin"), cmdObj: cmd});
+}
+
+/*
+ * Runs the given function with the query knobs set, then sets the query knobs back to their
+ * original state.
+ * It's important that each run of the property is independent from one another, so we'll always
+ * reset the knobs to their original state even if the function throws an exception.
+ */
+function runWithKnobs(db, knobToVal, fn) {
+    const knobNames = Object.keys(knobToVal);
+    // If there are no knobs to change, return the result of the function since there's no other
+    // work to do.
+    if (knobNames.length === 0) {
+        return fn();
+    }
+
+    // Get the previous knob settings, so we can undo our changes after setting the knobs from
+    // `knobToVal`.
+    const getParamObj = {getParameter: 1};
+    for (const key of knobNames) {
+        getParamObj[key] = 1;
+    }
+    const getParamResult = assert.commandWorked(db.adminCommand(getParamObj));
+    // Copy only the knob key/vals into the new object.
+    const priorSettings = {};
+    for (const key of knobNames) {
+        priorSettings[key] = getParamResult[key];
+    }
+
+    // Set the requested knobs.
+    runSetParamCommand(db, {setParameter: 1, ...knobToVal});
+
+    // With the finally block, we'll always revert the parameters back to their original settings,
+    // even if an exception is thrown.
+    try {
+        return fn();
+    } finally {
+        // Reset to the original settings.
+        runSetParamCommand(db, {setParameter: 1, ...priorSettings});
+    }
+}
+
+export function createQueriesWithKnobsSetAreSameAsControlCollScanProperty(controlColl,
+                                                                          experimentColl) {
+    return function queriesWithKnobsSetAreSameAsControlCollScan(
+        getQuery, testHelpers, {knobToVal}) {
+        const queries = getDifferentlyShapedQueries(getQuery, testHelpers);
+
+        // Compute the control results all at once.
+        const resultMap = runDeoptimized(controlColl, queries);
+
+        return runWithKnobs(experimentColl.getDB(), knobToVal, () => {
+            for (let i = 0; i < queries.length; i++) {
+                const query = queries[i];
+                const controlResults = resultMap[i];
+                const experimentResults = experimentColl.aggregate(query).toArray();
+                if (!testHelpers.comp(controlResults, experimentResults)) {
+                    return {
+                        passed: false,
+                        message:
+                            "A query with different knobs set has returned incorrect results compared to a collection scan query with no knobs set.",
+                        query,
+                        explain: experimentColl.explain().aggregate(query),
+                        controlResults,
+                        experimentResults,
+                        knobToVal,
+                    };
+                }
+            }
+            return {passed: true};
+        });
     };
 }

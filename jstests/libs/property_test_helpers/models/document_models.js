@@ -16,6 +16,7 @@
  */
 import {
     dateArb,
+    fieldArb,
     intArb,
     scalarArb
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
@@ -48,8 +49,11 @@ for (let i = 0; i < kMaxNumDocs; i++) {
 }
 const uniqueIdsArb = fc.shuffledSubarray(docIds, {minLength: kMaxNumDocs, maxLength: kMaxNumDocs});
 
-export function getDocsModel(isTS) {
-    const docModel = isTS ? timeseriesDocModel : defaultDocModel;
+export function getDocsModel({isTS = false, docModel} = {}) {
+    if (!docModel) {
+        docModel = isTS ? timeseriesDocModel : defaultDocModel;
+    }
+
     // The size=+2 argument tells fc.array to generate array sizes closer to the max than the min.
     // This way the average number of documents produced is >100, which means our queries will be
     // less likely to produce empty results. The size argument does not affect minimization. On
@@ -68,4 +72,30 @@ export function getDocsModel(isTS) {
                 return Object.assign({}, oldDoc, {_id: _ids[ix]});
             });
         });
+}
+
+/**
+ * Similar to getDocModel(), but generates more deeply nested data, and does not allow arrays.
+ *
+ * 'keyArb' is the arbitrary used to generate object keys. It's not a strict guarantee that objects
+ * produced will have nesting depth at most 'approxMaxDepth' (hence "approx"); see note below.
+ */
+export function getNestedDocModelNoArray({keyArb, approxMaxDepth, maxObjectKeys} = {}) {
+    if (!keyArb) {
+        // Re-use the standard field arbitrary if keyArb is not provided. Note that some of these
+        // keys could be dotted, so in reality we may end up with an object slightly more nested
+        // than 'approxMaxDepth'.
+        keyArb = fieldArb;
+    }
+    if (!maxObjectKeys) {
+        maxObjectKeys = 5;
+    }
+
+    return fc
+        .letrec((tie) => ({
+                    // A value in an object can be our leaf arbitrary, or it can be a nested object.
+                    value: fc.oneof({maxDepth: approxMaxDepth}, scalarArb, tie("object")),
+                    object: fc.dictionary(keyArb, tie("value"), {maxKeys: maxObjectKeys}),
+                }))
+        .object;
 }
