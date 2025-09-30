@@ -776,7 +776,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/core/query/where/**/OWNERS.yml @10gen/query-integration-staff-leads @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/replicate_record_ids/OWNERS.yml
-/jstests/core/replicate_record_ids/**/* @10gen/server-storage-engine-integration @svc-auto-approve-bot
+/jstests/core/replicate_record_ids/**/* @10gen/server-collection-write-path @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/core/shell/OWNERS.yml
 /jstests/core/shell/ @10gen/devprod-correctness @svc-auto-approve-bot
@@ -1466,6 +1466,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/replsets/**/standalone_recover_to_oplog_timestamp.js @10gen/server-recovery @svc-auto-approve-bot
 /jstests/replsets/**/*startup_recovery* @10gen/server-recovery @svc-auto-approve-bot
 /jstests/replsets/**/*fcv* @10gen/server-fcv @svc-auto-approve-bot
+/jstests/replsets/**/*record_ids* @10gen/server-collection-write-path @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/replsets/dbcheck/OWNERS.yml
 /jstests/replsets/dbcheck/**/* @10gen/server-dbcheck @svc-auto-approve-bot

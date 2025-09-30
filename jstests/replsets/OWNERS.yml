@@ -33,3 +33,6 @@ filters:
   - "*fcv*":
     approvers:
       - 10gen/server-fcv
+  - "*record_ids*":
+    approvers:
+      - 10gen/server-collection-write-path
