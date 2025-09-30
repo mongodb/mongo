@@ -64,6 +64,13 @@ assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);
 assert.commandWorked(bucketsColl.insert(bucket));
 assert.commandWorked(bucketsColl.deleteOne({_id: bucket._id}));
 assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), true);
+
+// We perform an fsync to move the stable checkpoint up to include the deletion of the mixed schema
+// document, so that background validation does not see an inconsistent state when checking the
+// latest catalog value for the mixed schema flag (i.e, prevent it from detecting the presence of a
+// mixed schema bucket with the mixed schema flag set to false).
+assert.commandWorked(testDB.adminCommand({fsync: 1}));
+
 assert.commandWorked(
     testDB.runCommand({collMod: collName, timeseriesBucketsMayHaveMixedSchemaData: false}));
 assert.eq(TimeseriesTest.bucketsMayHaveMixedSchemaData(bucketsColl), false);
