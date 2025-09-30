@@ -1,0 +1,7 @@
+# Toolchain configuration is checked in to lock the version
+# Uncomment the following line if you want each developer to generate their own:
+# toolchain_config.env
+
+# Temporary files
+*.tar.gz
+*.tmp
