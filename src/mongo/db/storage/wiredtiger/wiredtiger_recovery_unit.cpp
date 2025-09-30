@@ -771,7 +771,11 @@ void WiredTigerRecoveryUnit::setCommitTimestamp(Timestamp timestamp) {
     // setPrepareTimestamp() is called. Prepared transactions ensure the correct timestamping
     // semantics and the set-once commitTimestamp behavior is exactly what prepared transactions
     // want.
-    invariant(!_inUnitOfWork() || !_prepareTimestamp.isNull(), toString(_getState()));
+    invariant(!_inUnitOfWork() || !_prepareTimestamp.isNull(),
+              str::stream() << "Current state: " << toString(_getState())
+                            << ". Invalid internal state while setting commit timestamp to: "
+                            << timestamp.toString() << ". prepareTimestamp is currently set to: "
+                            << _prepareTimestamp.toString());
     invariant(_commitTimestamp.isNull(),
               str::stream() << "Commit timestamp set to " << _commitTimestamp.toString()
                             << " and trying to set it to " << timestamp.toString());
