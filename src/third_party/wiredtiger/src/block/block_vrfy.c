@@ -179,12 +179,14 @@ err:
  *     End file verification.
  */
 int
-__wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block, bool verify_success)
 {
     WT_DECL_RET;
 
-    /* Confirm we verified every file block. */
-    ret = __verify_filefrag_chk(session, block);
+    /* Only run file fragments check if verify didn't exit early due to any error. */
+    if (verify_success)
+        /* Confirm we verified every file block. */
+        ret = __verify_filefrag_chk(session, block);
 
     block->verify = false;
     block->verify_strict = false;

@@ -24,9 +24,6 @@ fi
 backup=$home.backup
 recovery=$home.recovery
 
-# Extract the disagg config if any.
-disagg_config=$(echo $config | sed -n -r 's/.*(-d \w+).*/\1/p')
-
 #./t -t r -W 3 -D -X -n 100000 -k 100000 -C cache_size=100MB -h $home > $home.out 2>&1 &
 ./${bin} ${config} -h ${home} > $home.out 2>&1 &
 pid=$!
@@ -45,7 +42,7 @@ while kill -STOP $pid ; do
 	cp $home/* $backup
 	kill -CONT $pid
 	cp $backup/* $recovery
-	./${bin} $disagg_config -t r -D -v -h $recovery || exit 1
+	./${bin} -t r -D -v -h $recovery || exit 1
 done
 
 # Clean the home directory once the test is completed. Note that once we fail to send the signal to

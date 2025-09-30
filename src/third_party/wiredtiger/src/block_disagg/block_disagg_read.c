@@ -47,7 +47,7 @@ __block_disagg_read_checksum_err(WT_SESSION_IMPL *session, const char *name, uin
     __wt_errx(session,
       "%s: read checksum error for %" PRIu32
       "B block at "
-      "page %" PRIu64 ", lsn %" PRIu64 ": %s of %" PRIu32
+      "page %" PRIu64 ", lsn %" PRIu64 ": %s of %" PRIx32
       " doesn't match expected checksum of %" PRIx32,
       name, size, page_id, lsn, context_msg, checksum, expected_checksum);
 }

@@ -18,9 +18,6 @@ test_config09.py
 test_config10.py
 test_config12.py
 test_cursor01.py
-test_cursor02.py  # FIXME: WT-15291
-test_cursor03.py
-test_cursor05.py  # FIXME: WT-15291
 test_cursor06.py  # FIXME: WT-15417
 test_cursor17.py  # FIXME: WT-15418
 test_cursor21.py  # FIXME: WT-15369

@@ -467,13 +467,7 @@ functions:
           set -o errexit
           set -o verbose
           ${PREPARE_TEST_ENV}
-
-          # Check if we running in disagg mode.
-          disagg_args=""
-          if [[ "${disagg_run|false}" == "true" ]]; then
-              disagg_args="-d leader -t row"
-          fi
-          ../../../tools/run_parallel.sh "nice ./recovery-test.sh \"${data_validation_stress_test_args} ${run_test_checkpoint_args} $disagg_args\" WT_TEST.\$t test_checkpoint" ${validation_stress_num_runs|120}
+          ../../../tools/run_parallel.sh 'nice ./recovery-test.sh "${data_validation_stress_test_args} ${run_test_checkpoint_args}" WT_TEST.$t test_checkpoint' ${validation_stress_num_runs|120}
   "run tiered storage test":
     - command: shell.exec
       params:
@@ -650,22 +644,7 @@ functions:
         ${PREPARE_TEST_ENV}
         . test/evergreen/find_cmake.sh
         cd cmake_build/${directory}
-
-        # Determine if we want to exclude or include disagg labels.
-        disagg_filter=""
-        if [[ "${disagg_run|false}" == "true" ]]; then
-          disagg_filter='-L'  # Include labels
-        else
-          disagg_filter='-LE'  # Exclude labels
-        fi
-        # Create new disagg label filter or append to the existing one.
-        ctest_args='${ctest_extra_args}'
-        if $(echo "$ctest_args" | grep -q -w -- "$disagg_filter"); then
-          ctest_args=$(echo "$ctest_args" | sed -E "s/$disagg_filter \"([^\"]*)\"/$disagg_filter \"\1|disagg\"/")
-        else
-          ctest_args+=" $disagg_filter \"disagg\""
-        fi
-        eval $CTEST $ctest_args --output-on-failure 2>&1
+        $CTEST ${ctest_extra_args} --output-on-failure 2>&1
 
   "make check all":
     command: shell.exec
@@ -679,7 +658,7 @@ functions:
         . test/evergreen/find_cmake.sh
         cd cmake_build
         echo "Using number of parallel processes '-j ${num_jobs}' for 'make check all'"
-        $CTEST -L "^check$" -LE "disagg" -j ${num_jobs} --output-on-failure ${ctest_extra_args|} 2>&1
+        $CTEST -L "^check$" -j ${num_jobs} --output-on-failure ${ctest_extra_args|} 2>&1
 
   # The following cppsuite tasks define a greater overall task.
   "cppsuite test run": &cppsuite_test_run
@@ -1023,7 +1002,6 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        ${additional_san_vars}
         # Fail, show the configuration file.
         fail() {
           echo "======= FAILURE =========="
@@ -1180,12 +1158,7 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        # Check if we running in disagg mode.
-        disagg_args=""
-        if [[ "${disagg_run|false}" == "true" ]]; then
-            disagg_args="-d leader -t row -x"
-        fi
-        ./test_checkpoint ${checkpoint_args} $disagg_args  2>&1
+        ./test_checkpoint ${checkpoint_args} 2>&1
 
   "checkpoint test predictable":
     command: shell.exec
@@ -1197,11 +1170,8 @@ functions:
         set -o errexit
         set -o verbose
         ${PREPARE_TEST_ENV}
-        disagg_args=""
-        if [[ "${disagg_run|false}" == "true" ]]; then
-            disagg_args="-d leader -t row -x"
-        fi
-        ../../../test/evergreen/checkpoint_test_predictable.sh ${times} "${checkpoint_args} $disagg_args"
+
+        ../../../test/evergreen/checkpoint_test_predictable.sh ${times} ${checkpoint_args}
 
   "checkpoint stress test":
     command: shell.exec
@@ -1434,7 +1404,6 @@ variables:
     CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake
     ENABLE_CPPSUITE: -DENABLE_CPPSUITE=0
-    ENABLE_TCMALLOC: 0
 
   # Template for Mac tests
   - &mac_test_template
@@ -1479,8 +1448,7 @@ variables:
       - func: "fetch artifacts"
       - func: "format test disagg"
         vars:
-          # FIXME-WT-14566 Limit the runs for now.
-          format_args: disagg.mode=leader runs.rows=100000:300000 runs.tables=1:3 runs.ops=300000
+          format_args: disagg.mode=leader runs.tables=1 runs.timer=3
           times: 5
 
   - &format-stress-data-validation-test-disagg-leader
@@ -1502,8 +1470,7 @@ variables:
       - func: "fetch artifacts"
       - func: "format test disagg"
         vars:
-          # FIXME-WT-14566 Limit the runs for now.
-          format_args: disagg.mode=switch runs.rows=100000:300000 runs.tables=1:3 runs.ops=300000
+          format_args: disagg.mode=switch runs.tables=1 runs.timer=3
           times: 5
 
   - &format-stress-test-disagg-follower
@@ -1558,9 +1525,9 @@ variables:
       - func: "compile wiredtiger"
         vars:
           <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
+          additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
       - func: "format test script"
         vars:
-          additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
           format_test_script_args: -t 360
 
   - &race-condition-stress-asan-test
@@ -2179,7 +2146,7 @@ tasks:
       - func: "make check directory"
         vars:
           directory: test/csuite
-          ctest_extra_args: -LE "long_running|disagg" ${ctest_extra_args} -j ${num_jobs}
+          ctest_extra_args: -LE "long_running" ${ctest_extra_args} -j ${num_jobs}
 
   - name: csuite-timestamp-abort-test-s3
     commands:
@@ -3946,14 +3913,6 @@ tasks:
             ${PREPARE_TEST_ENV}
             ../tools/tsan_playground/collect_warnings.sh
 
-  - name: data-validation-disagg-stress-test-checkpoint
-    depends_on:
-    - name: compile
-    commands:
-      - func: "run data validation stress test checkpoint"
-        vars:
-          run_test_checkpoint_args: -x -C cache_size=100MB
-
   - name: data-validation-stress-test-checkpoint
     tags: ["data-validation-stress-test"]
     depends_on:
@@ -4334,14 +4293,8 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            # Check if we running in disagg mode.
-            disagg_args=""
-            if [[ "${disagg_run|false}" == "true" ]]; then
-                disagg_args="-D"
-            fi
-            echo "./model_test $disagg_args -l 2000-3000 -t 3600"
             # Keep repeating the model test for 60 minutes
-            ./model_test $disagg_args -l 2000-3000 -t 3600
+            ./model_test -l 2000-3000 -t 3600
 
   - name: model-test-long-random-config
     tags: ["model_checking"]
@@ -4356,14 +4309,40 @@ tasks:
             set -o errexit
             set -o verbose
             ${PREPARE_TEST_ENV}
-            # Check if we running in disagg mode.
-            disagg_args=""
-            if [[ "${disagg_run|false}" == "true" ]]; then
-                disagg_args="-D"
-            fi
-
             # Keep repeating the model test for 60 minutes
-            ./model_test $disagg_args -l 100-200 -g -t 3600
+            ./model_test -l 100-200 -g -t 3600
+
+  - name: model-test-disagg-long
+    tags: ["stress-test-disagg-fail"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/model/tools"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            # Keep repeating the model test for 60 minutes
+            ./model_test -D -l 2000-3000 -t 3600
+
+  - name: model-test-disagg-long-random-config
+    tags: ["stress-test-disagg-fail"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/test/model/tools"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
+            ${PREPARE_TEST_ENV}
+            # Keep repeating the model test for 60 minutes
+            ./model_test -D -l 100-200 -g -t 3600
 
   - name: model-test-long-with-coverage
     tags: ["model_checking"]
@@ -4489,7 +4468,7 @@ tasks:
    # FIXME-WT-14566: Enable disagg leader mode on all platforms once failures has been resolved.
   - <<: *format-stress-test-disagg-leader
     name: format-stress-test-disagg-leader-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-asan-fail"]
+    tags: ["stress-test-disagg-fail"]
   - <<: *format-stress-test-disagg-leader
     name: format-stress-test-disagg-leader-2
     tags: ["stress-test-disagg-fail"]
@@ -4519,7 +4498,7 @@ tasks:
     tags: ["stress-test-disagg-fail"]
   - <<: *format-stress-test-disagg-follower
     name: format-stress-test-disagg-follower-1
-    tags: ["stress-test-disagg", "stress-test-disagg-asan-fail"]
+    tags: ["stress-test-disagg"]
   - <<: *format-stress-test-disagg-follower
     name: format-stress-test-disagg-follower-2
     tags: ["stress-test-disagg"]
@@ -4550,7 +4529,7 @@ tasks:
   # FIXME-WT-14566: Enable disagg switch mode on all platforms once failures has been resolved.
   - <<: *format-stress-test-disagg-switch
     name: format-stress-test-disagg-switch-1
-    tags: ["stress-test-disagg-fail", "stress-test-disagg-asan-fail"]
+    tags: ["stress-test-disagg-fail"]
   - <<: *format-stress-test-disagg-switch
     name: format-stress-test-disagg-switch-2
     tags: ["stress-test-disagg-fail"]
@@ -6404,7 +6383,7 @@ buildvariants:
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
     # We don't run C++ memory sanitized testing as it creates false positives. TSan also significantly increases the runtime
     # of some csuite tests, so disable the already long tests as well as tests heavily impacted by TSan.
-    ctest_extra_args: -LE "cppsuite|long_running|disagg"
+    ctest_extra_args: -LE "cppsuite|long_running"
     # TSan slows down python testing enough that we start printing "operation took X seconds" warnings.
     # These don't impact functionality, but the python tests fail on detection of any content in stdout so ignore it instead.
     ignore_stdout: --ignore-stdout
@@ -6467,7 +6446,7 @@ buildvariants:
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
     # some csuite tests to take an extended amount of time. These are excluded from the
     # make-check-test task and are covered by the csuite-long-running task.
-    ctest_extra_args: -LE "cppsuite|long_running|disagg"
+    ctest_extra_args: -LE "cppsuite|long_running"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
   tasks:
     - name: compile
@@ -7241,7 +7220,7 @@ buildvariants:
     # We don't run C++ memory sanitized testing as it creates false positives. MSAN also causes
     # some csuite tests to take an extended amount of time. These are excluded from the
     # make-check-test task and are covered by the csuite-long-running task.
-    ctest_extra_args: -LE "cppsuite|long_running|disagg"
+    ctest_extra_args: -LE "cppsuite|long_running"
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo` / 2" | bc)
   tasks:
     - name: compile
@@ -7301,41 +7280,13 @@ buildvariants:
       batchtime: 720 # 12 hours
 
 - name: amazon2023-disagg-stress
-  display_name: "[Failure Expected] (ARMV9) Amazon 2023 Disagg Stress tests"
-  batchtime: 4320 # once every two days
+  display_name: "(ARMV9) Amazon 2023 Disagg Stress tests"
   run_on:
   - amazon2023-arm64-latest-large-m8g
   expansions:
     ENABLE_TCMALLOC: 1
     num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
-    disagg_run: true
   tasks:
     - name: compile
     - name: ".stress-test-disagg-fail"
-    - name: data-validation-disagg-stress-test-checkpoint
-      batchtime: 10080 # once every week
-    - name: checkpoint-test-long-running
-    - name: checkpoint-test
-    - name: checkpoint-filetypes-predictable-test
-    - name: checkpoint-filetypes-test
-    - name: model-test-long
-    - name: model-test-long-random-config
-
-- name: amazon2023-disagg-asan-stress
-  display_name: "[Failure Expected] (ARMV9) Amazon 2023 ASAN Disagg Stress tests"
-  batchtime: 4320 # once every three days
-  run_on:
-  - amazon2023-arm64-latest-large-m8g
-  expansions:
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake
-    CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=ASan
-    ENABLE_TCMALLOC: 0
-    additional_env_vars: |
-      export LSAN_OPTIONS="$COMMON_SAN_OPTIONS:print_suppressions=0:suppressions=$(git rev-parse --show-toplevel)/test/evergreen/asan_leaks.supp"
-    num_jobs: $(echo "`grep -c ^processor /proc/cpuinfo`" | bc)
-    disagg_run: true
-    <<: *configure_flags_asan_mongodb_stable_clang_with_builtins
-    additional_san_vars: export ASAN_OPTIONS="$COMMON_SAN_OPTIONS:unmap_shadow_on_exit=1"
-  tasks:
-    - name: compile
-    - name: ".stress-test-disagg-asan-fail"
+      batchtime: 2880 # once every two days

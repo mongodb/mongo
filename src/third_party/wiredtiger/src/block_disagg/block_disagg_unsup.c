@@ -200,10 +200,11 @@ __wti_block_disagg_verify_addr(
  *     End a block manager verify.
  */
 int
-__wti_block_disagg_verify_end(WT_BM *bm, WT_SESSION_IMPL *session)
+__wti_block_disagg_verify_end(WT_BM *bm, WT_SESSION_IMPL *session, bool verify_success)
 {
     WT_UNUSED(bm);
     WT_UNUSED(session);
+    WT_UNUSED(verify_success);
     return (0);
 }
 

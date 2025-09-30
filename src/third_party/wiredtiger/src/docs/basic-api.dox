@@ -106,6 +106,26 @@ would simplify to:
 	}
 @endcode
 
+@section internal_access Access to Internal Data Structures
+WT exposes a relatively small and consistent external API surface.
+However, it is important for developers to be aware that this API can also
+be used to access certain **internal data structures** directly. For example,
+it is currently possible to open cursors on internal files such as:
+
+- The history store (`file:WiredTigerHS.wt`)
+- The metadata file (`file:WiredTiger.wt`)
+- Other internal data sources such as constituent stables of layered tables
+(e.g. `*.wt_ingest` and `*.wt_stable`)
+
+This capability exists primarily for **testing, debugging and recovery
+purposes**, and requires deliberate use of specific URIs. It is not part of the
+typical application interface, and incorrect usage cal lead to undefined
+behavior or data corruption.
+
+In general, applications should access data through the standard interfaces
+(`table:` URIs or higher-level abstractions) rather than interacting with
+internal components.
+
 @section basic_close Closing handles
 
 Lastly, we close the connection, which implicitly closes the cursor and

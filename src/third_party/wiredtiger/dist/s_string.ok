@@ -434,6 +434,7 @@ UnlockFile
 Unmap
 UnmapViewOfFile
 Unmount
+Unreferenced
 Uryyb
 VARCHAR
 VLCS

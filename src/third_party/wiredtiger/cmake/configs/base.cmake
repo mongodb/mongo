@@ -50,13 +50,6 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     set(default_enable_debug_info OFF)
 endif()
 
-# Use system provided sqlite3 if available.
-find_package(SQLite3 QUIET)
-
-if(SQLite3_FOUND)
-    set(default_internal_sqlite3 OFF)
-endif()
-
 if(WT_WIN)
     # We force a static compilation to generate a ".lib" file. We can then
     # additionally generate a dll file using a *DEF file.
@@ -356,6 +349,20 @@ config_bool(
     "Enable debug information. Will be automatically enabled if diagnostics is enabled."
     DEFAULT ${default_enable_debug_info}
 )
+
+config_string(
+    SQLITE3_REQUIRED_VERSION
+    "SQLite3 version to use when building PALite extension. \
+    Expected format of version string: major[.minor[.patch]]"
+    DEFAULT "3.8"   # Minimum version for partial indexes (used in PALite)
+)
+
+# Use system provided sqlite3 if available.
+find_package(SQLite3 ${SQLITE3_REQUIRED_VERSION} QUIET)
+
+if(SQLite3_FOUND)
+    set(default_internal_sqlite3 OFF)
+endif()
 
 config_bool(
     ENABLE_INTERNAL_SQLITE3

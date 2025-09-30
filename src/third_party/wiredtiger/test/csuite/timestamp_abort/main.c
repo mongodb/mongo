@@ -919,11 +919,11 @@ run_workload(uint32_t workload_iteration)
     /*
      * Size the cache appropriately for the number of threads. Each thread adds keys sequentially to
      * its own portion of the key space, so each thread will be dirtying one page at a time. By
-     * default, a leaf page grows to 32K in size before it splits and the thread begins to fill
+     * default, a leaf page grows to 256K in size before it splits and the thread begins to fill
      * another page. We'll budget for 10 full size leaf pages per thread in the cache plus a little
      * extra in the total for overhead.
      */
-    cache_mb = ((32 * WT_KILOBYTE * 10) * nth) / WT_MEGABYTE + 20;
+    cache_mb = ((256 * WT_KILOBYTE * 10) * nth) / WT_MEGABYTE + 300;
 
     /*
      * Do not remove log files when using model verification. The current implementation requires

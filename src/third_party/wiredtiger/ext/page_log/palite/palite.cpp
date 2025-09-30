@@ -692,17 +692,18 @@ class Storage {
                 a[GET_GLOBAL] = R"(
                     SELECT val FROM globals WHERE key = ?;)";
                 a[PUT_PAGE] = R"(
-                    INSERT INTO pages (
+                    INSERT OR REPLACE INTO pages (
                         table_id,
                         page_id,
                         lsn,
                         backlink_lsn,
                         base_lsn,
                         flags,
+                        delta,
                         encryption,
                         timestamp_materialized_us,
                         page_data)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);)";
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);)";
                 a[GET_PAGE_IDS] = R"(
                     SELECT DISTINCT p1.page_id
                     FROM pages AS p1
@@ -836,11 +837,15 @@ private:
                 backlink_lsn INTEGER NOT NULL,
                 base_lsn INTEGER NOT NULL,
                 flags INTEGER NOT NULL,
+                delta INTEGER NOT NULL,
                 encryption STRING NOT NULL,
                 timestamp_materialized_us INTEGER NOT NULL,
                 page_data BLOB,
-                PRIMARY KEY (table_id, page_id, lsn)
+             PRIMARY KEY (table_id, page_id, lsn)
             );)",
+          R"(CREATE UNIQUE INDEX IF NOT EXISTS ux_delta
+             ON pages (table_id, page_id, backlink_lsn)
+             WHERE delta = 1;)",
           R"(CREATE TABLE IF NOT EXISTS globals (
                 key INTEGER NOT NULL,
                 val INTEGER NOT NULL,
@@ -1082,11 +1087,13 @@ public:
         SQ_CHECK(sqlite3_bind_int64, stmt.get(), 4, static_cast<sqlite3_int64>(args->backlink_lsn));
         SQ_CHECK(sqlite3_bind_int64, stmt.get(), 5, static_cast<sqlite3_int64>(args->base_lsn));
         SQ_CHECK(sqlite3_bind_int64, stmt.get(), 6, static_cast<sqlite3_int64>(args->flags));
-        SQ_CHECK(sqlite3_bind_text, stmt.get(), 7, args->encryption.dek,
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 7,
+          static_cast<sqlite3_int64>(args->flags & WT_PAGE_LOG_DELTA ? 1 : 0));
+        SQ_CHECK(sqlite3_bind_text, stmt.get(), 8, args->encryption.dek,
           strlen(args->encryption.dek), SQLITE_STATIC);
-        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 8,
+        SQ_CHECK(sqlite3_bind_int64, stmt.get(), 9,
           static_cast<sqlite3_int64>(now_us() + (config.materialization_delay_ms * 1ms / 1us)));
-        SQ_CHECK(sqlite3_bind_blob, stmt.get(), 9, buf->data, buf->size, SQLITE_STATIC);
+        SQ_CHECK(sqlite3_bind_blob, stmt.get(), 10, buf->data, buf->size, SQLITE_STATIC);
         SQ_CHECK(sqlite3_step, stmt.get());
 
         object_puts++;
@@ -1102,33 +1109,46 @@ public:
         SQ_CHECK(sqlite3_bind_int64, stmt.get(), 3, static_cast<sqlite3_int64>(args->lsn));
         SQ_CHECK(sqlite3_bind_int64, stmt.get(), 4, now_us());
 
+        /* Note: Results are ordered by lsn DESC, so the first row is the most recent.
+         In case of a delta chain, deltas (D) appear first, followed by the full page (B):
+              D2, D1, B
+         We will reverse the order before returning to the caller:
+              B, D1, D2
+        */
         uint32_t count = 0;
         int ret = 0;
-        uint64_t last_lsn = 0;
+        PageInfo prev_delta{};
         while ((ret = SQ_CHECK(sqlite3_step, stmt.get())) == SQLITE_ROW && count < *results_count) {
-            uint64_t lsn = sqlite3_column_int64(stmt.get(), 0);
-            uint64_t backlink_lsn = sqlite3_column_int64(stmt.get(), 1);
-            uint64_t base_lsn = sqlite3_column_int64(stmt.get(), 2);
-            *flags = static_cast<uint32_t>(sqlite3_column_int64(stmt.get(), 3));
+            PageInfo page{
+              .table_id = table_id,
+              .page_id = page_id,
+              .lsn = static_cast<uint64_t>(sqlite3_column_int64(stmt.get(), 0)),
+              .backlink_lsn = static_cast<uint64_t>(sqlite3_column_int64(stmt.get(), 1)),
+              .base_lsn = static_cast<uint64_t>(sqlite3_column_int64(stmt.get(), 2)),
+              .flags = static_cast<uint32_t>(sqlite3_column_int64(stmt.get(), 3)),
+            };
+            validate_page(page, prev_delta);
+            prev_delta = page;
 
             const char *enc = reinterpret_cast<const char *>(sqlite3_column_text(stmt.get(), 4));
-            strncpy(args->encryption.dek, enc ? enc : "", sizeof(args->encryption.dek));
+            if (count == 0) { // First row will be the last in the returned array
+                strncpy(args->encryption.dek, enc ? enc : "", sizeof(args->encryption.dek));
+            }
 
             const void *blob = sqlite3_column_blob(stmt.get(), 5);
             int size = sqlite3_column_bytes(stmt.get(), 5);
             fill_item(&results_array[count], blob, static_cast<size_t>(size));
 
-            validate_page(
-              count, backlink_lsn, last_lsn, table_id, page_id, base_lsn, args, flags, lsn);
-
-            last_lsn = lsn;
-            args->backlink_lsn = backlink_lsn;
-            args->base_lsn = base_lsn;
+            if (count == 0) { // First row will be the last in the returned array
+                args->backlink_lsn = page.backlink_lsn;
+                args->base_lsn = page.base_lsn;
+                *flags = page.flags;
+            }
 
             // Continue to next row
             count++;
 
-            if (!(*flags & WT_PAGE_LOG_DELTA)) {
+            if (!(page.flags & WT_PAGE_LOG_DELTA)) {
                 // Stop if this is a full page
                 ret = SQLITE_DONE;
                 break;
@@ -1141,42 +1161,59 @@ public:
             LOG_AND_THROW("Insufficient space in results_array: {}", *results_count);
         }
 
+        // Reverse the results array to have the full page first, followed by deltas.
+        std::reverse(results_array, results_array + count);
+
         *results_count = count;
         object_gets += count;
 
         return 0;
     }
 
-    // TODO: tidy-up validation
+    struct PageInfo {
+        uint64_t table_id;
+        uint64_t page_id;
+        uint64_t lsn;
+        uint64_t backlink_lsn;
+        uint64_t base_lsn;
+        uint32_t flags;
+
+        std::string
+        to_string() const
+        {
+            return std::format(
+              "{{table_id={}, page_id={}, lsn={}, backlink_lsn={}, base_lsn={}, "
+              "flags={:#x}}}",
+              table_id, page_id, lsn, backlink_lsn, base_lsn, flags);
+        }
+    };
+
     void
-    validate_page(uint32_t &count, uint64_t &backlink_lsn, uint64_t &last_lsn, uint64_t &table_id,
-      uint64_t &page_id, uint64_t &base_lsn, WT_PAGE_LOG_GET_ARGS *args, uint32_t *flags,
-      uint64_t &lsn)
+    validate_page(const PageInfo &page, const PageInfo &prev_delta)
     {
-        if (count > 0 && backlink_lsn != last_lsn) {
-            LOG_WARN(
-              "Delta chain validation failed at position {}, "
-              "table_id {}, page_id {}: backlink_lsn {} does not match previous lsn {}",
-              count, table_id, page_id, backlink_lsn, last_lsn);
+        if (page.flags & WT_PAGE_LOG_DISCARDED) {
+            LOG_AND_THROW("Encountered discarded page: {}", page.to_string());
         }
 
-        if (count == 1 && base_lsn != last_lsn) {
-            LOG_WARN(
-              "Delta chain validation failed at position {}, "
-              "table_id {}, page_id {}: base_lsn {} does not match previous lsn {}",
-              count, table_id, page_id, base_lsn, last_lsn);
-        } else if (count > 1 && base_lsn != args->base_lsn) {
-            LOG_WARN(
-              "Delta chain validation failed at position {}, "
-              "table_id {}, page_id {}: base_lsn {} does not match initial base_lsn {}",
-              count, table_id, page_id, base_lsn, args->base_lsn);
+        if (prev_delta.lsn == 0) {
+            return; // No previous delta to validate against
         }
 
-        if (*flags & WT_PAGE_LOG_DISCARDED) {
-            LOG_ERROR(
-              "Encountered discarded page at position {}, "
-              "table_id {}, page_id {}, lsn {}",
-              count, table_id, page_id, lsn);
+        if (page.lsn != prev_delta.backlink_lsn) {
+            LOG_AND_THROW(
+              "Delta chain validation failed: backlink mismatch. Previous delta: {}, current page: "
+              "{}",
+              prev_delta.to_string(), page.to_string());
+        }
+
+        const bool is_delta = (page.flags & WT_PAGE_LOG_DELTA) != 0;
+        const uint64_t expected_lsn = is_delta ? page.base_lsn : page.lsn;
+
+        if (expected_lsn != prev_delta.base_lsn) {
+            LOG_AND_THROW(
+              "Delta chain validation failed: base_lsn mismatch. Previous delta: {}, current page: "
+              "{}",
+              prev_delta.to_string(), page.to_string());
         }
     }
 
@@ -1208,12 +1245,14 @@ public:
     discard_page(Connection &conn, uint64_t table_id, uint64_t page_id, uint64_t lsn,
       WT_PAGE_LOG_DISCARD_ARGS *args)
     {
-        WT_ITEM dummy_page{};
         WT_PAGE_LOG_PUT_ARGS put_args{};
         put_args.backlink_lsn = args->backlink_lsn;
         put_args.base_lsn = args->base_lsn;
-        put_args.flags = Storage::WT_PAGE_LOG_DISCARDED;
+        put_args.flags = args->flags | Storage::WT_PAGE_LOG_DISCARDED;
+
+        WT_ITEM dummy_page{};
         put_page(conn, table_id, page_id, lsn, &put_args, &dummy_page);
+        args->lsn = put_args.lsn;
     }
 };
 

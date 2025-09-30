@@ -1,5 +1,5 @@
 if(NOT ENABLE_INTERNAL_SQLITE3)
-    find_package(SQLite3 REQUIRED)
+    find_package(SQLite3 ${SQLITE3_REQUIRED_VERSION} REQUIRED)
     add_library(wt::sqlite3 ALIAS SQLite::SQLite3)
     return()
 endif()
