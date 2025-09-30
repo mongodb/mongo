@@ -31,6 +31,7 @@
 
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/extension/host/host_services.h"
+#include "mongo/db/extension/host/load_stub_parsers.h"
 #include "mongo/db/extension/host_adapter/extension_handle.h"
 #include "mongo/db/extension/public/api.h"
 #include "mongo/db/extension/sdk/extension_status.h"
@@ -57,7 +58,7 @@ const std::filesystem::path& getExtensionConfDir() {
     // Use /tmp/mongo/extensions in test environments, otherwise use /etc/mongo/extensions.
     static const std::filesystem::path kExtensionConfDir = getTestCommandsEnabled()
         ? std::filesystem::temp_directory_path() / "mongo" / "extensions"
-        : std::filesystem::path{"/etc/mongo/extensions"};
+        : ExtensionLoader::kExtensionConfigPath;
 
     return kExtensionConfDir;
 }
@@ -119,11 +120,20 @@ host_adapter::ExtensionHandle getMongoExtension(SharedLibrary& extensionLib,
 stdx::unordered_map<std::string, LoadedExtension> ExtensionLoader::loadedExtensions;
 
 bool loadExtensions(const std::vector<std::string>& extensionNames) {
+    const bool featureFlagExtensionsAPIEnabled =
+        feature_flags::gFeatureFlagExtensionsAPI.isEnabled();
+
+    ON_BLOCK_EXIT([&] {
+        if (featureFlagExtensionsAPIEnabled) {
+            registerUnloadedExtensionStubParsers();
+        }
+    });
+
     if (extensionNames.empty()) {
         return true;
     }
 
-    if (!feature_flags::gFeatureFlagExtensionsAPI.isEnabled()) {
+    if (!featureFlagExtensionsAPIEnabled) {
         LOGV2_ERROR(10668500,
                     "Extensions are not allowed with the current configuration. You may need to "
                     "enable featureFlagExtensionsAPI.");

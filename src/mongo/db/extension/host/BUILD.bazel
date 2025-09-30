@@ -41,9 +41,13 @@ mongo_cc_library(
     name = "extension_loader",
     srcs = [
         "load_extension.cpp",
+        "load_stub_parsers.cpp",
         "//src/mongo/db/pipeline:document_source_list_extensions.cpp",
     ],
-    hdrs = ["load_extension.h"],
+    hdrs = [
+        "load_extension.h",
+        "load_stub_parsers.h",
+    ],
     deps = [
         ":extension_host",
         ":host_services",
