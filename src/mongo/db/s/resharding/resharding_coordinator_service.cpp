@@ -2530,8 +2530,10 @@ void ReshardingCoordinator::_setCriticalSectionTimeoutCallback(
             _reshardingCoordinatorObserver->onCriticalSectionTimeout();
         });
 
-    if (!swCbHandle.isOK()) {
-        _reshardingCoordinatorObserver->interrupt(swCbHandle.getStatus());
+    auto scheduleTimeoutStatus = swCbHandle.getStatus();
+    if (!scheduleTimeoutStatus.isOK()) {
+        _reshardingCoordinatorObserver->interrupt(scheduleTimeoutStatus);
+        uassertStatusOK(scheduleTimeoutStatus);
     }
 
     _criticalSectionTimeoutCbHandle = swCbHandle.getValue();
