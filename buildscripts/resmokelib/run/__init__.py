@@ -1072,7 +1072,7 @@ class TestRunner(Subcommand):
                         config.ARCHIVE_DIRECTORY, self._exec_logger
                     )
                 case "test_archival":
-                    archive_strategy = utils.archival.TestArchival()
+                    archive_strategy = utils.archival.TestArchival(self._exec_logger)
             self._archive = utils.archival.Archival(
                 archival_json_file=config.ARCHIVE_FILE,
                 limit_size_mb=config.ARCHIVE_LIMIT_MB,

@@ -315,21 +315,27 @@ class ArchiveToDirectory(ArchiveStrategy):
 
 
 class TestArchival(ArchiveStrategy):
-    def __init__(self):
+    def __init__(self, logger):
         self.archive_file = os.path.join(config.DBPATH_PREFIX, "test_archival.txt")
+        self.logger = logger
 
     def archive_files(self, files: List[str], archive_name: str, display_name: str):
+        self.logger.info(f"These files/directories would have been archived: {files}")
         with open(self.archive_file, "a") as f:
             for file in files:
                 # If a resmoke fixture is used, the input_file will be the source of the data
                 # files. If mongorunner is used, input_file/mongorunner will be the source
                 # of the data files.
                 if os.path.isdir(os.path.join(file, config.MONGO_RUNNER_SUBDIR)):
+                    self.logger.info(
+                        f"{file} contains {config.MONGO_RUNNER_SUBDIR}. Archiving {config.MONGO_RUNNER_SUBDIR} instead."
+                    )
                     file = os.path.join(file, config.MONGO_RUNNER_SUBDIR)
 
                 # Each node contains one directory for its data files. Here we write out
                 # the names of those directories. In the unit test for archival, we will
                 # check that the directories are those we expect.
+                self.logger.info(f"{file} contains {os.listdir(file)}")
                 f.write("\n".join(os.listdir(file)) + "\n")
         message = "'test_archival' specified. Skipping tar/gzip."
         return 0, message, 0
