@@ -317,7 +317,7 @@ public:
             if (subs < 0) {
                 if (probing && subs == PCRE2_ERROR_NOMEMORY) {
                     probing = false;
-                    buf.resize(bufSize + 1);
+                    buf.resize(bufSize);
                     continue;
                 }
                 iasserted(ErrorCodes::UnknownError,
