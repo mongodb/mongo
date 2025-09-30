@@ -352,8 +352,6 @@ bool evaluateBitTestExpressionSingleElement(const T* expr,
         return performBitTest(expr, eBinary, eBinaryLen);
     }
 
-    invariant(e.isNumber());
-
     if (e.type() == BSONType::numberDouble) {
         double eDouble = e.numberDouble();
 
