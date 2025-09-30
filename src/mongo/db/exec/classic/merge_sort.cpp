@@ -162,7 +162,7 @@ PlanStage::StageState MergeSortStage::doWork(WorkingSetID* out) {
     WorkingSetID idToTest = top->id;
     WorkingSetMember* member = _ws->get(idToTest);
     _mergingData.erase(top);
-    _memoryTracker.add(-1 * member->getMemUsage());
+    _memoryTracker.add(-static_cast<int64_t>(member->getMemUsage()));
     _specificStats.peakTrackedMemBytes = _memoryTracker.peakTrackedMemoryBytes();
     // Return the min.
     *out = idToTest;
