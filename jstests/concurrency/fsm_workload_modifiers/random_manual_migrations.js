@@ -22,7 +22,11 @@ export function randomManualMigration($config, $super) {
             TestData.shardsAddedRemoved &&
             (err.code == ErrorCodes.ShardNotFound ||
                 (err.message &&
-                    (err.message.includes("ShardNotFound") || err.message.includes("is currently draining"))));
+                    (err.message.includes("ShardNotFound") ||
+                        err.message.includes("is currently draining") ||
+                        // This interruption can happen if a shard is being removed, and the
+                        // namespace involved in chunk migration is dropped as part of shard removal
+                        err.message.includes("Location6718402"))));
         return acceptDueToBalancerConflict || acceptDueToDrainingConflict;
     };
 
