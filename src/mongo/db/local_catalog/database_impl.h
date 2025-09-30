@@ -75,7 +75,7 @@ public:
      * When fromMigrate is set, the related oplog entry will be marked with a 'fromMigrate' field to
      * reduce its visibility (e.g. in change streams).
      *
-     * The caller should hold a DB X lock and ensure there are no index builds in progress on the
+     * The caller should hold a DB IX lock and ensure there are no index builds in progress on the
      * collection.
      */
     Status dropCollection(OperationContext* opCtx,

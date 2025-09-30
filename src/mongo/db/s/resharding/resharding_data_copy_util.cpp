@@ -120,7 +120,7 @@ void ensureCollectionDropped(OperationContext* opCtx,
     invariant(!shard_role_details::getLocker(opCtx)->inAWriteUnitOfWork());
 
     writeConflictRetry(opCtx, "resharding::data_copy::ensureCollectionDropped", nss, [&] {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         const auto coll = acquireCollection(
             opCtx,
             CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
