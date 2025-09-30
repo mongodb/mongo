@@ -79,6 +79,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -223,14 +224,6 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
 
             return iterate(client.get(), factory);
         })
-        .then([executor, cancelToken](bool moreToCome) {
-            // Wait a little before re-running the aggregation pipeline on the donor's oplog. The
-            // 1-second value was chosen to match the default awaitData timeout that would have been
-            // used if the aggregation cursor was TailableModeEnum::kTailableAndAwaitData.
-            return executor->sleepFor(Seconds{1}, cancelToken).then([moreToCome] {
-                return moreToCome;
-            });
-        })
         .then([this, executor, cancelToken, factory](bool moreToCome) mutable {
             if (!moreToCome) {
                 LOGV2_INFO(6077401,
@@ -246,7 +239,16 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                     Status{ErrorCodes::CallbackCanceled,
                            "Resharding oplog fetcher canceled due to abort or stepdown"});
             }
-            return _reschedule(std::move(executor), cancelToken, factory);
+
+            // Wait a little before re-running the aggregation pipeline on the donor's oplog. The
+            // 1-second value was chosen to match the default awaitData timeout that would have been
+            // used if the aggregation cursor was TailableModeEnum::kTailableAndAwaitData.
+            return executor
+                ->sleepFor(Milliseconds{resharding::gReshardingOplogFetcherSleepMillis.load()},
+                           cancelToken)
+                .then([this, executor, cancelToken, factory] {
+                    return _reschedule(std::move(executor), cancelToken, factory);
+                });
         });
 }
 
