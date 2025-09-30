@@ -139,10 +139,40 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
  */
 write_ops::DeleteCommandRequest createShardKeyDeleteOp(const NamespaceString& nss,
                                                        const BSONObj& updatePreImage) {
+    BSONObjBuilder deleteQuery;
+    BSONArrayBuilder deleteExprQuery;
+
+    for (BSONElement elem : updatePreImage) {
+        const StringData fieldName = elem.fieldNameStringData();
+
+        const bool shouldWrapIntoGetField = fieldName.starts_with("$");
+        if (MONGO_unlikely(shouldWrapIntoGetField)) {
+            deleteExprQuery.append(
+                BSON("$eq" << BSON_ARRAY(
+                         BSON("$getField" << BSON("input" << "$$ROOT" << "field"
+                                                          << BSON("$literal" << fieldName)))
+                         << BSON("$literal" << elem))));
+        } else {
+            const bool shouldWrapIntoEq = elem.type() == BSONType::object &&
+                elem.Obj().firstElementFieldNameStringData().starts_with("$");
+            if (shouldWrapIntoEq) {
+                BSONObjBuilder eqOperator = deleteQuery.subobjStart(fieldName);
+                eqOperator.appendAs(elem, "$eq");
+                eqOperator.doneFast();
+            } else {
+                deleteQuery.append(elem);
+            }
+        }
+    }
+
+    if (auto exprQueryArray = deleteExprQuery.arr(); !exprQueryArray.isEmpty()) {
+        deleteQuery.append("$expr", BSON("$and" << exprQueryArray));
+    }
+
     write_ops::DeleteCommandRequest deleteOp(nss);
     deleteOp.setDeletes({[&] {
         write_ops::DeleteOpEntry entry;
-        entry.setQ(updatePreImage);
+        entry.setQ(deleteQuery.obj());
         entry.setMulti(false);
         return entry;
     }()});
