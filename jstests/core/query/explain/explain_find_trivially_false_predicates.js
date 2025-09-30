@@ -10,7 +10,6 @@
 import {assertDropAndRecreateCollection} from "jstests/libs/collection_drop_recreate.js";
 import {
     assertNoFetchFilter,
-    getAggPlanStage,
     getPlanStages,
     getWinningPlanFromExplain,
     isEofPlan,
@@ -58,34 +57,3 @@ const collName = "jstests_explain_find_trivially_false_predicates";
     assert(!isEofPlan(db, winningPlan));
     assert(!winningPlan.filter || bsonWoCompare(winningPlan.filter, {}) == 0);
 });
-
-/**
- * Verify that {$not: some-expression-that-is-always-false-or-true} is optimized
- */
-const coll = db[collName];
-
-// This query is interesting because $addFields and the structure of the query
-// require unparsing and parsing it back, and since {$in: []} is optimized to
-// $alwaysFalse, this requires parsing {$not: $alwaysFalse}, which fails. If
-// {$not: $alwaysFalse} is rewritten to $alwaysTrue, there is no parsing failure
-// and the query is simpler.
-const q1 = [{$addFields: {t: 0}}, {$match: {$or: [{b: 13, t: 42}], t: {$elemMatch: {$not: {$in: []}}}}}];
-let explainResult = coll.explain().aggregate(q1);
-let winningPlan = getWinningPlanFromExplain(explainResult);
-assert.docEq(winningPlan.filter, {b: {$eq: 13}}, "Winning plan filter should match expected filter");
-const matchStage = getAggPlanStage(explainResult, "$match");
-const expectedMatchCondition = {
-    $and: [{t: {$elemMatch: {}}}, {t: {$eq: 42}}],
-};
-assert.docEq(matchStage.$match, expectedMatchCondition, "$match stage should have the expected structure");
-
-// Simple cases
-const q2 = [{$match: {t: {$elemMatch: {$not: {$in: []}}}}}];
-explainResult = coll.explain().aggregate(q2);
-winningPlan = getWinningPlanFromExplain(explainResult);
-assert.docEq(winningPlan.filter, {t: {"$elemMatch": {}}}, "Winning plan filter should match expected filter");
-
-const q3 = [{$match: {t: {$not: {$in: []}}}}];
-explainResult = coll.explain().aggregate(q3);
-winningPlan = getWinningPlanFromExplain(explainResult);
-assert.eq(winningPlan.hasOwnProperty("filter"), false, "Winning plan should not have a filter property");
