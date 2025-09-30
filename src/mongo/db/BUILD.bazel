@@ -785,7 +785,7 @@ mongo_cc_unit_test(
     deps = [
         ":query_exec",
         ":shard_role",
-        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/admission:ticketing_system",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/local_catalog:catalog_control",
         "//src/mongo/db/local_catalog:catalog_test_fixture",
@@ -812,7 +812,7 @@ mongo_cc_unit_test(
     deps = [
         ":query_exec",
         ":shard_role",
-        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/admission:ticketing_system",
         "//src/mongo/db/collection_crud",
         "//src/mongo/db/local_catalog:catalog_control",
         "//src/mongo/db/local_catalog:catalog_test_fixture",
@@ -979,7 +979,7 @@ mongo_cc_library(
         "//src/mongo/db:shard_role_api_stor_ex",
         "//src/mongo/db/admission:execution_admission_context",
         "//src/mongo/db/admission:ingress_admission_context",
-        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/admission:ticketing_system",
         "//src/mongo/db/auth",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:authprivilege",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/auth:user_acquisition_stats",

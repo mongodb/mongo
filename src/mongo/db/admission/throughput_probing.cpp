@@ -30,8 +30,10 @@
 #include "mongo/db/admission/throughput_probing.h"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/throughput_probing_gen.h"
 #include "mongo/db/local_catalog/lock_manager/dump_lock_manager.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
@@ -383,23 +385,33 @@ void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
     builder.append("timesProbedDown", static_cast<long long>(timesProbedDown.load()));
 }
 
-ThroughputProbingTicketHolderManager::ThroughputProbingTicketHolderManager(
+ThroughputProbingTicketingSystem::ThroughputProbingTicketingSystem(
     ServiceContext* svcCtx,
     std::unique_ptr<TicketHolder> read,
     std::unique_ptr<TicketHolder> write,
     Milliseconds interval)
-    : TicketHolderManager(std::move(read), std::move(write)) {
+    : SinglePoolTicketingSystem(std::move(read), std::move(write)) {
     _monitor = std::make_unique<admission::ThroughputProbing>(
         svcCtx, _readTicketHolder.get(), _writeTicketHolder.get(), interval);
 }
 
-void ThroughputProbingTicketHolderManager::_appendImplStats(BSONObjBuilder& b) const {
+bool ThroughputProbingTicketingSystem::isRuntimeResizable() const {
+    return false;
+}
+
+bool ThroughputProbingTicketingSystem::usesPrioritization() const {
+    return false;
+}
+
+void ThroughputProbingTicketingSystem::appendStats(BSONObjBuilder& b) const {
+    SinglePoolTicketingSystem::appendStats(b);
+
     BSONObjBuilder bbb(b.subobjStart("monitor"));
     _monitor->appendStats(bbb);
     bbb.done();
 }
 
-void ThroughputProbingTicketHolderManager::startThroughputProbe() {
+void ThroughputProbingTicketingSystem::startThroughputProbe() {
     _monitor->start();
 }
 

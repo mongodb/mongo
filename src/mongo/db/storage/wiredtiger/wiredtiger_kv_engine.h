@@ -703,7 +703,7 @@ public:
      * eviction, transactions being committed to the Storage Engine, and available write and read
      * tickets.
      */
-    bool underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) override;
+    bool underCachePressure(int concurrentOpOuts) override;
 
     BSONObj setFlagToStorageOptions(const BSONObj& storageEngineOptions,
                                     StringData flagName,

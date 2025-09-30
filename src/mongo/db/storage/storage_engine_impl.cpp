@@ -1151,8 +1151,8 @@ Status StorageEngineImpl::autoCompact(RecoveryUnit& ru, const AutoCompactOptions
     return _engine->autoCompact(ru, options);
 }
 
-bool StorageEngineImpl::underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) {
-    return _engine->underCachePressure(concurrentWriteOuts, concurrentReadOuts);
+bool StorageEngineImpl::underCachePressure(int concurrentOpOuts) {
+    return _engine->underCachePressure(concurrentOpOuts);
 };
 
 size_t StorageEngineImpl::getCacheSizeMB() {

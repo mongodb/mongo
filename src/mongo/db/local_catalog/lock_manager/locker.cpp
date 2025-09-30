@@ -30,7 +30,7 @@
 #include "mongo/db/local_catalog/lock_manager/locker.h"
 
 #include "mongo/bson/json.h"
-#include "mongo/db/admission/ticketholder_manager.h"
+#include "mongo/db/admission/ticketing_system.h"
 #include "mongo/db/local_catalog/lock_manager/dump_lock_manager.h"
 #include "mongo/db/local_catalog/lock_manager/lock_manager.h"
 #include "mongo/db/local_catalog/lock_manager/locker.h"
@@ -230,7 +230,7 @@ const auto globalLockOrderingsSet =
 Locker::Locker(ServiceContext* serviceContext)
     : _id(idCounter.addAndFetch(1)),
       _lockManager(LockManager::get(serviceContext)),
-      _ticketHolderManager(admission::TicketHolderManager::get(serviceContext)) {
+      _ticketingSystem(admission::TicketingSystem::get(serviceContext)) {
 #ifdef MONGO_CONFIG_DEBUG_BUILD
     _lockOrderingsSet = &globalLockOrderingsSet(serviceContext);
 #endif
@@ -1113,40 +1113,37 @@ void Locker::_lockComplete(OperationContext* opCtx,
 }
 
 bool Locker::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline) {
-    // Upon startup, the holder is not guaranteed to be initialized.
-    auto holder = _ticketHolderManager ? _ticketHolderManager->getTicketHolder(mode) : nullptr;
-    const bool reader = isSharedLockMode(mode);
-
-    if (mode != MODE_X && mode != MODE_NONE && holder) {
-        // MODE_X is exclusive of all other locks, thus acquiring a ticket is unnecessary.
-        _clientState.store(reader ? kQueuedReader : kQueuedWriter);
-        // If the ticket wait is interrupted, restore the state of the client.
-        ScopeGuard restoreStateOnErrorGuard([&] { _clientState.store(kInactive); });
-
-        if (MONGO_unlikely(_assertOnLockAttempt)) {
-            LOGV2_FATAL(9360803,
-                        "Operation attempted to acquire an execution ticket after indicating that "
-                        "it should not",
-                        "mode"_attr = modeName(mode));
-        }
-
-        _ticket = [&]() {
-            ExecutionAdmissionContext* admCtx = &ExecutionAdmissionContext::get(opCtx);
-            if (opCtx->uninterruptibleLocksRequested_DO_NOT_USE()) {  // NOLINT
-                return holder->waitForTicketUntilNoInterrupt_DO_NOT_USE(opCtx, admCtx, deadline);
-            }
-
-            return holder->waitForTicketUntil(opCtx, admCtx, deadline);
-        }();
-
-        if (!_ticket) {
-            return false;
-        }
-
-        restoreStateOnErrorGuard.dismiss();
+    // MODE_X is exclusive of all other locks, thus acquiring a ticket is unnecessary.
+    if (mode == MODE_X || mode == MODE_NONE || !_ticketingSystem) {
+        _clientState.store(isSharedLockMode(mode) ? kActiveReader : kActiveWriter);
+        return true;
     }
 
-    _clientState.store(reader ? kActiveReader : kActiveWriter);
+    _clientState.store(isSharedLockMode(mode) ? kQueuedReader : kQueuedWriter);
+
+    // If the ticket wait is interrupted, restore the state of the client.
+    ScopeGuard restoreStateOnErrorGuard([&] { _clientState.store(kInactive); });
+
+    if (MONGO_unlikely(_assertOnLockAttempt)) {
+        LOGV2_FATAL(9360803,
+                    "Operation attempted to acquire an execution ticket after indicating that "
+                    "it should not",
+                    "mode"_attr = modeName(mode));
+    }
+
+    _ticket = _ticketingSystem->waitForTicketUntil(
+        opCtx,
+        isSharedLockMode(mode) ? admission::TicketingSystem::Operation::kRead
+                               : admission::TicketingSystem::Operation::kWrite,
+        deadline);
+
+    if (!_ticket) {
+        return false;
+    }
+
+    restoreStateOnErrorGuard.dismiss();
+
+    _clientState.store(isSharedLockMode(mode) ? kActiveReader : kActiveWriter);
     return true;
 }
 

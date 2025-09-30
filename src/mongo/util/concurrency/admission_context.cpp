@@ -36,6 +36,7 @@ namespace mongo {
 
 namespace {
 static constexpr StringData kNormalString = "normal"_sd;
+static constexpr StringData kLowString = "low"_sd;
 static constexpr StringData kExemptString = "exempt"_sd;
 }  // namespace
 
@@ -70,6 +71,10 @@ std::int32_t AdmissionContext::getAdmissions() const {
     return _admissions.loadRelaxed();
 }
 
+std::int32_t AdmissionContext::getLowAdmissions() const {
+    return _lowAdmissions.loadRelaxed();
+}
+
 std::int32_t AdmissionContext::getExemptedAdmissions() const {
     return _exemptedAdmissions.loadRelaxed();
 }
@@ -88,6 +93,10 @@ void AdmissionContext::setAdmission_forTest(int32_t admissions) {
 
 void AdmissionContext::setTotalTimeQueuedMicros_forTest(int64_t micros) {
     _totalTimeQueuedMicros.store(micros);
+}
+
+void AdmissionContext::recordLowAdmission() {
+    _lowAdmissions.fetchAndAdd(1);
 }
 
 void AdmissionContext::recordExemptedAdmission() {
@@ -114,8 +123,12 @@ StringData toString(AdmissionContext::Priority priority) {
     switch (priority) {
         case AdmissionContext::Priority::kNormal:
             return kNormalString;
+        case AdmissionContext::Priority::kLow:
+            return kLowString;
         case AdmissionContext::Priority::kExempt:
             return kExemptString;
+        case AdmissionContext::Priority::kPrioritiesCount:
+            MONGO_UNREACHABLE_TASSERT(11039603);
     }
     MONGO_UNREACHABLE;
 }

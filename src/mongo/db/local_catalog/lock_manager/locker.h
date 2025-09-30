@@ -58,7 +58,7 @@ namespace mongo {
 class LockManager;
 class OperationContext;
 namespace admission {
-class TicketHolderManager;
+class TicketingSystem;
 }
 
 namespace locker_internals {
@@ -712,7 +712,7 @@ protected:
     LockManager* const _lockManager;
 
     // The global ticketholders of the service context.
-    admission::TicketHolderManager* const _ticketHolderManager;
+    admission::TicketingSystem* const _ticketingSystem;
 
     // The only reason we have this spin lock here is for the diagnostic tools, which could iterate
     // through the LockRequestsMap on a separate thread and need it to be stable. Apart from that,

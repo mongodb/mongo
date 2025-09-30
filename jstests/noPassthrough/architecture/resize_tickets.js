@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   requires_replication,  # Tickets can only be resized when using the WiredTiger engine.
- *   requires_fcv80,
+ *   featureFlagMultipleTicketPoolsExecutionControl,
  *   requires_wiredtiger,
  * ]
  */
@@ -82,4 +82,32 @@ assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurre
 assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 20}));
 assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 10}));
 assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 30}));
+replTest.stopSet();
+
+jsTestLog("Start a replica set with 'fixedConcurrentTransactionsWithPrioritization' explicitly enabled on startup");
+replTest = new ReplSetTest({
+    name: jsTestName(),
+    nodes: 1,
+    nodeOptions: {
+        setParameter: {
+            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactionsWithPrioritization",
+        },
+    },
+});
+replTest.startSet();
+replTest.initiate();
+mongod = replTest.getPrimary();
+
+// Verify that we can resize normal priority tickets.
+assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentWriteTransactions: 20}));
+assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentWriteTransactions: 10}));
+assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 20}));
+assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadTransactions: 10}));
+
+// Verify that we can also resize low priority tickets.
+assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentWriteLowPriorityTransactions: 20}));
+assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentWriteLowPriorityTransactions: 10}));
+assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadLowPriorityTransactions: 20}));
+assert.commandWorked(mongod.adminCommand({setParameter: 1, storageEngineConcurrentReadLowPriorityTransactions: 10}));
+
 replTest.stopSet();

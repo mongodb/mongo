@@ -76,15 +76,14 @@ WiredTigerCachePressureMonitor::WiredTigerCachePressureMonitor(WiredTigerKVEngin
       _totalTicketsEDMA(1.0) {}
 
 bool WiredTigerCachePressureMonitor::isUnderCachePressure(StatsCollectionPermit& permit,
-                                                          int concurrentWriteOuts,
-                                                          int concurrentReadOuts) {
+                                                          int concurrentOpOuts) {
 
     // Get a permit to access the WiredTiger Statistics.
     WiredTigerSession session(&_engine.getConnection(), permit);
 
     // Perform cache pressure checks.
-    bool threadPressureResult = _windowTrackingStorageAppWaitTimeAndWriteLoad(
-        session, concurrentWriteOuts, concurrentReadOuts);
+    bool threadPressureResult =
+        _windowTrackingStorageAppWaitTimeAndWriteLoad(session, concurrentOpOuts);
     bool cacheRatioResult = _trackCacheRatioEvictionTrigger(session);
 
     LOGV2_DEBUG(10181703,
@@ -98,7 +97,7 @@ bool WiredTigerCachePressureMonitor::isUnderCachePressure(StatsCollectionPermit&
 
 
 bool WiredTigerCachePressureMonitor::_windowTrackingStorageAppWaitTimeAndWriteLoad(
-    WiredTigerSession& session, int concurrentWriteOuts, int concurrentReadOuts) {
+    WiredTigerSession& session, int concurrentOpOuts) {
     CachePressureStats currentStats{
         .cacheWaitUsecs = getStatisticValue(session, WT_STAT_CONN_APPLICATION_CACHE_TIME),
         .txnsCommittedCount = getStatisticValue(session, WT_STAT_CONN_TXN_COMMIT),
@@ -120,9 +119,8 @@ bool WiredTigerCachePressureMonitor::_windowTrackingStorageAppWaitTimeAndWriteLo
     }
 
     // Compute the exponentially decaying moving average from the current tickets.
-    int64_t currentTickets = concurrentReadOuts + concurrentWriteOuts;
     double edmaAlpha = gCachePressureExponentiallyDecayingMovingAverageAlphaValue.load();
-    _totalTicketsEDMA = (edmaAlpha * currentTickets) + ((1.0 - edmaAlpha) * _totalTicketsEDMA);
+    _totalTicketsEDMA = (edmaAlpha * concurrentOpOuts) + ((1.0 - edmaAlpha) * _totalTicketsEDMA);
 
     int64_t totalTickets =
         std::max(static_cast<int64_t>(std::round(_totalTicketsEDMA)), int64_t(1));

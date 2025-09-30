@@ -29,7 +29,7 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
-        - "mongo/db/admission/ticketholder_manager.h"
+        - "mongo/db/admission/ticketing_system.h"
         - "mongo/db/admission/concurrency_adjustment_validator.h"
 
 enums:
@@ -40,10 +40,18 @@ enums:
         # storageEngineConcurrentWriteTransactions/storageEngineConcurrentReadTransactions and will
         # not be adjusted automatically based on overall system throughput.
         #
+        # 'kFixedConcurrentTransactionsWithPrioritization': The number of concurrent transactions is
+        # controlled by server parameters and divided into two pools based on operation priority
+        # (normal and low priority). These values are not adjusted automatically based on overall
+        # system throughput. Instead, this algorithm is intended for use with an external server-side
+        # policy (e.g., mongotune) that dynamically adjusts the number of concurrent transactions in
+        # each pool.
+        #
         # 'kThroughputProbing': Number of concurrent transactions are dynamically adjusted, either
         # increasing or decreasing concurrency in the storage engine, based on system throughput.
         values:
             kFixedConcurrentTransactions: "fixedConcurrentTransactions"
+            kFixedConcurrentTransactionsWithPrioritization: "fixedConcurrentTransactionsWithPrioritization"
             kThroughputProbing: "throughputProbing"
 
 server_parameters:
@@ -52,16 +60,26 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentWriteTransactions
-        on_update: "admission::TicketHolderManager::updateConcurrentWriteTransactions"
+        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateConcurrentWriteTransactions"
         deprecated_name:
             - wiredTigerConcurrentWriteTransactions
-        # Default value being 0 on startup means we're allowing the underlying storage engines
-        # to use their default values. Updating it to 0 again after startup does not use the default value.
-        # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
-        # storageEngineConcurrencyAdjustmentAlgorithm.
-        default: 0
+        default:
+            {expr: "admission::TicketingSystem::kDefaultConcurrentTransactions"}
         validator:
-            callback: "admission::TicketHolderManager::validateConcurrentWriteTransactions"
+            callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentWriteTransactions"
+        redact: false
+
+    storageEngineConcurrentWriteLowPriorityTransactions:
+        description: "Storage Engine Concurrent Write Low Priority Transactions"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gConcurrentWriteLowPriorityTransactions
+        on_update: "admission::TicketingSystem::LowPrioritySettings::updateConcurrentWriteTransactions"
+        default:
+            {
+                expr: "admission::TicketingSystem::kDefaultLowPriorityConcurrentTransactions",
+            }
+        validator: {gte: 0}
         redact: false
 
     storageEngineConcurrentReadTransactions:
@@ -69,27 +87,50 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int32_t>
         cpp_varname: gConcurrentReadTransactions
-        on_update: "admission::TicketHolderManager::updateConcurrentReadTransactions"
+        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateConcurrentReadTransactions"
         deprecated_name:
             - wiredTigerConcurrentReadTransactions
-        # Default value being 0 on startup means we're allowing the underlying storage engines
-        # to use their default values. Updating it to 0 again after startup does not use the default value.
-        # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
-        # storageEngineConcurrencyAdjustmentAlgorithm.
-        default: 0
+        default:
+            {expr: "admission::TicketingSystem::kDefaultConcurrentTransactions"}
         validator:
-            callback: "admission::TicketHolderManager::validateConcurrentReadTransactions"
+            callback: "admission::TicketingSystem::NormalPrioritySettings::validateConcurrentReadTransactions"
+        redact: false
+
+    storageEngineConcurrentReadLowPriorityTransactions:
+        description: "Storage Engine Concurrent Read Low Priority Transactions"
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: gConcurrentReadLowPriorityTransactions
+        on_update: "admission::TicketingSystem::LowPrioritySettings::updateConcurrentReadTransactions"
+        default:
+            {
+                expr: "admission::TicketingSystem::kDefaultLowPriorityConcurrentTransactions",
+            }
+        validator: {gte: 0}
         redact: false
 
     storageEngineReadMaxQueueDepth:
         description: >-
             Controls the maximum number of read transactions waiting in queue for a thread to be free.
-            Setting this number to 0 will not allow any transaction above the max conccurency amount.
+            Setting this number to 0 will not allow any transaction above the max concurrency amount.
             Reducing this value will only affect new enqueued read transactions
         set_at: [startup, runtime]
         cpp_vartype: Atomic<std::int32_t>
         cpp_varname: gReadMaxQueueDepth
-        on_update: "admission::TicketHolderManager::updateReadMaxQueueDepth"
+        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateReadMaxQueueDepth"
+        default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
+        validator: {gte: 0}
+        redact: false
+
+    storageEngineReadLowPriorityMaxQueueDepth:
+        description: >-
+            Controls the maximum number of read low priority transactions waiting in queue for a thread to be free.
+            Setting this number to 0 will not allow any transaction above the max concurrency amount.
+            Reducing this value will only affect new enqueued read transactions
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<std::int32_t>
+        cpp_varname: gReadLowPriorityMaxQueueDepth
+        on_update: "admission::TicketingSystem::LowPrioritySettings::updateReadMaxQueueDepth"
         default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
         validator: {gte: 0}
         redact: false
@@ -97,12 +138,25 @@ server_parameters:
     storageEngineWriteMaxQueueDepth:
         description: >-
             Controls the maximum number of write transactions waiting in queue for a thread to be free.
-            Setting this number to 0 will not allow any transaction above the max conccurency amount.
+            Setting this number to 0 will not allow any transaction above the max concurrency amount.
             Reducing this value will only affect new enqueued write transactions
         set_at: [startup, runtime]
         cpp_vartype: Atomic<std::int32_t>
         cpp_varname: gWriteMaxQueueDepth
-        on_update: "admission::TicketHolderManager::updateWriteMaxQueueDepth"
+        on_update: "admission::TicketingSystem::NormalPrioritySettings::updateWriteMaxQueueDepth"
+        default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
+        validator: {gte: 0}
+        redact: false
+
+    storageEngineWriteLowPriorityMaxQueueDepth:
+        description: >-
+            Controls the maximum number of write low priority transactions waiting in queue for a thread to be free.
+            Setting this number to 0 will not allow any transaction above the max concurrency amount.
+            Reducing this value will only affect new enqueued write transactions
+        set_at: [startup, runtime]
+        cpp_vartype: Atomic<std::int32_t>
+        cpp_varname: gWriteLowPriorityMaxQueueDepth
+        on_update: "admission::TicketingSystem::LowPrioritySettings::updateWriteMaxQueueDepth"
         default: {expr: "TicketHolder::kDefaultMaxQueueDepth"}
         validator: {gte: 0}
         redact: false

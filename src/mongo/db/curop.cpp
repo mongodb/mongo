@@ -39,7 +39,7 @@
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/admission/execution_admission_context.h"
 #include "mongo/db/admission/ingress_admission_context.h"
-#include "mongo/db/admission/ticketholder_manager.h"
+#include "mongo/db/admission/ticketing_system.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status/server_status_metric.h"
@@ -175,14 +175,6 @@ BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
                                               dbName, SerializationContext::stateCommandReply(sc)))
                                          .firstElement());
     return newCmdObj;
-}
-
-void incrementQueueStats(TicketHolder* ticketHolder,
-                         const ExecutionAdmissionContext::DelinquencyStats& stats) {
-    ticketHolder->incrementDelinquencyStats(
-        stats.delinquentAcquisitions.loadRelaxed(),
-        Milliseconds(stats.totalAcquisitionDelinquencyMillis.loadRelaxed()),
-        Milliseconds(stats.maxAcquisitionDelinquencyMillis.loadRelaxed()));
 }
 }  // namespace
 
@@ -743,13 +735,8 @@ bool CurOp::completeAndLogOperation(const logv2::LogOptions& logOptions,
     if (!opCtx->inMultiDocumentTransaction()) {
         // If we're not in a txn, we record information about delinquent ticket acquisitions to the
         // Queue's stats.
-        auto& admCtx = ExecutionAdmissionContext::get(opCtx);
-
-        if (auto manager = admission::TicketHolderManager::get(opCtx->getServiceContext())) {
-            incrementQueueStats(manager->getTicketHolder(LockMode::MODE_IS),
-                                admCtx.readDelinquencyStats());
-            incrementQueueStats(manager->getTicketHolder(LockMode::MODE_IX),
-                                admCtx.writeDelinquencyStats());
+        if (auto ticketingSystem = admission::TicketingSystem::get(opCtx->getServiceContext())) {
+            ticketingSystem->incrementDelinquencyStats(opCtx);
         }
     }
 

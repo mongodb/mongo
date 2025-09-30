@@ -122,7 +122,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) override {
+    bool underCachePressure(int concurrentOpOuts) override {
         MONGO_UNREACHABLE;
     }
 

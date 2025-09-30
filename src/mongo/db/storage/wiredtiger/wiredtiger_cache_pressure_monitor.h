@@ -48,9 +48,7 @@ public:
     /**
      * Updates cache pressure metrics and determines whether the system is under cache pressure.
      */
-    bool isUnderCachePressure(StatsCollectionPermit& permit,
-                              int concurrentWriteOuts,
-                              int concurrentReadOuts);
+    bool isUnderCachePressure(StatsCollectionPermit& permit, int concurrentOpOuts);
 
 private:
     /**
@@ -58,8 +56,7 @@ private:
      *  and determines whether eviction stall thresholds are exceeded based on those metrics.
      */
     bool _windowTrackingStorageAppWaitTimeAndWriteLoad(WiredTigerSession& session,
-                                                       int concurrentWriteOuts,
-                                                       int concurrentReadOuts);
+                                                       int concurrentOpOuts);
 
     /**
      * Tracks WiredTiger's dirty and updates cache ratios to detect eviction thresholds.

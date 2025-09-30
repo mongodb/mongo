@@ -60,6 +60,11 @@ public:
      * user and internal, should use this priority unless they qualify as 'kExempt'
      * priority.
      *
+     * 'kLow': It's of low importance that the operation acquires a ticket. These low-priority
+     * operations are reserved for background tasks that have no other operations dependent on them.
+     * These operations may be throttled under load and make significantly less progress as compared
+     * to operations of a higher priority.
+     *
      * 'kExempt': It's crucial that the operation makes forward progress - bypasses the ticketing
      * mechanism.
      *
@@ -67,7 +72,17 @@ public:
      * (e.g. FTDC), and any operation that is releasing resources (e.g. committing or aborting
      * prepared transactions). Should be used sparingly.
      */
-    enum class Priority { kExempt = 0, kNormal };
+    enum class Priority {
+        kExempt = 0,
+        kNormal,
+        kLow,
+
+        /**
+         * Number of priorities.
+         * Always add new priorities above this entry.
+         */
+        kPrioritiesCount
+    };
 
     /**
      * Returns the total time this admission context has ever waited in a queue.
@@ -84,6 +99,11 @@ public:
      * Returns the number of times this context has taken a ticket.
      */
     std::int32_t getAdmissions() const;
+
+    /**
+     * Returns the number of times this context has taken a low priority ticket.
+     */
+    std::int32_t getLowAdmissions() const;
 
     /**
      * Returns the number of times this context has taken an exempt ticket.
@@ -116,6 +136,8 @@ protected:
 
     void recordAdmission();
 
+    void recordLowAdmission();
+
     void recordExemptedAdmission();
 
     void markTicketHeld() {
@@ -133,6 +155,7 @@ protected:
     constexpr static TickSource::Tick kNotQueueing = -1;
 
     Atomic<std::int32_t> _exemptedAdmissions{0};
+    Atomic<std::int32_t> _lowAdmissions{0};
     Atomic<std::int32_t> _admissions{0};
     Atomic<Priority> _priority{Priority::kNormal};
     Atomic<std::int64_t> _totalTimeQueuedMicros;

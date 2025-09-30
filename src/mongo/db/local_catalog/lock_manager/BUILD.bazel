@@ -61,7 +61,7 @@ mongo_cc_library(
         ":flow_control_ticketholder",
         "//src/mongo/db:server_base",
         "//src/mongo/db/admission:execution_admission_context",  # TODO(SERVER-93876): Remove.
-        "//src/mongo/db/admission:ticketholder_manager",
+        "//src/mongo/db/admission:ticketing_system",
         "//src/mongo/db/stats:counter_ops",
         "//src/mongo/db/storage/key_string",
         "//src/mongo/util:background_job",  # TODO(SERVER-93876): Remove.

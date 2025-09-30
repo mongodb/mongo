@@ -31,7 +31,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/admission/ticketholder_manager.h"
+#include "mongo/db/admission/single_pool_ticketing_system.h"
+#include "mongo/db/admission/ticketing_system.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
@@ -117,23 +118,23 @@ private:
     PeriodicJobAnchor _job;
 };
 
-class ThroughputProbingTicketHolderManager : public TicketHolderManager {
+class ThroughputProbingTicketingSystem : public SinglePoolTicketingSystem {
 public:
-    ThroughputProbingTicketHolderManager(ServiceContext* svcCtx,
-                                         std::unique_ptr<TicketHolder> readTicketHolder,
-                                         std::unique_ptr<TicketHolder> writeTicketHolder,
-                                         Milliseconds interval);
-    bool supportsRuntimeSizeAdjustment() const override {
-        return false;
-    }
+    ThroughputProbingTicketingSystem(ServiceContext* svcCtx,
+                                     std::unique_ptr<TicketHolder> readTicketHolder,
+                                     std::unique_ptr<TicketHolder> writeTicketHolder,
+                                     Milliseconds interval);
+
+    bool isRuntimeResizable() const override;
+
+    bool usesPrioritization() const override;
+
+    void appendStats(BSONObjBuilder& b) const override;
 
     /**
      * Start the periodic job to probe throughput and dynamically adjust ticket levels
      */
     void startThroughputProbe();
-
-protected:
-    void _appendImplStats(BSONObjBuilder& builder) const override;
 
 private:
     /**

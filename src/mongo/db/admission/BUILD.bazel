@@ -14,6 +14,11 @@ idl_generator(
     src = "ingress_request_rate_limiter.idl",
 )
 
+idl_generator(
+    name = "admission_feature_flags_gen",
+    src = "admission_feature_flags.idl",
+)
+
 mongo_cc_library(
     name = "ingress_request_rate_limiter",
     srcs = [
@@ -59,12 +64,17 @@ mongo_cc_library(
 )
 
 mongo_cc_library(
-    name = "ticketholder_manager",
+    name = "ticketing_system",
     srcs = [
-        "ticketholder_manager.cpp",
+        "admission_feature_flags_gen",
+        "multiple_pools_ticketing_system.cpp",
+        "single_pool_ticketing_system.cpp",
+        "ticketing_system.cpp",
     ],
     hdrs = [
-        "ticketholder_manager.h",
+        "multiple_pools_ticketing_system.h",
+        "single_pool_ticketing_system.h",
+        "ticketing_system.h",
     ],
     no_undefined_ref_DO_NOT_USE = False,
     deps = [
@@ -82,7 +92,7 @@ mongo_cc_library(
     deps = [
         ":ingress_admission_control",
         ":ingress_request_rate_limiter",
-        ":ticketholder_manager",  # TODO(SERVER-93876): Remove.
+        ":ticketing_system",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:server_feature_flags",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.
@@ -105,7 +115,7 @@ mongo_cc_library(
         "throughput_probing.h",
     ],
     deps = [
-        "ticketholder_manager",
+        "ticketing_system",
         "//src/mongo/db:server_base",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db:service_context",  # TODO(SERVER-93876): Remove.
         "//src/mongo/db/commands/server_status:server_status_core",  # TODO(SERVER-93876): Remove.

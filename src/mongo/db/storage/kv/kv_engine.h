@@ -205,7 +205,7 @@ public:
     virtual bool waitUntilUnjournaledWritesDurable(OperationContext* opCtx,
                                                    bool stableCheckpoint) = 0;
 
-    virtual bool underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) = 0;
+    virtual bool underCachePressure(int concurrentOpOuts) = 0;
 
     virtual Status createSortedDataInterface(
         const rss::PersistenceProvider&,

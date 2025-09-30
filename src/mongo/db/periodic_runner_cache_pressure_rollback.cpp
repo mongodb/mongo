@@ -63,13 +63,9 @@ using Argument =
     decltype(TransactionParticipant::observeCachePressureQueryPeriodMilliseconds)::Argument;
 
 bool underCachePressure(OperationContext* opCtx) {
-    auto ticketMgr = admission::TicketHolderManager::get(opCtx->getServiceContext());
-    auto writeTicketHolder = ticketMgr->getTicketHolder(MODE_IX);
-    auto readTicketHolder = ticketMgr->getTicketHolder(MODE_IS);
-
-    bool rollbackCachePressure = opCtx->getServiceContext()->getStorageEngine()->underCachePressure(
-        writeTicketHolder->used(), readTicketHolder->used());
-    return rollbackCachePressure;
+    auto ticketingSystem = admission::TicketingSystem::get(opCtx->getServiceContext());
+    return opCtx->getServiceContext()->getStorageEngine()->underCachePressure(
+        ticketingSystem->numOfTicketsUsed());
 }
 
 const auto periodicThreadToRollbackUnderCachePressureDecoration =

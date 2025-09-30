@@ -3090,13 +3090,12 @@ KeyFormat WiredTigerKVEngine::getKeyFormat(RecoveryUnit& ru, StringData ident) c
     return wtTableConfig.find("key_format=u") != string::npos ? KeyFormat::String : KeyFormat::Long;
 }
 
-bool WiredTigerKVEngine::underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) {
+bool WiredTigerKVEngine::underCachePressure(int concurrentOpOuts) {
     auto permit = tryGetStatsCollectionPermit();
     if (!permit) {
         return false;  // Skip cache pressure evaluation if the permit isn't available.
     }
-    return _cachePressureMonitor->isUnderCachePressure(
-        *permit, concurrentWriteOuts, concurrentReadOuts);
+    return _cachePressureMonitor->isUnderCachePressure(*permit, concurrentOpOuts);
 }
 
 BSONObj WiredTigerKVEngine::setFlagToStorageOptions(const BSONObj& storageEngineOptions,

@@ -35,7 +35,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/admission/execution_admission_context.h"
-#include "mongo/db/admission/ticketholder_manager.h"
+#include "mongo/db/admission/single_pool_ticketing_system.h"
+#include "mongo/db/admission/ticketing_system.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/local_catalog/lock_manager/exception_util.h"
@@ -100,14 +101,14 @@ public:
         : _svcCtx(svcCtx) {
         const bool trackPeakUsed = false;
         constexpr auto maxQueueDepth = TicketHolder::kDefaultMaxQueueDepth;
-        auto ticketHolderManager = std::make_unique<admission::FixedTicketHolderManager>(
+        auto ticketingSystem = std::make_unique<admission::SinglePoolTicketingSystem>(
             std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth),
             std::make_unique<TicketHolder>(_svcCtx, numTickets, trackPeakUsed, maxQueueDepth));
-        admission::TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
+        admission::TicketingSystem::use(_svcCtx, std::move(ticketingSystem));
     }
 
     ~UseReaderWriterGlobalThrottling() noexcept(false) {
-        admission::TicketHolderManager::use(_svcCtx, nullptr);
+        admission::TicketingSystem::use(_svcCtx, nullptr);
     }
 
 private:

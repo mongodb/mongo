@@ -211,7 +211,7 @@ public:
 
     void unpinOldestTimestamp(const std::string& requestingServiceName) override {}
 
-    bool underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) override {
+    bool underCachePressure(int concurrentOpOuts) override {
         return false;
     }
 

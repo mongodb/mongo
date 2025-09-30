@@ -1061,7 +1061,7 @@ public:
     /**
      * Return true if the storage engine indicates that it is under cache pressure.
      */
-    virtual bool underCachePressure(int concurrentWriteOuts, int concurrentReadOuts) {
+    virtual bool underCachePressure(int concurrentOpOuts) {
         return false;
     };
 

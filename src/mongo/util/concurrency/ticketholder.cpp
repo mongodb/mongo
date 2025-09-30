@@ -344,6 +344,10 @@ void TicketHolder::_updateQueueStatsOnTicketAcquisition(AdmissionContext* admCtx
         admCtx->recordExemptedAdmission();
     }
 
+    if (priority == AdmissionContext::Priority::kLow) {
+        admCtx->recordLowAdmission();
+    }
+
     admCtx->recordAdmission();
     queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
 }

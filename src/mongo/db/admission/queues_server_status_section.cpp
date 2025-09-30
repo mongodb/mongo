@@ -29,7 +29,7 @@
 
 #include "mongo/db/admission/ingress_admission_control_gen.h"
 #include "mongo/db/admission/ingress_admission_controller.h"
-#include "mongo/db/admission/ticketholder_manager.h"
+#include "mongo/db/admission/ticketing_system.h"
 #include "mongo/db/commands/server_status/server_status.h"
 #include "mongo/transport/session_establishment_rate_limiter.h"
 #include "mongo/transport/transport_layer.h"
@@ -51,10 +51,10 @@ public:
         const ClusterRole role = opCtx->getService()->role();
 
         BSONObjBuilder admissionBuilder;
-        auto ticketHolderManager = TicketHolderManager::get(opCtx->getServiceContext());
-        if (ticketHolderManager && role.has(ClusterRole::ShardServer)) {
+        auto ticketingSystem = TicketingSystem::get(opCtx->getServiceContext());
+        if (ticketingSystem && role.has(ClusterRole::ShardServer)) {
             BSONObjBuilder executionBuilder(admissionBuilder.subobjStart("execution"));
-            ticketHolderManager->appendStats(executionBuilder);
+            ticketingSystem->appendStats(executionBuilder);
             executionBuilder.done();
         }
 
