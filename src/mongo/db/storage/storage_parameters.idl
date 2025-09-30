@@ -305,7 +305,7 @@ feature_flags:
             Enable replication of local catalog identifiers across replica set nodes, ensuring the
             _mdb_catalog and its associated storage table 'ident' mappings remain consistent.
         cpp_varname: feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers
-        default: false
+        default: true
         fcv_gated: false
     featureFlagPrimaryDrivenIndexBuilds:
         description: "Enable primary-driven index builds."

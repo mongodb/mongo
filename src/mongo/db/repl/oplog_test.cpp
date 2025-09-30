@@ -419,9 +419,6 @@ TEST_F(CreateIndexForApplyOpsTest, GeneratesNewIdentIfNone) {
 }
 
 TEST_F(CreateIndexForApplyOpsTest, UsesIdentIfSpecified) {
-    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-
     auto opCtx = cc().makeOperationContext();
 
     const std::string ident = "index-test-ident";
@@ -448,9 +445,6 @@ TEST_F(CreateIndexForApplyOpsTest, UsesIdentIfSpecified) {
 }
 
 TEST_F(CreateIndexForApplyOpsTest, MetadataValidation) {
-    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-
     auto opCtx = cc().makeOperationContext();
     Lock::DBLock lock(opCtx.get(), _nss.dbName(), MODE_X);
     auto spec = BSON("v" << 2 << "key" << BSON("a" << 1) << "name"

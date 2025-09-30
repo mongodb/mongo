@@ -8,7 +8,7 @@
  *   requires_persistence,
  *   # This test intends to check consistency across a replica set.
  *   assumes_against_mongod_not_mongos,
- *   featureFlagReplicateLocalCatalogIdentifiers
+ *   requires_fcv_83,
  * ]
  */
 

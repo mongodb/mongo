@@ -6,7 +6,6 @@
           set_parameters:
             featureFlagPrimaryDrivenIndexBuilds: 1
             featureFlagRecordIdsReplicated: 1
-            featureFlagReplicateLocalCatalogIdentifiers: 1
       config:
         shell_options:
           global_vars:
@@ -22,7 +21,6 @@
           set_parameters:
             featureFlagPrimaryDrivenIndexBuilds: 1
             featureFlagRecordIdsReplicated: 1
-            featureFlagReplicateLocalCatalogIdentifiers: 1
 - name: enable_primary_driven_index_builds_feature_flag_testdata_parameter_mongod
   value:
     executor:
@@ -33,7 +31,6 @@
               setParameters:
                 featureFlagPrimaryDrivenIndexBuilds: true
                 featureFlagRecordIdsReplicated: 1
-                featureFlagReplicateLocalCatalogIdentifiers: true
               # TODO(SERVER-110172): Re-enable these checks.
               skipCheckDBHashes: true
               skipCollectionAndIndexValidation: true
@@ -47,7 +44,6 @@
               setParametersMongos:
                 featureFlagPrimaryDrivenIndexBuilds: true
                 featureFlagRecordIdsReplicated: 1
-                featureFlagReplicateLocalCatalogIdentifiers: true
 - name: exclude_primary_driven_index_builds_incompatible_tag
   value:
     exclude_with_any_tags:

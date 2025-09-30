@@ -15,11 +15,9 @@ executor:
           setParameters:
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: 1
-            featureFlagReplicateLocalCatalogIdentifiers: true
           setParametersMongos:
             featureFlagPrimaryDrivenIndexBuilds: true
             featureFlagRecordIdsReplicated: 1
-            featureFlagReplicateLocalCatalogIdentifiers: true
           skipCheckDBHashes: true
           skipCollectionAndIndexValidation: true
       nodb: ""

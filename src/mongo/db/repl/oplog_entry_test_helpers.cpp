@@ -29,13 +29,8 @@
 
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index_builds/index_builds_common.h"
-#include "mongo/db/sharding_environment/shard_id.h"
-#include "mongo/db/storage/ident.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 
 #include <boost/optional.hpp>
 
@@ -179,12 +174,6 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
     spec.append("name", indexName);
     spec.appendElementsUnique(options);
 
-    boost::optional<BSONObj> o2;
-    if (feature_flags::gFeatureFlagReplicateLocalCatalogIdentifiers.isEnabled()) {
-        o2 = BSON("indexIdent" << ident::generateNewIndexIdent(
-                      nss.dbName(), /*directoryPerDB=*/false, /*directoryForIndexes=*/false));
-    }
-
     BSONObjBuilder oBuilder;
     oBuilder.append("createIndexes", nss.coll());
     oBuilder.appendElements(spec.obj());
@@ -195,7 +184,7 @@ OplogEntry makeCreateIndexOplogEntry(OpTime opTime,
         .nss = nss.getCommandNS(),
         .uuid = uuid,
         .oField = oBuilder.obj(),
-        .o2Field = o2,
+        .o2Field = boost::none,
         .wallClockTime = Date_t::now(),
     }}};
 }

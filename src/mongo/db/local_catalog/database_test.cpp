@@ -252,9 +252,6 @@ TEST_F(DatabaseTest, CreateCollectionReportsCatalogIdentifier) {
 }
 
 TEST_F(DatabaseTest, CreateCollectionDoesNotReportCatalogIdentifierForVirtualCollection) {
-    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-
     // Register an OpObserver to validate the collection isn't persisted in the local catalog and
     // thus does not generate a 'CreateCollCatalogIdentifier'.
     auto createOpObserver =

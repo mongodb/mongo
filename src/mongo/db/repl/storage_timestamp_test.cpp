@@ -2853,9 +2853,6 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
  * index build through applying the oplog entry, rather than creating an oplog entry.
  */
 TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
-    RAIIServerParameterControllerForTest replicateLocalCatalogInfoController(
-        "featureFlagReplicateLocalCatalogIdentifiers", true);
-
     // Index builds expect a non-empty oplog and a valid committed snapshot.
     {
         Lock::GlobalLock lk(_opCtx, MODE_IX);

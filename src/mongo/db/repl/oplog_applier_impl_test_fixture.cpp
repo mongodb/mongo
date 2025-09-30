@@ -536,8 +536,8 @@ OplogEntry makeCreateCollectionOplogEntry(
     boost::optional<CreateCollCatalogIdentifier> createCollCatalogIdentifier) {
     const auto object = MutableOplogEntry::makeCreateCollObject(nss, collectionOptions, idIndex);
 
-    BSONObj o2;
-    if (createCollCatalogIdentifier.has_value()) {
+    boost::optional<BSONObj> o2;
+    if (createCollCatalogIdentifier) {
         auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
         auto identUniqueTag = storageEngine->getCollectionIdentUniqueTag(
             createCollCatalogIdentifier->ident, nss.dbName());
