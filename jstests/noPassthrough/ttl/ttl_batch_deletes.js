@@ -45,7 +45,7 @@ const runTestCase = function (fn, isSharded = false) {
 };
 
 const countIndexKeysDeleted = function () {
-    const logs = rawMongoProgramOutput('".*"');
+    const logs = rawMongoProgramOutput('"numKeysDeleted"');
     const indexKeyDeletedLogs = [...logs.matchAll(/"numKeysDeleted":(\d*)/g)];
     const keysDeleted = indexKeyDeletedLogs.reduce((acc, curr) => acc + parseInt(curr[1]), 0);
     clearRawMongoProgramOutput();
