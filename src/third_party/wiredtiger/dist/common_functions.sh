@@ -85,7 +85,7 @@ has_file_args() {
 # Check if the fast mode is requested and is available.
 # Set variables appropriately or exit with an error.
 check_fast_mode_flag() {
-  is_fast_mode || return
+  is_fast_mode || return 0
   check_fast_mode
   if [[ -n "${FAST_FLAG:-}" ]] && has_file_args; then
     echo "ERROR: Fast mode (-F flag) cannot be used with file arguments"

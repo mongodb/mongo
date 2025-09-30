@@ -533,6 +533,49 @@ palm_add_reference(WT_PAGE_LOG *page_log)
 }
 
 /*
+ * palm_abandon_checkpoint --
+ *     Abandon an incomplete checkpoint. This is an optional function, required only for internal
+ *     testing.
+ */
+static int
+palm_abandon_checkpoint(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_t last_checkpoint_lsn)
+{
+    PALM *palm;
+    PALM_KV_CONTEXT context;
+    uint64_t lsn;
+    int ret;
+
+    palm = (PALM *)page_log;
+    palm_init_context(palm, &context);
+
+    PALM_KV_RET(palm, session, palm_kv_begin_transaction(&context, palm->kv_env, false));
+    if (last_checkpoint_lsn == WT_PAGE_LOG_LSN_MAX) {
+        ret = palm_kv_get_last_checkpoint(&context, &lsn, NULL, NULL, NULL);
+        if (ret == MDB_NOTFOUND) {
+            lsn = 0;
+            ret = 0;
+        }
+        PALM_KV_ERR(palm, session, ret);
+        last_checkpoint_lsn = lsn;
+    }
+
+    PALM_VERBOSE_PRINT(
+      palm, session, "palm_abandon_checkpoint(lsn=%" PRIu64 ")\n", last_checkpoint_lsn);
+
+    PALM_KV_ERR(palm, session, palm_kv_abandon_after(&context, last_checkpoint_lsn));
+    PALM_KV_ERR(palm, session, palm_kv_commit_transaction(&context));
+
+    if (0) {
+err:
+        palm_kv_rollback_transaction(&context);
+        PALM_VERBOSE_PRINT(palm, session, "palm_abandon_checkpoint(lsn=%" PRIu64 ") returned %d\n",
+          last_checkpoint_lsn, ret);
+    }
+
+    return (ret);
+}
+
+/*
  * palm_begin_checkpoint --
  *     Begin a checkpoint.
  */
@@ -573,6 +616,9 @@ palm_complete_checkpoint_ext(WT_PAGE_LOG *page_log, WT_SESSION *session, uint64_
         lsn = 1;
         ret = 0;
     }
+
+    PALM_VERBOSE_PRINT(palm, session, "palm_complete_checkpoint_ext(lsn=%" PRIu64 ")\n", lsn);
+
     PALM_KV_ERR(palm, session, ret);
     PALM_KV_ERR(palm, session,
       palm_kv_put_checkpoint(&context, lsn, checkpoint_timestamp, checkpoint_metadata));
@@ -738,9 +784,7 @@ palm_handle_verify_page(
     PALM_HANDLE *palm_handle;
     PALM_KV_PAGE_MATCHES matches;
     uint32_t count;
-#if 0 /* FIXME-WT-15041: Enable once PALM can handle abandoned checkpoints. */
     bool seen_tombstone = false;
-#endif
     int ret;
     struct {
         uint64_t lsn;
@@ -772,12 +816,10 @@ palm_handle_verify_page(
         /* All subsequent pages are deltas. */
         PALM_VERIFY_EQUAL(matches.flags & WT_PAGE_LOG_DELTA, WT_PAGE_LOG_DELTA);
 
-#if 0 /* FIXME-WT-15041: Enable once PALM can handle abandoned checkpoints. */
         /* Only the last page in the chain can be a tombstone. */
         PALM_VERIFY_EQUAL(seen_tombstone, false);
         if ((matches.flags & WT_PALM_KV_TOMBSTONE) != 0)
             seen_tombstone = true;
-#endif
 
         /* Validate base LSN. */
         PALM_VERIFY_EQUAL(matches.base_lsn, matched_pages[0].lsn);
@@ -928,11 +970,8 @@ palm_handle_put(WT_PAGE_LOG_HANDLE *plh, WT_SESSION *session, uint64_t page_id,
             PALM_PUT_VERIFY_EQUAL(put_args->base_lsn, prev_full_page_lsn);
             PALM_PUT_VERIFY_EQUAL(put_args->backlink_lsn, prev_lsn);
         } else {
-            /* FIXME-WT-15041: Enable this once PALM can handle abandoned checkpoints. */
-#if 0
             PALM_PUT_VERIFY_EQUAL(put_args->base_lsn, 0);
             PALM_PUT_VERIFY_EQUAL(put_args->backlink_lsn, prev_full_page_lsn);
-#endif
         }
     }
 
@@ -1253,6 +1292,7 @@ palm_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
      * us to treat references to either type of structure as a reference to the other type.
      */
     palm->page_log.pl_add_reference = palm_add_reference;
+    palm->page_log.pl_abandon_checkpoint = palm_abandon_checkpoint;
     palm->page_log.pl_begin_checkpoint = palm_begin_checkpoint;
     palm->page_log.pl_complete_checkpoint = NULL;
     palm->page_log.pl_complete_checkpoint_ext = palm_complete_checkpoint_ext;

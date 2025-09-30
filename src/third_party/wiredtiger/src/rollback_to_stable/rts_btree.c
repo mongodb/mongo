@@ -66,8 +66,8 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
                                            ", stable_timestamp=%s < durable_timestamp=%s: %s, "
                                            "prepare_state=%s, flags 0x%" PRIx16,
               upd->txnid, !txn_id_visible ? "true" : "false",
-              __wt_timestamp_to_string(rollback_timestamp, ts_string[1]),
-              __wt_timestamp_to_string(upd->upd_durable_ts, ts_string[0]),
+              __wt_timestamp_to_string(rollback_timestamp, ts_string[0]),
+              __wt_timestamp_to_string(upd->upd_durable_ts, ts_string[1]),
               rollback_timestamp < upd->upd_durable_ts ? "true" : "false",
               __wt_prepare_state_str(upd->prepare_state), upd->flags);
 
@@ -83,8 +83,8 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
               WT_RTS_VERB_TAG_STABLE_UPDATE_FOUND
               "stable update found with txnid=%" PRIu64
               ", stable_timestamp=%s,  durable_timestamp=%s, flags 0x%" PRIx16,
-              upd->txnid, __wt_timestamp_to_string(rollback_timestamp, ts_string[1]),
-              __wt_timestamp_to_string(upd->upd_durable_ts, ts_string[0]), upd->flags);
+              upd->txnid, __wt_timestamp_to_string(rollback_timestamp, ts_string[0]),
+              __wt_timestamp_to_string(upd->upd_durable_ts, ts_string[1]), upd->flags);
             break;
         }
     }
@@ -517,7 +517,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
           WT_RTS_VERB_TAG_HS_UPDATE_ABORT
           "history store update aborted with time_window=%s, type=%s and stable_timestamp=%s",
           __wt_time_window_to_string(hs_tw, tw_string), __wt_update_type_str(type),
-          __wt_timestamp_to_string(rollback_timestamp, ts_string[3]));
+          __wt_timestamp_to_string(rollback_timestamp, ts_string[0]));
 
         /*
          * Start time point of the current record may be used as stop time point of the previous

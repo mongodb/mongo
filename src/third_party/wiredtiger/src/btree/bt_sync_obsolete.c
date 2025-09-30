@@ -422,7 +422,7 @@ __checkpoint_cleanup_page_skip(
      * and also it can dirty the already existing in-memory page in the cache, skip if eviction is
      * needed.
      */
-    if (__wt_evict_needed(session, false, false, NULL) || __wt_evict_aggressive(session) ||
+    if (__wt_evict_needed(session, false, false, false, NULL) || __wt_evict_aggressive(session) ||
       __wt_cache_full(session) || __wt_evict_cache_stuck(session)) {
         *skipp = true;
         return (0);

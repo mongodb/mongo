@@ -505,19 +505,22 @@ __wti_evict_updates_needed(WT_SESSION_IMPL *session, double *pct_fullp)
  *     thresholds.
  */
 static WT_INLINE bool
-__wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pct_fullp)
+__wt_evict_needed(
+  WT_SESSION_IMPL *session, bool busy, bool readonly, bool ignore_updates_dirty, double *pct_fullp)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_EVICT *evict;
     double pct_dirty, pct_full, pct_updates, dirty_trigger;
     bool clean_needed, dirty_needed, updates_needed;
 
-    evict = S2C(session)->evict;
+    conn = S2C(session);
+    evict = conn->evict;
 
     /*
      * If the connection is closing we do not need eviction from an application thread. The eviction
      * subsystem is already closed.
      */
-    if (F_ISSET_ATOMIC_32(S2C(session), WT_CONN_CLOSING))
+    if (F_ISSET_ATOMIC_32(conn, WT_CONN_CLOSING))
         return (false);
 
     clean_needed = __wt_evict_clean_needed(session, &pct_full);
@@ -530,7 +533,7 @@ __wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pc
      */
     if (!clean_needed) {
         uint8_t min_cache_fill_ratio = __wt_atomic_load8(
-          &S2C(session)->cache->cache_eviction_controls.app_eviction_min_cache_fill_ratio);
+          &conn->cache->cache_eviction_controls.app_eviction_min_cache_fill_ratio);
         if (min_cache_fill_ratio > 0 && pct_full < min_cache_fill_ratio)
             return (false);
     }
@@ -541,6 +544,29 @@ __wt_evict_needed(WT_SESSION_IMPL *session, bool busy, bool readonly, double *pc
     } else {
         dirty_needed = __wt_evict_dirty_needed(session, &pct_dirty);
         updates_needed = __wti_evict_updates_needed(session, &pct_updates);
+
+        /*
+         * Temporary solution to not do updates and dirty eviction using application threads. Log an
+         * error and log an error if the cache is full of updates or dirty pages.
+         */
+        if (ignore_updates_dirty && __wt_conn_is_disagg(session) &&
+          !conn->layered_table_manager.leader) {
+            double cache_full = (evict->eviction_target + evict->eviction_trigger) / 2;
+            if (pct_updates > cache_full)
+                __wt_verbose_warning(
+                  session, WT_VERB_EVICTION, "cache is full of updates: %f percent", pct_updates);
+
+            if (pct_dirty > cache_full)
+                __wt_verbose_warning(
+                  session, WT_VERB_EVICTION, "cache is full of dirty pages: %f percent", pct_dirty);
+
+            if (dirty_needed || updates_needed)
+                WT_STAT_CONN_DSRC_INCR(session, cache_eviction_app_threads_skip_updates_dirty_page);
+
+            if (pct_fullp != NULL)
+                *pct_fullp = 100.0 - (evict->eviction_trigger - pct_full);
+            return (clean_needed);
+        }
     }
 
     /*
@@ -831,7 +857,7 @@ __wt_evict_app_assist_worker_check(
 
     /* Check if eviction is needed. */
     double pct_full;
-    if (!__wt_evict_needed(session, busy, readonly, &pct_full))
+    if (!__wt_evict_needed(session, busy, readonly, true, &pct_full))
         return (0);
 
     /*

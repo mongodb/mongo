@@ -1789,9 +1789,13 @@ retry:
             continue;
         }
 
-        /*
-         * Skip files that are checkpointing if we are only looking for dirty pages.
-         */
+        /* Skip read-only btrees if we are not looking for clean pages. */
+        if (!F_ISSET(evict, WT_EVICT_CACHE_CLEAN) && F_ISSET(btree, WT_BTREE_READONLY)) {
+            WT_STAT_CONN_INCR(session, eviction_server_skip_trees_read_only);
+            continue;
+        }
+
+        /* Skip files that are checkpointing if we are only looking for dirty pages. */
         if (WT_BTREE_SYNCING(btree) &&
           !F_ISSET(evict, WT_EVICT_CACHE_CLEAN | WT_EVICT_CACHE_UPDATES)) {
             WT_STAT_CONN_INCR(session, eviction_server_skip_checkpointing_trees);
@@ -3075,7 +3079,7 @@ __wti_evict_app_assist_worker(
 
         /* See if eviction is still needed. */
         double pct_full;
-        if (!__wt_evict_needed(session, busy, readonly, &pct_full) ||
+        if (!__wt_evict_needed(session, busy, readonly, true, &pct_full) ||
           (pct_full < 100.0 &&
             (__wt_atomic_loadv64(&evict->eviction_progress) > initial_progress + max_progress)))
             break;

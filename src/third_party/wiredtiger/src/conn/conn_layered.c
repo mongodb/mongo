@@ -1019,6 +1019,49 @@ __wti_disagg_set_last_materialized_lsn(WT_SESSION_IMPL *session, uint64_t lsn)
 }
 
 /*
+ * __disagg_abandon_checkpoint --
+ *     Abandon the current incomplete checkpoint, if the operation is supported by the provided PALI
+ *     implementation. It is a no-op if the operation is not supported, in which case the
+ *     application must either perform the equivalent operation before changing roles, or otherwise
+ *     guarantee that no updates have been made since the last completed checkpoint.
+ *
+ * If there are any updates after the last completed checkpoint beyond this point, performing any
+ *     writes to the disaggregated tables may lead to undefined behavior, such as illegal delta
+ *     chains with wrong backlink LSNs, committing updates from incomplete checkpoints, or even data
+ *     loss in the case of not cleaning up abandoned page discards.
+ */
+static int
+__disagg_abandon_checkpoint(WT_SESSION_IMPL *session)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_DISAGGREGATED_STORAGE *disagg;
+
+    conn = S2C(session);
+    disagg = &conn->disaggregated_storage;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &conn->checkpoint_lock);
+
+    /* Only the leader can abandon a checkpoint. */
+    if (disagg->npage_log == NULL || !conn->layered_table_manager.leader)
+        WT_RET(EINVAL);
+
+    /* This is an optional operation for testing, so ignore it if it's not supported. */
+    if (disagg->npage_log->page_log->pl_abandon_checkpoint == NULL)
+        return (0);
+
+    /*
+     * Call the PALI function to abandon the checkpoint. Since we are not specifying the latest
+     * complete checkpoint, the implementation of this function would identify the LSN of the last
+     * checkpoint completion record and drop all later records. If there are no more updates after
+     * the last complete checkpoint, the function would have no effect.
+     */
+    WT_RET(disagg->npage_log->page_log->pl_abandon_checkpoint(
+      disagg->npage_log->page_log, &session->iface, WT_PAGE_LOG_LSN_MAX));
+
+    return (0);
+}
+
+/*
  * __disagg_begin_checkpoint --
  *     Begin the next checkpoint.
  */
@@ -1043,6 +1086,26 @@ __disagg_begin_checkpoint(WT_SESSION_IMPL *session)
     /* Store is sufficient because updates are protected by the checkpoint lock. */
     disagg->num_meta_put_at_ckpt_begin = disagg->num_meta_put;
     return (0);
+}
+
+/*
+ * __disagg_restart_checkpoint --
+ *     Restart the current checkpoint: Abandon the current checkpoint if it is incomplete (and the
+ *     operation to abandon a checkpoint is supported), and begin a new checkpoint.
+ */
+static int
+__disagg_restart_checkpoint(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+
+    WT_ASSERT_SPINLOCK_OWNED(session, &S2C(session)->checkpoint_lock);
+
+    WT_ERR_MSG_CHK(
+      session, __disagg_abandon_checkpoint(session), "Failed to abandon the incomplete checkpoint");
+    WT_ERR_MSG_CHK(session, __disagg_begin_checkpoint(session), "Failed to begin a new checkpoint");
+
+err:
+    return (ret);
 }
 
 /*
@@ -1111,8 +1174,9 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
 
         /* Follower step-up. */
         if (reconfig && !was_leader && leader) {
-            WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_begin_checkpoint(session));
-            WT_ERR_MSG_CHK(session, ret, "Failed to begin a new checkpoint");
+            /* Abandon the current checkpoint if it is incomplete, and begin a new one. */
+            WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_restart_checkpoint(session));
+            WT_ERR(ret);
 
             /* Create any missing stable tables. */
             WT_ERR_MSG_CHK(session, __layered_create_missing_stable_tables(session),
@@ -1154,6 +1218,12 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
     if (__wt_conn_is_disagg(session)) {
         WT_ERR(__layered_table_manager_start(session));
 
+        /* If we are starting as a primary, abandon a previous incomplete checkpoint. */
+        if (leader) {
+            WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_abandon_checkpoint(session));
+            WT_ERR_MSG_CHK(session, ret, "Failed to abandon the incomplete checkpoint");
+        }
+
         /* Initialize the shared metadata table. */
         WT_ERR(__disagg_metadata_table_init(session));
 
@@ -1170,20 +1240,19 @@ __wti_disagg_conn_config(WT_SESSION_IMPL *session, const char **cfg, bool reconf
 
         /* If we are starting as primary (e.g., for internal testing), begin the checkpoint. */
         if (leader && !picked_up) {
-            WT_ERR(__wt_config_gets(session, cfg, "create", &cval));
-            if (cval.val == 0) {
-                ret = __layered_get_disagg_checkpoint(
-                  session, cfg, NULL, NULL, &complete_checkpoint_meta);
-                if (ret == WT_NOTFOUND)
-                    WT_ERR_MSG(session, ret, "disaggregated checkpoint not found.");
-                WT_ERR(ret);
-
+            ret =
+              __layered_get_disagg_checkpoint(session, cfg, NULL, NULL, &complete_checkpoint_meta);
+            WT_ERR_NOTFOUND_OK(ret, true);
+            if (ret == 0) {
+                /* Pick up the checkpoint we just found. */
                 WT_WITH_CHECKPOINT_LOCK(session,
                   ret = __disagg_pick_up_checkpoint_meta_item(session, &complete_checkpoint_meta));
 
                 __wt_buf_free(session, &complete_checkpoint_meta);
                 WT_ERR_MSG_CHK(session, ret, "Failed to pick up checkpoint metadata");
-            }
+            } else if (WT_CHECK_AND_RESET(ret, WT_NOTFOUND))
+                __wt_verbose_debug2(session, WT_VERB_DISAGGREGATED_STORAGE, "%s",
+                  "Did not find any complete checkpoint to pick up at startup");
             WT_WITH_CHECKPOINT_LOCK(session, ret = __disagg_begin_checkpoint(session));
             WT_ERR_MSG_CHK(session, ret, "Failed to begin a new checkpoint");
         }

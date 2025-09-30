@@ -380,6 +380,68 @@ palm_kv_put_page(PALM_KV_CONTEXT *context, uint64_t table_id, uint64_t page_id, 
     return (mdb_put(context->lmdb_txn, context->env->lmdb_pages_dbi, &kval, &vval, 0));
 }
 
+/*
+ * palm_kv_abandon_after --
+ *     Abandon (delete) all page log entries with an LSN greater than the given LSN.
+ */
+int
+palm_kv_abandon_after(PALM_KV_CONTEXT *context, uint64_t abandon_after_lsn)
+{
+    MDB_cursor *cursor;
+    MDB_val kval;
+    MDB_val vval;
+    int ret;
+
+    cursor = NULL;
+    memset(&kval, 0, sizeof(kval));
+    memset(&vval, 0, sizeof(vval));
+
+    if ((ret = mdb_cursor_open(context->lmdb_txn, context->env->lmdb_pages_dbi, &cursor)) != 0)
+        goto err;
+    if ((ret = mdb_cursor_get(cursor, &kval, &vval, MDB_FIRST)) != 0 && ret != MDB_NOTFOUND)
+        goto err;
+    if (ret == MDB_NOTFOUND) {
+        ret = 0;
+        goto err;
+    }
+
+    /*
+     * TODO: We probably also need to delete the checkpoint completion records, if we are not
+     * abandoning the most recent checkpoint. Note: PALM is being deprecated, won't be addressed.
+     */
+
+    /*
+     * Iterate through the pages table, looking for pages that have an LSN greater than the given
+     * LSN and delete any such pages.
+     */
+    while (ret == 0) {
+        if (kval.mv_size != sizeof(PAGE_KEY)) {
+            ret = EINVAL;
+            goto err;
+        }
+
+        PAGE_KEY *key = (PAGE_KEY *)kval.mv_data;
+        PAGE_KEY decoded_key;
+        swap_page_key(key, &decoded_key);
+        if (decoded_key.lsn > abandon_after_lsn) {
+            ret = mdb_cursor_del(cursor, 0);
+            if (ret != 0)
+                goto err;
+        }
+
+        ret = mdb_cursor_get(cursor, &kval, &vval, MDB_NEXT);
+        if (ret != 0 && ret != MDB_NOTFOUND)
+            goto err;
+    }
+
+    ret = 0;
+
+err:
+    if (cursor != NULL)
+        mdb_cursor_close(cursor);
+    return (ret);
+}
+
 int
 palm_kv_get_page_ids(
   PALM_KV_CONTEXT *context, WT_ITEM *item, uint64_t checkpoint_lsn, uint64_t table_id, size_t *size)

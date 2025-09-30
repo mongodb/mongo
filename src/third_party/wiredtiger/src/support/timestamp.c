@@ -28,11 +28,12 @@ char *
 __wt_time_point_to_string(wt_timestamp_t durable_ts, wt_timestamp_t ts, wt_timestamp_t prepare_ts,
   uint64_t prepared_id, uint64_t txn_id, char *tp_string)
 {
-    char ts_string[WT_TS_INT_STRING_SIZE];
+    char ts_string[3][WT_TS_INT_STRING_SIZE];
 
     WT_IGNORE_RET(__wt_snprintf(tp_string, WT_TIME_STRING_SIZE, "%s/%s/%s/%" PRIu64 "/%" PRIu64,
-      __wt_timestamp_to_string(durable_ts, ts_string), __wt_timestamp_to_string(ts, ts_string),
-      __wt_timestamp_to_string(prepare_ts, ts_string), prepared_id, txn_id));
+      __wt_timestamp_to_string(durable_ts, ts_string[0]),
+      __wt_timestamp_to_string(ts, ts_string[1]),
+      __wt_timestamp_to_string(prepare_ts, ts_string[2]), prepared_id, txn_id));
     return (tp_string);
 }
 
@@ -298,7 +299,12 @@ __wt_time_aggregate_validate(
      *
      */
 
-    if (ta->oldest_start_ts > ta->newest_stop_ts)
+    /*
+     * Although timestamped truncates are supported in MongoDB, it is still possible for MongoDB to
+     * do truncate operations without a timestamp. In this case, validate needs to handle page
+     * deleted structures with a zero timestamp.
+     */
+    if (ta->newest_stop_ts != WT_TS_NONE && ta->oldest_start_ts > ta->newest_stop_ts)
         WT_TIME_VALIDATE_RET(session,
           "aggregate time window has an oldest start time after its newest stop time; time "
           "aggregate %s",
@@ -327,8 +333,14 @@ __wt_time_aggregate_validate(
      * start durable timestamp may be larger than newest stop timestamp. Check whether start and
      * stop are equal first and then check the newest start durable timestamp against newest stop
      * durable timestamp if all the data on the page are deleted.
+     *
+     *
+     * Although timestamped truncates are supported in MongoDB, it is still possible for MongoDB to
+     * do truncate operations without a timestamp. In this case, validate needs to handle page
+     * deleted structures with a zero timestamp.
      */
-    if (ta->newest_start_durable_ts != ta->newest_stop_durable_ts &&
+    if (ta->newest_stop_durable_ts != WT_TS_NONE &&
+      ta->newest_start_durable_ts != ta->newest_stop_durable_ts &&
       ta->newest_stop_ts != WT_TS_MAX && ta->newest_start_durable_ts > ta->newest_stop_durable_ts)
         WT_TIME_VALIDATE_RET(session,
           "aggregate time window has a newest start durable time after its newest stop durable "

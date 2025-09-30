@@ -68,6 +68,9 @@ class test_layered15(wttest.WiredTigerTestCase, DisaggConfigMixin):
 
     # Restart the node without local files
     def restart_without_local_files(self):
+        # Step down to ensure that there are no more checkpoints
+        self.conn.reconfigure(f'disaggregated=(role=follower)')
+
         # Close the current connection
         self.close_conn()
 

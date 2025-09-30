@@ -715,6 +715,7 @@ usage(const char *progname)
     fprintf(stderr, "usage: %s [OPTIONS]\n\n", progname);
     fprintf(stderr, "Options:\n");
     fprintf(stderr, "  -C CONFIG  specify WiredTiger's connection configuration\n");
+    fprintf(stderr, "  -D         use disaggregated storage (equivalent to -G disaggregated=1)\n");
     fprintf(stderr, "  -G CONFIG  specify the workload generator's configuration\n");
     fprintf(stderr, "  -g         generate random timing stress configuration\n");
     fprintf(stderr, "  -h HOME    specify the database directory\n");

@@ -54,6 +54,7 @@ static const char *const __stats_dsrc_desc[] = {
   "cache: application threads eviction requested with cache fill ratio >= 25% and < 50%",
   "cache: application threads eviction requested with cache fill ratio >= 50% and < 75%",
   "cache: application threads eviction requested with cache fill ratio >= 75%",
+  "cache: application threads eviction skip page with updates or dirty page",
   "cache: bytes currently in the cache",
   "cache: bytes dirty in the cache cumulative",
   "cache: bytes read into cache",
@@ -493,6 +494,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_eviction_app_threads_fill_ratio_25_50 = 0;
     stats->cache_eviction_app_threads_fill_ratio_50_75 = 0;
     stats->cache_eviction_app_threads_fill_ratio_gt_75 = 0;
+    stats->cache_eviction_app_threads_skip_updates_dirty_page = 0;
     /* not clearing cache_bytes_inuse */
     /* not clearing cache_bytes_dirty_total */
     stats->cache_bytes_read = 0;
@@ -897,6 +899,8 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
       from->cache_eviction_app_threads_fill_ratio_50_75;
     to->cache_eviction_app_threads_fill_ratio_gt_75 +=
       from->cache_eviction_app_threads_fill_ratio_gt_75;
+    to->cache_eviction_app_threads_skip_updates_dirty_page +=
+      from->cache_eviction_app_threads_skip_updates_dirty_page;
     to->cache_bytes_inuse += from->cache_bytes_inuse;
     to->cache_bytes_dirty_total += from->cache_bytes_dirty_total;
     to->cache_bytes_read += from->cache_bytes_read;
@@ -1319,6 +1323,8 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
       WT_STAT_DSRC_READ(from, cache_eviction_app_threads_fill_ratio_50_75);
     to->cache_eviction_app_threads_fill_ratio_gt_75 +=
       WT_STAT_DSRC_READ(from, cache_eviction_app_threads_fill_ratio_gt_75);
+    to->cache_eviction_app_threads_skip_updates_dirty_page +=
+      WT_STAT_DSRC_READ(from, cache_eviction_app_threads_skip_updates_dirty_page);
     to->cache_bytes_inuse += WT_STAT_DSRC_READ(from, cache_bytes_inuse);
     to->cache_bytes_dirty_total += WT_STAT_DSRC_READ(from, cache_bytes_dirty_total);
     to->cache_bytes_read += WT_STAT_DSRC_READ(from, cache_bytes_read);
@@ -1828,6 +1834,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: application threads eviction requested with cache fill ratio >= 25% and < 50%",
   "cache: application threads eviction requested with cache fill ratio >= 50% and < 75%",
   "cache: application threads eviction requested with cache fill ratio >= 75%",
+  "cache: application threads eviction skip page with updates or dirty page",
   "cache: application threads page read from disk to cache count",
   "cache: application threads page read from disk to cache time (usecs)",
   "cache: application threads page write from cache to disk count",
@@ -1880,6 +1887,7 @@ static const char *const __stats_connection_desc[] = {
   "cache: eviction server skips trees because there are too many active walks",
   "cache: eviction server skips trees that are being checkpointed",
   "cache: eviction server skips trees that are configured to stick in cache",
+  "cache: eviction server skips trees that are read-only if it is not looking for clean pages",
   "cache: eviction server skips trees that disable eviction",
   "cache: eviction server skips trees that were not useful before",
   "cache: eviction server slept, because we did not make progress with eviction",
@@ -2813,6 +2821,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_eviction_app_threads_fill_ratio_25_50 = 0;
     stats->cache_eviction_app_threads_fill_ratio_50_75 = 0;
     stats->cache_eviction_app_threads_fill_ratio_gt_75 = 0;
+    stats->cache_eviction_app_threads_skip_updates_dirty_page = 0;
     stats->cache_read_app_count = 0;
     stats->cache_read_app_time = 0;
     stats->cache_write_app_count = 0;
@@ -2858,6 +2867,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->eviction_server_skip_trees_too_many_active_walks = 0;
     stats->eviction_server_skip_checkpointing_trees = 0;
     stats->eviction_server_skip_trees_stick_in_cache = 0;
+    stats->eviction_server_skip_trees_read_only = 0;
     stats->eviction_server_skip_trees_eviction_disabled = 0;
     stats->eviction_server_skip_trees_not_useful_before = 0;
     stats->eviction_server_slept = 0;
@@ -3766,6 +3776,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, cache_eviction_app_threads_fill_ratio_50_75);
     to->cache_eviction_app_threads_fill_ratio_gt_75 +=
       WT_STAT_CONN_READ(from, cache_eviction_app_threads_fill_ratio_gt_75);
+    to->cache_eviction_app_threads_skip_updates_dirty_page +=
+      WT_STAT_CONN_READ(from, cache_eviction_app_threads_skip_updates_dirty_page);
     to->cache_read_app_count += WT_STAT_CONN_READ(from, cache_read_app_count);
     to->cache_read_app_time += WT_STAT_CONN_READ(from, cache_read_app_time);
     to->cache_write_app_count += WT_STAT_CONN_READ(from, cache_write_app_count);
@@ -3831,6 +3843,8 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
       WT_STAT_CONN_READ(from, eviction_server_skip_checkpointing_trees);
     to->eviction_server_skip_trees_stick_in_cache +=
       WT_STAT_CONN_READ(from, eviction_server_skip_trees_stick_in_cache);
+    to->eviction_server_skip_trees_read_only +=
+      WT_STAT_CONN_READ(from, eviction_server_skip_trees_read_only);
     to->eviction_server_skip_trees_eviction_disabled +=
       WT_STAT_CONN_READ(from, eviction_server_skip_trees_eviction_disabled);
     to->eviction_server_skip_trees_not_useful_before +=
