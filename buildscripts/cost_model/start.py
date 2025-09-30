@@ -81,6 +81,7 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
                     note=f"IXSCAN_{note}",
                 )
             )
+
             # In order to calibrate the cost of seeks, we uniformly sample for an $in query so that the
             # index scan will examine the same number of keys as the range query,
             # but instead of being able to traverse the leaves, it has to do a seek for each one.
@@ -104,6 +105,33 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
                     note=f"IXSCAN_{note}",
                 )
             )
+
+            if direction == 1:
+                # In order to calibrate the cost of a filter on an ixscan, we add a predicate to the
+                # queries above that will always be true. We expect that the cost of a filter on an
+                # ixscan should be the same whether the direction is forwards or backwards, so we only
+                # calibrate in the forwards case.
+                requests.append(
+                    Query(
+                        {
+                            "filter": {
+                                field.name: {"$lt": card, "$mod": [1, 0]},
+                            },
+                            "sort": {field.name: direction},
+                        },
+                        note="IXSCAN_W_FILTER",
+                    )
+                )
+                requests.append(
+                    Query(
+                        {
+                            "filter": {field.name: {"$in": seeks, "$mod": [1, 0]}},
+                            "sort": {field.name: direction},
+                        },
+                        note="IXSCAN_W_FILTER",
+                    )
+                )
+
     await workload_execution.execute(
         database, main_config.workload_execution, [collection], requests
     )
@@ -121,6 +149,20 @@ async def execute_collection_scans(
         note = f"COLLSCAN_{'FORWARD' if direction == 1 else 'BACKWARD'}"
         for limit in limits:
             requests.append(Query({"limit": limit, "sort": {"$natural": direction}}, note=note))
+
+            if direction == 1:
+                # We expect that the cost of a filter on a collscan should be the same whether
+                # the direction is forwards or backwards, so we only calibrate in the forwards case.
+                requests.append(
+                    Query(
+                        {
+                            "limit": limit,
+                            "filter": {"int_uniform_unindexed": 1},
+                            "sort": {"$natural": direction},
+                        },
+                        note="COLLSCAN_W_FILTER",
+                    )
+                )
     await workload_execution.execute(
         database, main_config.workload_execution, collections, requests
     )
@@ -333,12 +375,20 @@ async def execute_fetches(database: DatabaseInstance, collections: Sequence[Coll
 
     requests = []
 
-    cards = [10, 50, 100, 500, 1000, 5000, 10000]
+    cards = [10, 50, 100, 500, 1000, 5000, 10000, 15000]
     for card in cards:
         requests.append(
             Query(
                 {"filter": {"int_uniform": {"$lt": card}}},
                 note="FETCH",
+            )
+        )
+
+        requests.append(
+            Query(
+                # 'int_uniform_unindexed' is not indexed, so the fetch will have a filter.
+                {"filter": {"int_uniform": {"$lt": card}, "int_uniform_unindexed": 1}},
+                note="FETCH_W_FILTER",
             )
         )
 

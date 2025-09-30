@@ -248,6 +248,12 @@ def create_coll_scan_collection_template(
                 ),
                 indexed=True,
             ),
+            config.FieldTemplate(
+                name="int_uniform_unindexed",
+                data_type=config.DataType.INTEGER,
+                distribution=RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, 2)),
+                indexed=False,
+            ),
         ],
         compound_indexes=[],
         cardinalities=cardinalities,
@@ -495,6 +501,7 @@ qsn_nodes = [
     config.QsNodeCalibrationConfig(type="SUBPLAN"),
     config.QsNodeCalibrationConfig(name="COLLSCAN_FORWARD", type="COLLSCAN"),
     config.QsNodeCalibrationConfig(name="COLLSCAN_BACKWARD", type="COLLSCAN"),
+    config.QsNodeCalibrationConfig(name="COLLSCAN_W_FILTER", type="COLLSCAN"),
     config.QsNodeCalibrationConfig(
         name="IXSCAN_FORWARD",
         type="IXSCAN",
@@ -519,7 +526,16 @@ qsn_nodes = [
             axis=1,
         ),
     ),
+    config.QsNodeCalibrationConfig(
+        name="IXSCAN_W_FILTER",
+        type="IXSCAN",
+        variables_override=lambda df: pd.concat(
+            [df["n_processed"].rename("Keys Examined"), df["seeks"].rename("Number of seeks")],
+            axis=1,
+        ),
+    ),
     config.QsNodeCalibrationConfig(type="FETCH"),
+    config.QsNodeCalibrationConfig(name="FETCH_W_FILTER", type="FETCH"),
     config.QsNodeCalibrationConfig(
         type="AND_HASH",
         variables_override=lambda df: pd.concat(
