@@ -325,3 +325,4 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagTimeseriesUpdatesSupport: true
+        performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert: true
