@@ -752,6 +752,7 @@ mongo_cc_library(
         "//src/mongo/db:vector_clock",
         "//src/mongo/executor:async_rpc_error_info",
         "//src/mongo/idl:cluster_server_parameter_server_status",
+        "//src/mongo/logv2/log_metric_initializer",
         "//src/mongo/transport:message_compressor_options_server",
         "//src/mongo/transport:session_manager",
         "//src/mongo/transport:transport_layer_manager",

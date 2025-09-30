@@ -120,10 +120,19 @@ GetTenantIDFn& getTenantID() {
     static StaticImmortal<GetTenantIDFn> fn;
     return *fn;
 }
+LogCounterCallback& getLogCounterCallback() {
+    static StaticImmortal<LogCounterCallback> fn{[]() {
+    }};
+    return *fn;
+}
 }  // namespace
 
 void setGetTenantIDCallback(GetTenantIDFn&& fn) {
     getTenantID() = std::move(fn);
+}
+
+void setLogCounterCallback(LogCounterCallback cb) {
+    getLogCounterCallback() = std::move(cb);
 }
 
 struct UnstructuredValueExtractor {
@@ -292,6 +301,7 @@ void _doLogImpl(int32_t id,
         }
 
         source.push_record(std::move(record));
+        getLogCounterCallback()();
     }
 }
 

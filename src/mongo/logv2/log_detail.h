@@ -61,6 +61,10 @@ namespace detail {
 using GetTenantIDFn = std::function<std::string()>;
 void setGetTenantIDCallback(GetTenantIDFn&& fn);
 
+using LogCounterCallback = std::function<void()>;
+// Must be called before other threads start logging
+void setLogCounterCallback(LogCounterCallback);
+
 void doLogImpl(int32_t id,
                LogSeverity const& severity,
                LogOptions const& options,
