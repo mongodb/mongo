@@ -162,7 +162,7 @@ class TestReport(unittest.TestResult):
             # check if there are stacktrace files, if so, invoke the symbolizer here.
             # log symbolized output to test.logger.info()
             symbolizer = ResmokeSymbolizer()
-            symbolizer.symbolize_test_logs(test)
+            symbolizer.get_unsymbolized_stacktrace(test)
 
             unittest.TestResult.stopTest(self, test)
 

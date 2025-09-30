@@ -1,17 +1,20 @@
 """Symbolize stacktraces inside test logs."""
 from __future__ import annotations
 
+import ast
+import json
 import os
 import subprocess
 import sys
 import time
 from datetime import timedelta
 from threading import Lock
-from typing import List, NamedTuple, Optional, Set
+from typing import Any, List, NamedTuple, Optional, Set
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.flags import HANG_ANALYZER_CALLED
 from buildscripts.resmokelib.testing.testcases.interface import TestCase
+from buildscripts.util.read_config import read_config_file
 
 # This lock prevents different resmoke jobs from symbolizing stacktraces concurrently,
 # which includes downloading the debug symbols, that can be reused by other resmoke jobs
@@ -23,6 +26,13 @@ _processed_files_lock = Lock()
 STACKTRACE_FILE_EXTENSION = ".stacktrace"
 SYMBOLIZE_RETRY_TIMEOUT_SECS = timedelta(minutes=4).total_seconds()
 PROCESSED_FILES_LIST_FILE_PATH = "symbolizer-processed-files.txt"  # noqa
+
+BACKTRACE_KEY = "backtrace"
+PROCESS_INFO_KEY = "processInfo"
+
+UNSYMBOLIZED_STACKTRACE_TXT = "unsymbolized_stacktraces.txt"
+UNSYMBOLIZED_STACKTRACE_JSON = "unsymbolized_stacktraces.json"
+UNSYMBOLIZED_STACKTRACE_INSTRUCTIONS = "unsymbolized_stacktrace_instructions.txt"
 
 
 class ResmokeSymbolizerConfig(NamedTuple):
@@ -37,6 +47,7 @@ class ResmokeSymbolizerConfig(NamedTuple):
     evg_task_id: Optional[str]
     client_id: Optional[str]
     client_secret: Optional[str]
+    skip_symbolization: bool
 
     @classmethod
     def from_resmoke_config(cls) -> ResmokeSymbolizerConfig:
@@ -49,6 +60,7 @@ class ResmokeSymbolizerConfig(NamedTuple):
             evg_task_id=_config.EVERGREEN_TASK_ID,
             client_id=_config.SYMBOLIZER_CLIENT_ID,
             client_secret=_config.SYMBOLIZER_CLIENT_SECRET,
+            skip_symbolization=_config.SKIP_SYMBOLIZATION,
         )
 
     @staticmethod
@@ -85,15 +97,19 @@ class ResmokeSymbolizer:
         self.file_service = file_service if file_service is not None else FileService(
             PROCESSED_FILES_LIST_FILE_PATH)
 
-    def symbolize_test_logs(self, test: TestCase,
-                            symbolize_retry_timeout: float = SYMBOLIZE_RETRY_TIMEOUT_SECS) -> None:
+    def get_unsymbolized_stacktrace(
+        self,
+        test: TestCase,
+    ):
         """
-        Perform all necessary actions to symbolize and write output to test logs.
+        Perform all necessary actions to obtain the unsymbolized stack trace.
+        If we skip symbolization, steps on how to manually symbolize the unsymbolized stacktraces are provided in Evergreen
+        If we do not skip symbolization, the unsymbolized stacktraces are automatically symbolized and output
 
         :param test: resmoke test case
-        :param symbolize_retry_timeout: the timeout for symbolizer retries
         """
-        if not self.should_symbolize(test):
+        if test.return_code == 0:
+            test.logger.info("Test succeeded, skipping symbolization")
             return
 
         dbpath = self.get_stacktrace_dir(test)
@@ -102,32 +118,223 @@ class ResmokeSymbolizer:
 
         test.logger.info("Looking for stacktrace files in '%s'", dbpath)
         files = self.collect_stacktrace_files(dbpath)
-        if not files:
-            test.logger.info("No failure logs/stacktrace files found, skipping symbolization")
-            return
-
         test.logger.info("Found stacktrace files: %s", files)
 
-        test.logger.info("Starting symbolization once no other tests are being symbolized.")
+        if not files:
+            test.logger.info(
+                "No failure logs/stacktrace files found during unsymbolized stack trace acquisition"
+            )
+            return
+
+        if not _config.EVERGREEN_TASK_ID:
+            return
+
+        self.file_service.add_to_processed_files(files)
+        self.file_service.write_processed_files(PROCESSED_FILES_LIST_FILE_PATH)
+        data = self.get_unsymbolized_stacktrace_data(test, files)
+        self.make_symbolization_instructions_or_symbolize(test, data, files)
+
+    def get_unsymbolized_stacktrace_data(self, test: TestCase, files: list[str]) -> dict:
+        """
+        Reads each file containing unsymbolized stacktraces and stores its content.
+        In each entry, the original name of the file and the test associated with the stacktrace is also stored.
+        These results are then written to a file posted on Evergreen.
+
+        :param test: resmoke test case
+        :param files: unsymbolized stacktrace file names
+        :return: dictionary (each entry is the unsymbolized stacktrace file name, the stacktrace contents, and the test name)
+        """
         with _symbolizer_lock:
-            test.logger.info("\nBEGIN Symbolization")
+            if not os.path.exists(UNSYMBOLIZED_STACKTRACE_JSON):
+                data = {"unsymbolized_stacktraces": []}
+            else:
+                try:
+                    with open(UNSYMBOLIZED_STACKTRACE_JSON, "r") as file:
+                        data = json.load(file)
+                except Exception as ex:
+                    test.logger.info(f"unable to read existing unsymbolized_stacktraces file: {ex}")
 
-            start_time = time.perf_counter()
-            for file_path in files:
-                test.logger.info("Working on: %s", file_path)
-                symbolizer_script_timeout = int(symbolize_retry_timeout -
-                                                (time.perf_counter() - start_time))
-                symbolized_out = self.symbolizer_service.run_symbolizer_script(
-                    file_path, symbolizer_script_timeout)
-                test.logger.info(symbolized_out)
-                if time.perf_counter() - start_time > symbolize_retry_timeout:
-                    break
+            for f in files:
+                unsymbolized_content_dict = {}
+                try:
+                    with open(f, "r") as file:
+                        unsymbolized_content = ','.join([line.rstrip('\n') for line in file])
+                        unsymbolized_content_dict = ast.literal_eval(unsymbolized_content)
+                except Exception as e:
+                    test.logger.error(e)
 
-            # To avoid performing the same actions on these files again, we mark them as processed
-            self.file_service.add_to_processed_files(files)
-            self.file_service.write_processed_files(PROCESSED_FILES_LIST_FILE_PATH)
 
-            test.logger.info("\nEND Symbolization \nSymbolization process completed. ")
+                unsymbolized_stacktrace_details = {
+                    "name": f,
+                    "unsymbolized_stacktrace": unsymbolized_content_dict,
+                    "test_name": test.long_name(),
+                }
+                data["unsymbolized_stacktraces"].append(unsymbolized_stacktrace_details)
+
+                with open(UNSYMBOLIZED_STACKTRACE_TXT, "a") as outfile:
+                    outfile.write(f"name: {f}\n\n")
+                    outfile.write(
+                        f"unsymbolized_stacktrace: {json.dumps(unsymbolized_content_dict)}\n\n"
+                    )
+                    outfile.write(f"test_name: {test.long_name()}\n\n")
+
+                    outfile.write("\n----------------------------------\n")
+
+        return data
+
+    def make_symbolization_instructions_or_symbolize(
+        self, test: TestCase, data: dict, files: list[str]
+    ):
+        """
+        If we skip symbolization, produce steps on how to manually symbolize the unsymbolized stacktraces are provided in Evergreen.
+        If we do not skip symbolization, the unsymbolized stacktraces are automatically symbolized and output by logs statements.
+
+        :param test: resmoke test case
+        :param data
+        :param files: unsymbolized stacktrace file names
+
+        """
+        with _symbolizer_lock:
+            if len(data.get("unsymbolized_stacktraces")) > 0:
+                try:
+                    with open(UNSYMBOLIZED_STACKTRACE_JSON, "w") as file:
+                        json.dump(data, file, indent=4)
+                except Exception as ex:
+                    test.logger.info(f"unable to write to file: {ex}")
+
+                if self.config.skip_symbolization:
+                    self.create_unsymbolized_instructions(
+                        test,
+                        data.get("unsymbolized_stacktraces"),
+                    )
+                else:
+                    self.symbolize_stacktraces(test, files)
+
+    def symbolize_stacktraces(
+        self,
+        test: TestCase,
+        files: List[str],
+        symbolize_retry_timeout: float = SYMBOLIZE_RETRY_TIMEOUT_SECS,
+    ) -> None:
+        """
+        Perform all necessary actions to symbolize the provided stack traces
+
+        :param test: resmoke test case
+        :param files: unsymbolized stacktrace file names
+        :param symbolize_retry_timeout: the timeout for symbolizer retries
+        """
+        if not self.should_symbolize(test):
+            return
+
+        test.logger.info("\nBEGIN Symbolization")
+
+        start_time = time.perf_counter()
+        for file_path in files:
+            test.logger.info("Working on: %s", file_path)
+            symbolizer_script_timeout = int(
+                symbolize_retry_timeout - (time.perf_counter() - start_time)
+            )
+            symbolized_out = self.symbolizer_service.run_symbolizer_script(
+                file_path, symbolizer_script_timeout
+            )
+            test.logger.info(symbolized_out)
+            if time.perf_counter() - start_time > symbolize_retry_timeout:
+                break
+
+        test.logger.info("\nEND Symbolization")
+        test.logger.info("Symbolization process completed.")
+
+    def create_unsymbolized_instructions(
+        self,
+        test: TestCase,
+        unsymbolized_stacktraces_info: List[dict],
+        expansions_file: str = "../expansions.yml",
+    ):
+        """
+        Creates steps on how to manually symbolize provided unsymbolized stacktraces
+
+        :param unsymbolized_stacktrace_instructions: .txt file to write steps to
+        :param test: resmoke test case
+        :param unsymbolized_stacktraces_info: Unsymbolized stacktraces along with the file name and test name
+        :param expansions_file: Location of evergreen expansions file
+
+        """
+        if not _config.EVERGREEN_TASK_ID:
+            test.logger.info(
+                "Skipping local symbolization instructions because evergreen task id was not provided."
+            )
+            return
+
+        expansions = read_config_file(expansions_file)
+        compile_variant = expansions.get("compile_variant")
+        build_variant = expansions.get("build_variant")
+
+        missing_keys = []
+        for entry in unsymbolized_stacktraces_info:
+            unsymbolized_stacktrace = entry["unsymbolized_stacktrace"]
+            found_backtrace = self.get_value_recursively(unsymbolized_stacktrace, BACKTRACE_KEY)
+            found_process_info = self.get_value_recursively(
+                unsymbolized_stacktrace, PROCESS_INFO_KEY
+            )
+            if not (found_backtrace and found_process_info):
+                missing_keys.append((entry["name"], entry["test_name"]))
+        unsymbolizable_stacktrace_comment = (
+            self.show_unsymbolizable_stacktraces(missing_keys) if missing_keys else None
+        )
+
+        content = f"""
+There should be a file attached to this evergreen task labeled, "Unsymbolized Stack Traces - Execution" and then some execution value.
+To symbolize these stack traces, you should use the CLI of db-contrib-tools for symbolization.
+{unsymbolizable_stacktrace_comment if unsymbolizable_stacktrace_comment else "All of the stacktraces are eligible to be symbolized in the Unsymbolized Stacktrace file."}
+Specifically, Create a local json file for each of the stacktraces (the content after the header "unsymbolized_stacktrace").
+    WARNING: This json file must have the stacktrace all on one line for parsing to work properly.
+    Also, please ensure the "generate_build_id_to_debug_symbols_mapping" task is run on this variant: {compile_variant if compile_variant else build_variant} in Evergreen to generate the stacktrace to symbolize.
+Then, call "db-contrib-tool symbolize < my/stracktrace_json/file" in the command line.
+This requires manual login authentication to Kanopy, but will then give a file that is symbolized after any needed debug symbols are downloaded.
+To find the start of the symbolized stacktrace in terminal, look for the lines of this format: <source-file>:<line>:<column>: <(fully-qualified) function/symbol>.
+There are various other optional parameters when symbolizing. For more clarification on these, use the command "db-contrib-tool symbolize --help" in your command line.
+If no symbolized stacktrace is created, then most likely either:
+    - None of the build ID's in the unsymbolized stacktrace are mapped to debug symbols, in which case double check the task run above is on the correct build / compile variant.
+    -The unsymbolized stacktrace is not represented as a json or that json is not on just one line of the file, in which cause the parser will not be able to find a backtrace object.
+    -You tried to symbolize a stacktrace that was deemed not symbolizable by its format.
+            """
+
+        with open(UNSYMBOLIZED_STACKTRACE_INSTRUCTIONS, "w") as outfile:
+            outfile.write(content)
+
+    def get_value_recursively(self, doc: Any, key: str) -> bool:
+        """
+        Search the dict recursively for a key.
+
+        :param doc: Dict or any value to search in.
+        :param key: Key to search for.
+        :return: Value of the key or None.
+        """
+        try:
+            if key in doc.keys():
+                return True
+            for sub_doc in doc.values():
+                res = self.get_value_recursively(sub_doc, key)
+                if res:
+                    return True
+        except AttributeError:
+            pass
+        return False
+
+    def show_unsymbolizable_stacktraces(self, missing_keys: list[tuple[str, str]]):
+        """
+        Writes to the Evergreen user what files are not
+        in proper formatting to be symbolized.
+
+        :param output: Instructions to write to Evergreen
+        :param missing_keys: Tuple(file_name, test_name) that are misformed
+        """
+        lines = [
+            "The following file names, along with the test case they are associated with, cannot have their stacktrace symbolized due to missing keys that are needed for parsing"
+        ]
+        for file_name, test_name in missing_keys:
+            lines.append(f"\t{file_name}, associated with the test {test_name}")
+        return "\n".join(lines)
 
     def should_symbolize(self, test: TestCase) -> bool:
         """

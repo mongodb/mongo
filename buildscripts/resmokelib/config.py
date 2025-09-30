@@ -68,6 +68,7 @@ DEFAULTS = {
     "flow_control": None,
     "flow_control_tickets": None,
     "force_excluded_tests": False,
+    "skip_symbolization": False,
     "fuzz_mongod_configs": None,
     "fuzz_mongos_configs": None,
     "config_fuzz_seed": None,
@@ -400,6 +401,9 @@ EXCLUDE_WITH_ANY_TAGS = None
 
 # Allow test files passed as positional args to run even if they are excluded on the suite config.
 FORCE_EXCLUDED_TESTS = None
+
+# Skip symbolizing stacktraces generated during tests.
+SKIP_SYMBOLIZATION = None
 
 # A tag which is implicited excluded. This is useful for temporarily disabling a test.
 EXCLUDED_TAG = "__TEMPORARILY_DISABLED__"

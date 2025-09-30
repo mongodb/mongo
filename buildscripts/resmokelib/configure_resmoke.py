@@ -531,6 +531,8 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     # Force invalid suite config
     _config.FORCE_EXCLUDED_TESTS = config.pop("force_excluded_tests")
 
+    _config.SKIP_SYMBOLIZATION = config.pop("skip_symbolization")
+
     # Archival options. Archival is enabled only when running on evergreen.
     if not _config.EVERGREEN_TASK_ID:
         _config.ARCHIVE_FILE = None

@@ -36,6 +36,11 @@ parameters:
   value: "compiledb,gen_source,dist_test,mongo_library,mongo_unittest,mongo_benchmark,mongo_integration_test,mongo_binary"
   description: "Filters to pass Bazel to be built for the purpose of hydrating remote cache"
 
+- key: skip_symbolization
+  value: true
+  description: >-
+    Automatically disables symbolizing stack traces from Resmoke tasks. If this is set to false, the steps on how to manually symbolize the unsymbolized stacktraces will not be generated.
+
 ## Cron parameters.
 - key: project_required_suggested_cron
   value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
@@ -111,6 +116,7 @@ post:
 - func: "kill processes"
 - func: "save local client logs"
 - func: "save jepsen artifacts"
+- func: "save unsymbolized stacktraces and local invocation"
 - func: "save mongo coredumps"
 - func: "generate hang analyzer tasks"
 - func: "save failed unittests"
