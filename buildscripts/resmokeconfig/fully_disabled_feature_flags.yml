@@ -32,3 +32,5 @@
 - featureFlagReshardingCloneNoRefresh
 # TODO SERVER-100132: Remove this once we know the impact of enabling tracing.
 - featureFlagTracing
+# TODO SERVER-111747 Re-enable 'featureFlagExtractFieldPathsSbeStage'
+- featureFlagExtractFieldPathsSbeStage
