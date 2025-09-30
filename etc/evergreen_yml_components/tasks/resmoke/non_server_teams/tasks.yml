@@ -370,7 +370,7 @@ tasks:
           fallback_num_sub_suites: 2
           resmoke_jobs_max: 1
 
-  - name: streams_build_and_publish_gen
+  - name: streams_build_only_gen
     tags: ["assigned_to_jira_team_streams", "auxiliary"]
     depends_on:
       - name: version_gen
@@ -378,11 +378,23 @@ tasks:
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
-      # Update with all gen tasks to depend on here and the display name in evergreen_gen_streams_build_and_publish_task.py
+    commands:
+      - func: "streams build"
+
+  - name: streams_build_and_push_gen
+    tags: ["assigned_to_jira_team_streams", "auxiliary"]
+    depends_on:
+      - name: version_gen
+        variant: generate-tasks-for-version
+        # This is added because of EVG-18211.
+        # Without this we are adding extra dependencies on evergreen and it is causing strain
+        omit_generated_tasks: true
+      # Update with all gen tasks to depend on here and the display name in evergreen_gen_streams_build_and_push_task.py
       - name: streams_gen
       - name: streams_kafka_gen
+      - name: streams_aspio_gen
     commands:
-      - func: "streams build and publish"
+      - func: "streams build and push"
 
   # Temporary task running the jscore suite as a bazel target. To be removed with SERVER-103537.
   - name: bazel_test_jscore

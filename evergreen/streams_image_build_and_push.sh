@@ -67,4 +67,6 @@ docker tag "$IMAGE" "$IMAGE:$GITSHA-$TAG_SUFFIX"
 
 docker images
 
-docker push "$IMAGE:$GITSHA-$TAG_SUFFIX"
+if [ "$1" == "--push" ]; then
+    docker push "$IMAGE:$GITSHA-$TAG_SUFFIX"
+fi

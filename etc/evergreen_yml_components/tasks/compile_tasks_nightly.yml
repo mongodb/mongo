@@ -764,9 +764,9 @@ tasks:
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
-      - name: streams_build_and_publish_gen
+      - name: streams_build_and_push_gen
         variant: enterprise-amazon2-streams
-      - name: streams_build_and_publish_gen
+      - name: streams_build_and_push_gen
         variant: enterprise-amazon2-streams-arm64
     commands:
       - func: "streams publish manifest"
@@ -779,9 +779,9 @@ tasks:
         # This is added because of EVG-18211.
         # Without this we are adding extra dependencies on evergreen and it is causing strain
         omit_generated_tasks: true
-      - name: streams_build_and_publish_gen
+      - name: streams_build_and_push_gen
         variant: enterprise-amazon2023-streams
-      - name: streams_build_and_publish_gen
+      - name: streams_build_and_push_gen
         variant: enterprise-amazon2023-streams-arm64
     commands:
       - func: "streams publish manifest"

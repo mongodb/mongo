@@ -40,8 +40,8 @@ def make_task(compile_variant: str) -> Task:
         ),
     ]
     dependencies = {
-        TaskDependency(f"streams_build_and_publish_{compile_variant.replace('-arm64', '')}"),
-        TaskDependency(f"streams_build_and_publish_{compile_variant}"),
+        TaskDependency(f"streams_build_and_push_{compile_variant.replace('-arm64', '')}"),
+        TaskDependency(f"streams_build_and_push_{compile_variant}"),
     }
     return Task(f"streams_publish_manifest_{compile_variant}", commands, dependencies)
 
