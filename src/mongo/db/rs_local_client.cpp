@@ -219,7 +219,7 @@ Status RSLocalClient::runAggregation(
     std::function<bool(const std::vector<BSONObj>& batch,
                        const boost::optional<BSONObj>& postBatchResumeToken)> callback) {
     /* We use DBDirectClient to read locally, which uses the readSource/readTimestamp set on the
-     * opCtx rather than applying the readConcern speficied in the command. This is not
+     * opCtx rather than applying the readConcern specified in the command. This is not
      * consistent with any remote client. We extract the readConcern from the request and apply
      * it to the opCtx's readSource/readTimestamp. Leave as it was originally before returning*/
 
@@ -238,12 +238,20 @@ Status RSLocalClient::runAggregation(
             return readConcernParseStatus;
         }
 
-        // if after cluster time is set, change it with lastOp time if this comes later
-        if (requestReadConcernArgs.getArgsAfterClusterTime()) {
-            auto afterClusterTime = *requestReadConcernArgs.getArgsAfterClusterTime();
-            if (afterClusterTime.asTimestamp() < _getLastOpTime().getTimestamp())
-                requestReadConcernArgs =
-                    repl::ReadConcernArgs{_getLastOpTime(), requestReadConcernArgs.getLevel()};
+        // Waits for any writes performed by this ShardLocal instance to be committed and
+        // visible. This will set the correct ReadSource as well.
+        if (const auto& afterClusterTime = requestReadConcernArgs.getArgsAfterClusterTime();
+            afterClusterTime) {
+            // If the afterClusterTime is later than lastOp we have to wait here in order in order
+            // to prevent the operation failing due to the call to mongo::waitForReadConcern below.
+            // We don't allow specifying a future timestamp for normal operations.
+            if (const auto lastOp = _getLastOpTime();
+                afterClusterTime->asTimestamp() < lastOp.getTimestamp()) {
+                auto status = repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
+                    opCtx, repl::ReadConcernArgs{lastOp, requestReadConcernArgs.getLevel()});
+                if (!status.isOK())
+                    return status;
+            }
         }
     }
     // saving original read source and read concern
@@ -269,7 +277,6 @@ Status RSLocalClient::runAggregation(
     repl::ReadConcernArgs::get(opCtx) = requestReadConcernArgs;
     Status rcStatus = mongo::waitForReadConcern(
         opCtx, requestReadConcernArgs, aggRequest.getNamespace().dbName(), true);
-
     if (!rcStatus.isOK())
         return rcStatus;
 
