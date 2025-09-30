@@ -288,7 +288,7 @@ Decimal128 Value::getDecimal() const {
         return Decimal128(static_cast<int64_t>(_storage.longValue));
     if (type == BSONType::numberDouble)
         return Decimal128(_storage.doubleValue);
-    invariant(type == BSONType::numberDecimal);
+    tassert(11103313, "Expected the type to be numberDecimal", type == BSONType::numberDecimal);
     return _storage.getDecimal();
 }
 

@@ -181,7 +181,7 @@ public:
     }
 
     double getTextScore() const {
-        invariant(hasTextScore());
+        tassert(11103304, "textScore must be present in metadata", hasTextScore());
         return _holder->textScore;
     }
 
@@ -197,7 +197,7 @@ public:
     }
 
     double getRandVal() const {
-        invariant(hasRandVal());
+        tassert(11103305, "randVal must be present in metadata", hasRandVal());
         return _holder->randVal;
     }
 
@@ -230,7 +230,7 @@ public:
     }
 
     double getGeoNearDistance() const {
-        invariant(hasGeoNearDistance());
+        tassert(11103314, "geoNearDistance must be present in metadata", hasGeoNearDistance());
         return _holder->geoNearDistance;
     }
 
@@ -244,7 +244,7 @@ public:
     }
 
     Value getGeoNearPoint() const {
-        invariant(hasGeoNearPoint());
+        tassert(11103306, "geoNearPoint must be present in metadata", hasGeoNearPoint());
         return _holder->geoNearPoint;
     }
 
@@ -258,7 +258,7 @@ public:
     }
 
     double getSearchScore() const {
-        invariant(hasSearchScore());
+        tassert(11103307, "searchScore must be present in metadata", hasSearchScore());
         return _holder->searchScore;
     }
 
@@ -274,7 +274,7 @@ public:
     }
 
     Value getSearchHighlights() const {
-        invariant(hasSearchHighlights());
+        tassert(11103308, "searchHighlights must be present in metadata", hasSearchHighlights());
         return _holder->searchHighlights;
     }
 
@@ -288,7 +288,7 @@ public:
     }
 
     BSONObj getIndexKey() const {
-        invariant(hasIndexKey());
+        tassert(11103315, "indexKey must be present in metadata", hasIndexKey());
         return _holder->indexKey;
     }
 
@@ -302,7 +302,7 @@ public:
     }
 
     RecordId getRecordId() const {
-        invariant(hasRecordId());
+        tassert(11103309, "recordId must be present in metadata", hasRecordId());
         return _holder->recordId;
     }
 
@@ -316,7 +316,8 @@ public:
     }
 
     BSONObj getSearchScoreDetails() const {
-        invariant(hasSearchScoreDetails());
+        tassert(
+            11103310, "searchScoreDetails must be present in metadata", hasSearchScoreDetails());
         return _holder->searchScoreDetails;
     }
 
@@ -333,7 +334,9 @@ public:
     }
 
     Value getSearchRootDocumentId() const {
-        invariant(hasSearchRootDocumentId());
+        tassert(11103311,
+                "searchRootDocumentId must be present in metadata",
+                hasSearchRootDocumentId());
         return _holder->searchRootDocumentId;
     }
 
@@ -410,7 +413,8 @@ public:
     }
 
     Value getSearchSequenceToken() const {
-        invariant(hasSearchSequenceToken());
+        tassert(
+            11103312, "searchSequenceToken must be present in metadata", hasSearchSequenceToken());
         return _holder->searchSequenceToken;
     }
 

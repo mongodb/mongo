@@ -501,7 +501,8 @@ void DocumentStorage::loadLazyMetadata() const {
                 if (elem.type() == BSONType::array) {
                     val = Value(BSONArray(elem.embeddedObject()));
                 } else {
-                    invariant(elem.type() == BSONType::object);
+                    tassert(
+                        11103300, "Expected elem to be an object", elem.type() == BSONType::object);
                     val = Value(elem.embeddedObject());
                 }
 

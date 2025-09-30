@@ -519,7 +519,7 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
 }
 
 void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetadataFields* out) {
-    invariant(out);
+    tassert(11103302, "Expected non-null DocumentMetadataFields", out);
 
     while (char marker = buf.read<char>()) {
         if (marker == static_cast<char>(MetaType::kTextScore) + 1) {
@@ -586,7 +586,7 @@ BSONArray DocumentMetadataFields::serializeSortKey(bool isSingleElementKey, cons
     if (isSingleElementKey) {
         return BSON_ARRAY(missingToNull(value));
     }
-    invariant(value.isArray());
+    tassert(11103303, "Expected value to be an array", value.isArray());
     BSONArrayBuilder bb;
     for (auto&& val : value.getArray()) {
         bb << missingToNull(val);
