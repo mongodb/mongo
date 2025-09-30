@@ -5,8 +5,10 @@ import os
 import sys
 
 import click
+import requests
 import structlog
 from pydantic.main import BaseModel
+from retry.api import retry_call
 from urllib3.util import Retry
 
 from evergreen.api import (
@@ -93,7 +95,12 @@ def activate_task(expansions: EvgExpansions, evg_api: EvergreenApi) -> None:
                         tasks_not_activated.append(task.task_id)
 
     else:
-        task_list = evg_api.tasks_by_build(expansions.build_id)
+        task_list = retry_call(
+            evg_api.tasks_by_build,
+            fargs=[expansions.build_id],
+            tries=3,
+            exceptions=requests.exceptions.ChunkedEncodingError,
+        )
         for task in task_list:
             if task.display_name == expansions.task:
                 LOGGER.info("Activating task", task_id=task.task_id, task_name=task.display_name)
