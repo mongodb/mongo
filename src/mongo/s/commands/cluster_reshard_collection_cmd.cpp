@@ -96,20 +96,17 @@ public:
 
             if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
                     serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {
-                uassert(
-                    ErrorCodes::InvalidOptions,
-                    "Resharding improvements is not enabled, reject shardDistribution parameter",
-                    !request().getShardDistribution().has_value());
-                uassert(
-                    ErrorCodes::InvalidOptions,
-                    "Resharding improvements is not enabled, reject forceRedistribution parameter",
-                    !request().getForceRedistribution().has_value());
                 uassert(ErrorCodes::InvalidOptions,
-                        "Resharding improvements is not enabled, reject reshardingUUID parameter",
+                        "This command requires FCV 8.0 or higher (shardDistribution parameter)",
+                        !request().getShardDistribution().has_value());
+                uassert(ErrorCodes::InvalidOptions,
+                        "This command requires FCV 8.0 or higher (forceRedistribution parameter)",
+                        !request().getForceRedistribution().has_value());
+                uassert(ErrorCodes::InvalidOptions,
+                        "This command requires FCV 8.0 or higher (reshardingUUID parameter)",
                         !request().getReshardingUUID().has_value());
                 uassert(ErrorCodes::InvalidOptions,
-                        "Resharding improvements is not enabled, reject feature flag "
-                        "moveCollection or unshardCollection",
+                        "This command requires FCV 8.0 or higher",
                         !resharding::gFeatureFlagMoveCollection.isEnabled(
                             serverGlobalParams.featureCompatibility.acquireFCVSnapshot()) &&
                             !resharding::gFeatureFlagUnshardCollection.isEnabled(
