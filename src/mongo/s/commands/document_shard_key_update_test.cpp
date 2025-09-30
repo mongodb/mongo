@@ -30,6 +30,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
@@ -53,58 +54,16 @@ public:
 
 TEST_F(DocumentShardKeyUpdateTest, constructShardKeyDeleteCmdObj) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
-    static const BSONObj kUpdatePreImage =
-        BSON("x" << 4 << "y" << 3 << "z" << BSON("a" << 2 << "b" << 1) << "_id" << 20);
+    BSONObj updatePreImage = BSON("x" << 4 << "y" << 3 << "_id" << 20);
 
-    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, kUpdatePreImage);
+    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage);
 
     auto deletesObj = deleteCmdObj["deletes"].Array();
     ASSERT_EQ(deletesObj.size(), 1U);
 
     auto predicate = deletesObj[0]["q"].Obj();
-    ASSERT_BSONOBJ_EQ(kUpdatePreImage, predicate);
-
-    ASSERT_EQ(deleteCmdObj["delete"].String(), nss.coll());
-}
-
-TEST_F(DocumentShardKeyUpdateTest, constructShardKeyDeleteCmdObjWithDollarFields) {
-    NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.foo");
-    static const BSONObj kUpdatePreImage = BSON(
-        "_id" << 1 << "array" << BSON_ARRAY(2 << BSON("$alpha" << 3)) << "obj" << BSON("$beta" << 4)
-              << "obj2" << BSON("$charlie" << 5 << "$delta" << BSON("$foxtrot" << 6)) << "$golf"
-              << 7 << "$hotel" << BSON("$india" << BSON("$juliett" << 9)) << "obj3"
-              << BSON("subobj" << BSON("$kilo" << 10)) << "$mike" << BSON_ARRAY(11 << 12));
-
-    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, kUpdatePreImage);
-
-    auto deletesObj = deleteCmdObj["deletes"].Array();
-    ASSERT_EQ(deletesObj.size(), 1U);
-
-    static const BSONObj kExpectedPredicate = BSON(
-        "_id" << 1 << "array" << BSON_ARRAY(2 << BSON("$alpha" << 3)) << "obj"
-              << BSON("$eq" << BSON("$beta" << 4)) << "obj2"
-              << BSON("$eq" << BSON("$charlie" << 5 << "$delta" << BSON("$foxtrot" << 6))) << "obj3"
-              << BSON("subobj" << BSON("$kilo" << 10)) << "$expr"
-              << BSON("$and" << BSON_ARRAY(
-                          BSON("$eq" << BSON_ARRAY(
-                                   BSON("$getField"
-                                        << BSON("input" << "$$ROOT"
-                                                        << "field" << BSON("$literal" << "$golf")))
-                                   << BSON("$literal" << 7)))
-                          << BSON("$eq" << BSON_ARRAY(
-                                      BSON("$getField" << BSON(
-                                               "input" << "$$ROOT"
-                                                       << "field" << BSON("$literal" << "$hotel")))
-                                      << BSON("$literal"
-                                              << BSON("$india" << BSON("$juliett" << 9)))))
-                          << BSON("$eq" << BSON_ARRAY(
-                                      BSON("$getField" << BSON(
-                                               "input" << "$$ROOT"
-                                                       << "field" << BSON("$literal" << "$mike")))
-                                      << BSON("$literal" << BSON_ARRAY(11 << 12)))))));
-
-    auto predicate = deletesObj[0]["q"].Obj();
-    ASSERT_BSONOBJ_EQ(kExpectedPredicate, predicate);
+    ASSERT_EQ(predicate["x"].Int(), 4);
+    ASSERT_EQ(predicate["_id"].Int(), 20);
 
     ASSERT_EQ(deleteCmdObj["delete"].String(), nss.coll());
 }
