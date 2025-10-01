@@ -80,6 +80,7 @@ selector:
     - requires_capped
     - viewless_timeseries_incompatible
     - does_not_support_viewless_timeseries_yet
+    - featureFlagCreateViewlessTimeseriesCollections_incompatible
   roots:
     - jstests/core/**/*.js
     - jstests/core_sharding/**/*.js

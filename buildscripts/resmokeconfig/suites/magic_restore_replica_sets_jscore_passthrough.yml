@@ -63,7 +63,7 @@ selector:
 
     # Expects to successfully drop invalid views. As drops are no-oped, the leftover
     # invalid views fail the data consistency checker.
-    - jstests/core/timeseries/ddl/timeseries_drop.js
+    - jstests/core/timeseries/ddl/timeseries_drop_legacy.js
     - jstests/core/catalog/list_catalog_stage_consistency.js
 
     # Fails upsert operations with duplicate key errors due to drops being no-oped.

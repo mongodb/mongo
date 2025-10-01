@@ -40,6 +40,7 @@ selector:
   exclude_with_any_tags:
     - viewless_timeseries_incompatible
     - does_not_support_viewless_timeseries_yet
+    - featureFlagCreateViewlessTimeseriesCollections_incompatible
   roots:
     - jstests/noPassthrough/catalog/server_status_catalog_stats.js
     - jstests/noPassthrough/cluster_scalability_misc/catalog_shard.js
