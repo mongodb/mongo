@@ -160,11 +160,8 @@ def teardown_processes(logger, processes, dump_pids):
                 else:
                     logger.info("Killing process %s with pid %d", pinfo.name, pid)
                     proc.kill()
-                proc.wait(
-                    timeout=TYPICAL_MONGOD_DUMP_SECS
-                )  # A zombie or defunct process won't end until it is reaped by its parent.
-            except (psutil.NoSuchProcess, psutil.TimeoutExpired):
-                # Process has already terminated or will need to be reaped by its parent.
+            except psutil.NoSuchProcess:
+                # Process has already terminated.
                 pass
     _await_cores(dump_pids, logger)
 

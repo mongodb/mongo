@@ -17,9 +17,6 @@ def test_analysis(logger, pids):
                 proc = psutil.Process(pid)
                 logger.info("Killing process pid %d", pid)
                 proc.kill()
-                proc.wait(
-                    timeout=5
-                )  # A zombie or defunct process won't end until it is reaped by its parent.
-            except (psutil.NoSuchProcess, psutil.TimeoutExpired):
-                # Process has already terminated or will need to be reaped by its parent.
+            except psutil.NoSuchProcess:
+                # Process has already terminated.
                 pass

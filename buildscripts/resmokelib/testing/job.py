@@ -263,13 +263,12 @@ class Job(object):
                 raise test.propagate_error
 
             if test.timed_out.is_set():
-                # Restart the fixture, since it may have been killed by the test's timeout handler
-                if not self.fixture.is_running():
-                    self.logger.info(
-                        "Restarting the fixture since it is not running after a test timed out."
-                    )
-                    self.fixture.setup()
-                    self.fixture.await_ready()
+                # Restart the fixture, since it has been killed by the test's timeout handler
+                self.logger.info(
+                    "Restarting the fixture since it is not running after a test timed out."
+                )
+                self.fixture.setup()
+                self.fixture.await_ready()
 
             # We are intentionally only checking the individual 'test' status and not calling
             # report.wasSuccessful() here. It is possible that a thread running in the background as
