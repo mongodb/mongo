@@ -80,6 +80,7 @@ const stats = explainResult.executionStats;
 assert.eq(3, stats.nReturned, "ex1");
 assert.eq(0, stats.totalKeysExamined, "ex2");
 assert.eq(4, stats.totalDocsExamined, "ex3");
+assert.commandWorked(secondary.remove({_id: 111})); // Need to remove because next move chunk errors on invalid document.
 
 const chunkSkips = getChunkSkipsFromAllShards(explainResult);
 assert.eq(1, chunkSkips, "ex4");

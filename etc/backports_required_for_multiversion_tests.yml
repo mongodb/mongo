@@ -63,6 +63,8 @@ last-continuous:
       ticket: SERVER-111486
     - test_file: jstests/change_streams/events_containing_version_literals.js
       ticket: SERVER-111406
+    - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
+      ticket: SERVER-110953
   suites: null
 last-lts:
   all:
@@ -628,4 +630,6 @@ last-lts:
       ticket: SERVER-110058
     - test_file: jstests/change_streams/events_containing_version_literals.js
       ticket: SERVER-111406
+    - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
+      ticket: SERVER-110953
   suites: null
