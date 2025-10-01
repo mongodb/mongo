@@ -47,12 +47,13 @@ server_parameters:
 
     "performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert":
         description:
-            "Whether or not to perform data integrity checks when inserting measurements
-            into compressed time-series buckets."
+            "Percentage of time [0...100] to perform data integrity checks when inserting
+            measurements into compressed time-series buckets."
         set_at: [startup, runtime]
-        cpp_vartype: "AtomicWord<bool>"
+        cpp_vartype: "AtomicWord<int>"
         cpp_varname: "gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert"
-        default: false
+        default: 1
+        validator: {gte: 0, lte: 100}
         redact: false
 
     "timeseriesBucketMaxCount":

@@ -724,6 +724,26 @@ MongoRunner.mongodOptions = function (opts = {}) {
     _removeSetParameterIfBeforeVersion(opts, "defaultConfigCommandTimeoutMS", "7.3.0");
     _removeSetParameterIfBeforeVersion(opts, "enableAutoCompaction", "7.3.0");
 
+    // Force typing of performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert; this
+    // changed from boolean to numeric in 8.2
+    // TODO: SERVER-106761 Remove type enforcement once all versions in multiversion
+    // tests are in alignment.
+    if (opts.setParameter["performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert"] != undefined) {
+        const checkOnInsert = opts.setParameter["performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert"];
+        if (opts.binVersion != undefined && opts.binVersion != "") {
+            if (_isMongodVersionEqualOrAfter("8.2.0", opts.binVersion)) {
+                // If it's already numeric, keep current value
+                if (typeof checkOnInsert != "number") {
+                    opts.setParameter["performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert"] =
+                        checkOnInsert ? 100 : 0;
+                }
+            } else {
+                opts.setParameter["performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert"] =
+                    Boolean(checkOnInsert);
+            }
+        }
+    }
+
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";
     } else if (opts.logFile) {
