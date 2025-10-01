@@ -284,19 +284,25 @@ err:
 }
 
 /*
- * __rec_find_and_save_delete_hs_upd --
- *     Find and save the update that needs to be deleted from the history store later
+ * __rec_save_delete_hs_upd_and_free_obs_updates --
+ *     Find and save the update that needs to be deleted from the history store later and also free
+ *     the obsolete updates in the update chain.
  */
 static int
-__rec_find_and_save_delete_hs_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
-  WT_ROW *rip, WTI_UPDATE_SELECT *upd_select)
+__rec_save_delete_hs_upd_and_free_obs_updates(WT_SESSION_IMPL *session, WTI_RECONCILE *r,
+  WT_INSERT *ins, WT_ROW *rip, WTI_UPDATE_SELECT *upd_select)
 {
-    WT_UPDATE *delete_upd, *tombstone;
-    uint64_t txnid;
+    WT_UPDATE *delete_upd, *tombstone, *visible_all_upd;
+    wt_timestamp_t prune_timestamp;
+    uint64_t oldest_id, txnid;
     bool seen_committed;
 
     if (upd_select->upd == NULL)
         return (0);
+
+    WT_ACQUIRE_READ(prune_timestamp, S2BT(session)->prune_timestamp);
+    oldest_id = __wt_txn_oldest_id(session);
+    visible_all_upd = NULL;
 
     /*
      * If we select an update in the history store to write to disk, delete it from the history
@@ -350,8 +356,40 @@ __rec_find_and_save_delete_hs_upd(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT
             if (!seen_committed)
                 break;
             WT_RET(__rec_delete_hs_upd_save(session, r, ins, rip, delete_upd, NULL));
+            visible_all_upd = NULL;
             break;
         }
+
+        /*
+         * Prepare transaction rollback adds a globally visible tombstone to the update chain to
+         * remove the entire key. Treating these globally visible tombstones as obsolete and
+         * trimming update list can cause problems if the update chain is getting accessed somewhere
+         * else. To avoid this problem, skip these globally visible tombstones from the update
+         * obsolete check.
+         */
+        if (F_ISSET(delete_upd, WT_UPDATE_PREPARE_ROLLBACK)) {
+            visible_all_upd = NULL;
+            break;
+        }
+
+        /*
+         * Track the first self-contained value that is globally visible. If a table has garbage
+         * collection enabled, then trim updates as possible. We should check the logic here - it
+         * might be possible to do something more aggressive?
+         */
+        if (F_ISSET(r, WT_REC_CHECKPOINT) && visible_all_upd == NULL && delete_upd->next != NULL &&
+          ((__wt_txn_upd_visible_all(session, delete_upd) ||
+             (F_ISSET(S2BT(session), WT_BTREE_GARBAGE_COLLECT) &&
+               (delete_upd->txnid < oldest_id && prune_timestamp != WT_TS_NONE &&
+                 delete_upd->upd_durable_ts <= prune_timestamp))) &&
+            WT_UPDATE_DATA_VALUE(delete_upd)))
+            visible_all_upd = delete_upd;
+    }
+
+    /* Free obsolete updates, excluding the on-page tombstone if exist. */
+    if (visible_all_upd != NULL && visible_all_upd != upd_select->tombstone) {
+        __wt_free_obsolete_updates(session, r->page, visible_all_upd);
+        WT_STAT_CONN_DSRC_INCR(session, cache_obsolete_updates_removed);
     }
 
     return (0);
@@ -1329,7 +1367,8 @@ __wti_rec_upd_select(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_INSERT *ins,
      * chain but the same value is left in the history store. Save it to delete it from the history
      * store later.
      */
-    WT_RET(__rec_find_and_save_delete_hs_upd(session, r, ins, rip, upd_select));
+    if (F_ISSET(r, WT_REC_HS))
+        WT_RET(__rec_save_delete_hs_upd_and_free_obs_updates(session, r, ins, rip, upd_select));
 
     /* Check the update chain for conditions that could prevent it's eviction. */
     WT_RET(__rec_validate_upd_chain(session, r, onpage_upd, &upd_select->tw, vpack));

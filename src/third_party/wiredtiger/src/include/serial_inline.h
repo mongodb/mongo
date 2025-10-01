@@ -320,6 +320,14 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
     __wt_page_modify_update_timestamp(session, page);
 
     /*
+     * If configured, skip checking for obsolete updates and they will be checked as part of the
+     * page reconciliation.
+     */
+    if (F_ISSET_ATOMIC_32(
+          &S2C(session)->cache->cache_eviction_controls, WT_CACHE_SKIP_UPDATE_OBSOLETE_CHECK))
+        return (0);
+
+    /*
      * Don't remove obsolete updates in the history store, due to having different visibility rules
      * compared to normal tables. This visibility rule allows different readers to concurrently read
      * globally visible updates, and insert new globally visible updates, due to the reuse of
@@ -358,7 +366,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
         page->modify->obsolete_check_txn = WT_TXN_NONE;
     }
 
-    __wt_update_obsolete_check(session, cbt, upd->next, true);
+    __wt_update_obsolete_check(session, cbt, upd->next);
 
     return (0);
 }

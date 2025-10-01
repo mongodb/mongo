@@ -71,7 +71,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     btree = S2BT(session);
     dhandle = session->dhandle;
     dhandle_name = dhandle->name;
-    checkpoint = dhandle->checkpoint;
+    checkpoint = NULL;
     WT_CLEAR(lr_fh_meta);
 
     /*
@@ -96,7 +96,12 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     WT_ERR(__wt_btree_shared_base_name(session, &dhandle_name, &checkpoint, &name_buf));
 
     /* Get the checkpoint information for this name/checkpoint pair. */
-    WT_ERR(__wt_meta_checkpoint(session, dhandle_name, dhandle->checkpoint, &ckpt, &lr_fh_meta));
+    if (checkpoint != NULL) {
+        WT_ERR(__wt_meta_checkpoint(session, dhandle_name, checkpoint, &ckpt, &lr_fh_meta));
+        F_SET(btree, WT_BTREE_READONLY);
+    } else
+        WT_ERR(
+          __wt_meta_checkpoint(session, dhandle_name, dhandle->checkpoint, &ckpt, &lr_fh_meta));
 
     /* Set the order number. */
     dhandle->checkpoint_order = ckpt.order;

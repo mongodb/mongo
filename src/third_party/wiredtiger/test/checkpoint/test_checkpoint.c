@@ -241,6 +241,29 @@ main(int argc, char *argv[])
         return (EXIT_FAILURE);
     }
 
+    if (g.opts.disagg_storage) {
+        if (!g.use_timestamps) {
+            fprintf(stderr, "disaggregated storage feature requires usage of timestamps (-x/-X)");
+            return (EXIT_FAILURE);
+        }
+        if (ttype != ROW) {
+            fprintf(
+              stderr, "disaggregated storage feature only supports row store table types (-r)");
+            return (EXIT_FAILURE);
+        }
+        if (strcmp(g.checkpoint_name, "WiredTigerCheckpoint") != 0) {
+            fprintf(
+              stderr, "disaggregated storage feature doesn't supports named checkpoints (-c)");
+            return (EXIT_FAILURE);
+        }
+        /* FIXME-WT-15051 Disagg is not support prepared operations yet. */
+        if (g.prepare == true) {
+            fprintf(
+              stderr, "disaggregated storage feature doesn't supports prepare operations (-p)");
+            return (EXIT_FAILURE);
+        }
+    }
+
     /*
      * Among other things, this initializes the random number generators in the option structure.
      */

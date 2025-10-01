@@ -1015,7 +1015,7 @@ if [ "$dirty_restart" = true ]; then
     for b1 in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
         for b2 in "${upgrade_to_latest_upgrade_downgrade_release_branches[@]}"; do
             if [[ "$b1" != "$b2" ]]; then
-                if ! check_dirty_restart_compatibility "$src_branch" "$dst_branch"; then
+                if ! check_dirty_restart_compatibility "$b1" "$b2"; then
                     continue
                 fi
 

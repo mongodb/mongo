@@ -286,7 +286,7 @@ __clayered_open_stable(WT_CURSOR_LAYERED *clayered, bool leader)
              * wasteful, but it's a corner case, it will be resolved at the next checkpoint, and it
              * keeps the code easy.
              */
-            cfg[2] = "readonly,checkpoint_use_history=false";
+            cfg[2] = "checkpoint_use_history=false";
             F_SET(clayered, WT_CLAYERED_STABLE_NO_CKPT);
         } else {
             WT_ERR(__wt_scr_alloc(session, 0, &stable_uri_buf));
@@ -297,7 +297,6 @@ __clayered_open_stable(WT_CURSOR_LAYERED *clayered, bool leader)
             WT_ERR(
               __wt_buf_fmt(session, stable_uri_buf, "%s/%s", layered->stable_uri, checkpoint_name));
             stable_uri = stable_uri_buf->data;
-            cfg[2] = "readonly";
         }
     }
     ret = __wt_open_cursor(session, stable_uri, &clayered->iface, cfg, &clayered->stable_cursor);

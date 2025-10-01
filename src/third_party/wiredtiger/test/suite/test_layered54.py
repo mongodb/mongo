@@ -148,7 +148,6 @@ class test_layered54(wttest.WiredTigerTestCase, DisaggConfigMixin):
             self.assertEqual(self.get_stat(stat.conn.cache_read_internal_delta), 0)
 
     def test_prefix_suffix_compression1(self):
-        self.session.create(self.uri, self.session_create_config())
         self.verify_compression(False)
 
     def test_prefix_suffix_compression2(self):

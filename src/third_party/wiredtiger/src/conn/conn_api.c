@@ -2339,6 +2339,11 @@ __wti_cache_eviction_controls_config(WT_SESSION_IMPL *session, const char *cfg[]
     if (cval.val != 0)
         F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_EVICT_SCRUB_UNDER_TARGET);
 
+    WT_RET(
+      __wt_config_gets(session, cfg, "cache_eviction_controls.skip_update_obsolete_check", &cval));
+    if (cval.val != 0)
+        F_SET_ATOMIC_32(&(cache->cache_eviction_controls), WT_CACHE_SKIP_UPDATE_OBSOLETE_CHECK);
+
     WT_RET(__wt_config_gets(
       session, cfg, "cache_eviction_controls.app_eviction_min_cache_fill_ratio", &cval));
     __wt_atomic_store8(

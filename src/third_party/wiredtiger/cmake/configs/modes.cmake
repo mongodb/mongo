@@ -203,26 +203,3 @@ if(CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CONFIGURATION_TYPES ${BUILD_MODES})
-
-# We want to use the optimization level from CC_OPTIMIZE_LEVEL and our DEBUG settings as well.
-if(MSVC_C_COMPILER)
-    set(opt_flags "/O3" "/O2")
-else()
-    set(opt_flags "-O3" "-O2")
-    set(debug_flags "-g")
-endif()
-
-foreach(lang C CXX)
-    replace_compile_options(CMAKE_${lang}_FLAGS_RELEASE
-        REMOVE ${opt_flags}
-        ADD ${CC_OPTIMIZE_LEVEL})
-    replace_compile_options(CMAKE_${lang}_FLAGS_RELWITHDEBINFO
-        REMOVE ${opt_flags} ${debug_flags}
-        ADD ${CC_OPTIMIZE_LEVEL})
-endforeach()
-
-if(GNU_C_COMPILER OR GNU_CXX_COMPILER)
-    foreach(lang C CXX)
-        add_cmake_flag(CMAKE_${lang}_FLAGS -fno-strict-aliasing)
-    endforeach()
-endif()

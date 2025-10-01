@@ -1696,9 +1696,6 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
 
         /* We assume the updates returned will be in timestamp order. */
         if (prev_upd != NULL) {
-            /* If we see a single tombstone in the previous iteration, we must be reaching the end
-             * and should never be here. */
-            WT_ASSERT(session, prev_upd->type == WT_UPDATE_STANDARD);
             WT_ASSERT(session,
               tw.stop_txn <= prev_upd->txnid && tw.stop_ts <= prev_upd->upd_start_ts &&
                 tw.durable_stop_ts <= prev_upd->upd_durable_ts);
@@ -1717,8 +1714,10 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
          * update in this case.
          */
         if (tw.durable_start_ts > last_checkpoint_timestamp) {
-            /* FIXME-WT-14732: this is an ugly layering violation. But I can't think of a better way
-             * now. */
+            /*
+             * FIXME-WT-14732: this is an ugly layering violation. But I can't think of a better way
+             * now.
+             */
             if (__wt_clayered_deleted(value)) {
                 /*
                  * If we use tombstone value, we should never see a real tombstone on the ingest
@@ -1736,8 +1735,10 @@ __layered_copy_ingest_table(WT_SESSION_IMPL *session, WT_LAYERED_TABLE_MANAGER_E
         } else
             WT_ASSERT(session, tombstone != NULL);
 
-        /* FIXME-WT-14732: we can simplify the algorithm if we don't use real tombstones on the
-         * ingest table. */
+        /*
+         * FIXME-WT-14732: we can simplify the algorithm if we don't use real tombstones on the
+         * ingest table.
+         */
         if (tombstone != NULL) {
             tombstone->txnid = tw.stop_txn;
             tombstone->upd_start_ts = tw.stop_ts;

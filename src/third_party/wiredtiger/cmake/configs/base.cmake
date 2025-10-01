@@ -14,7 +14,9 @@ set(default_enable_static OFF)
 set(default_enable_shared ON)
 set(default_internal_sqlite3 ON)
 
-if("${CMAKE_BUILD_TYPE}" MATCHES "^(Release|RelWithDebInfo)$")
+string(TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_UPPER)
+
+if(${CMAKE_BUILD_TYPE_UPPER} MATCHES "^(RELEASE|RELWITHDEBINFO)$")
     set(default_have_diagnostics OFF)
 endif()
 
@@ -26,7 +28,7 @@ if(Python3_FOUND)
 endif()
 
 # MSan / UBSan fails on Python tests due to linking issue.
-if("${CMAKE_BUILD_TYPE}" MATCHES "^(MSan|UBSan)$")
+if(${CMAKE_BUILD_TYPE_UPPER} MATCHES "^(MSAN|UBSAN)$")
     set(default_enable_python OFF)
 endif()
 
@@ -46,7 +48,7 @@ if(NOT HAVE_BUILTIN_EXTENSION_IAA)
     set(default_enable_iaa ${HAVE_LIBQPL})
 endif()
 
-if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+if(${CMAKE_BUILD_TYPE_UPPER} STREQUAL "RELEASE")
     set(default_enable_debug_info OFF)
 endif()
 
@@ -371,7 +373,7 @@ config_bool(
 )
 
 set(default_optimize_level "-Og")
-if("${CMAKE_BUILD_TYPE}" MATCHES "^(Release|RelWithDebInfo)$")
+if(${CMAKE_BUILD_TYPE_UPPER} MATCHES "^(RELEASE|RELWITHDEBINFO)$")
     if(WT_WIN)
         set(default_optimize_level "/O2")
     else()
@@ -457,6 +459,39 @@ if(ENABLE_DEBUG_INFO AND NOT WT_DEBUG_FLAGS_INITIALIZED)
     # Mark that we've set the initial debug flags
     set(WT_DEBUG_FLAGS_INITIALIZED TRUE CACHE INTERNAL
         "WiredTiger debug flags have been initialized")
+endif()
+
+# We want to use the optimization level from CC_OPTIMIZE_LEVEL.
+if(NOT ("${WT_OPTIMIZE_FLAGS_SAVED}" STREQUAL "${CC_OPTIMIZE_LEVEL}"))
+    if(MSVC_C_COMPILER)
+        set(opt_flags "/O3" "/O2")
+    else()
+        set(opt_flags "-O3" "-O2")
+    endif()
+    set(prev_opt_flags "${WT_OPTIMIZE_FLAGS_SAVED}")
+    separate_arguments(prev_opt_flags)
+    list(APPEND opt_flags ${prev_opt_flags})
+
+    set(new_opt_flags "${CC_OPTIMIZE_LEVEL}")
+    separate_arguments(new_opt_flags)
+
+    foreach(lang C CXX)
+        foreach(build_type RELEASE RELWITHDEBINFO)
+            replace_compile_options(CMAKE_${lang}_FLAGS_${build_type}
+                REMOVE ${opt_flags}
+                ADD ${new_opt_flags})
+        endforeach()
+    endforeach()
+
+    if(GNU_C_COMPILER OR GNU_CXX_COMPILER)
+        foreach(lang C CXX)
+            add_cmake_flag(CMAKE_${lang}_FLAGS -fno-strict-aliasing)
+        endforeach()
+    endif()
+
+    # Mark that we've set the initial optimize flags
+    set(WT_OPTIMIZE_FLAGS_SAVED "${CC_OPTIMIZE_LEVEL}" CACHE INTERNAL
+        "WiredTiger optimize flags have been initialized")
 endif()
 
 # Ref tracking is always enabled in diagnostic build.

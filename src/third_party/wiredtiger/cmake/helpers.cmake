@@ -592,6 +592,8 @@ endfunction()
 # add_cmake_flag(dest_var flag)
 # A helper function that adds a CMake flag to a list of included flags if it's not already present.
 function(add_cmake_flag included_flags flag)
+    # Add extra spaces to ensure we only match whole flags.
+    # This avoids partial matches and ensures correct match at the start/end of the string.
     string(FIND " ${${included_flags}} " " ${flag} " flag_position)
     if(flag_position EQUAL -1)
         set(${included_flags} "${${included_flags}} ${flag}" CACHE STRING "" FORCE)
@@ -709,8 +711,13 @@ function(replace_compile_options flag_var)
 
     # Remove existing flags
     foreach(flag ${REPLACE_REMOVE})
-        string(REPLACE "${flag}" "" ${flag_var} ${${flag_var}})
+        # Add extra spaces to ensure we only match whole flags.
+        # This avoids partial matches and ensures correct match at the start/end of the string.
+        string(REPLACE " ${flag} " "" ${flag_var} " ${${flag_var}} ")
     endforeach()
+
+    # Clean up extra spaces
+    string(STRIP "${${flag_var}}" ${flag_var})
 
     # Add custom flags if provided
     foreach(flag ${REPLACE_ADD})
@@ -719,5 +726,6 @@ function(replace_compile_options flag_var)
 
     # Clean up extra spaces
     string(STRIP "${${flag_var}}" ${flag_var})
+
     set(${flag_var} "${${flag_var}}" CACHE STRING "" FORCE)
 endfunction()
