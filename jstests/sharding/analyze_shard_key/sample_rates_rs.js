@@ -17,11 +17,11 @@ import {AnalyzeShardKeyUtil} from "jstests/sharding/analyze_shard_key/libs/analy
 import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_sampling_util.js";
 import {
     assertDiffWindow,
-    isSlowBuild,
     runDeleteCmdsOnRepeat,
     runFindCmdsOnRepeat,
     runNestedAggregateCmdsOnRepeat,
 } from "jstests/sharding/analyze_shard_key/libs/sample_rates_common.js";
+import {isSlowBuild} from "jstests/sharding/libs/sharding_util.js";
 
 if (jsTestOptions().useAutoBootstrapProcedure) {
     // TODO: SERVER-80318 Delete test

@@ -87,3 +87,16 @@ export function createChunks(shardNames, shardKey, min, max) {
 
     return chunks;
 }
+
+export function isSlowBuild(conn) {
+    const buildInfo = conn.getDB("admin").getServerBuildInfo();
+    const rawBuildInfo = buildInfo.rawData();
+    jsTest.log("buildInfo: " + tojson({rawBuildInfo}));
+
+    return (
+        buildInfo.isAddressSanitizerActive() ||
+        buildInfo.isThreadSanitizerActive() ||
+        buildInfo.isDebug() ||
+        (rawBuildInfo.hasOwnProperty("buildEnvironment") && rawBuildInfo.buildEnvironment.target_os == "windows")
+    );
+}

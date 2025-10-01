@@ -19,11 +19,11 @@ import {QuerySamplingUtil} from "jstests/sharding/analyze_shard_key/libs/query_s
 import {
     assertDiffWindow,
     fieldName,
-    isSlowBuild,
     runDeleteCmdsOnRepeat,
     runFindCmdsOnRepeat,
     runNestedAggregateCmdsOnRepeat,
 } from "jstests/sharding/analyze_shard_key/libs/sample_rates_common.js";
+import {isSlowBuild} from "jstests/sharding/libs/sharding_util.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.

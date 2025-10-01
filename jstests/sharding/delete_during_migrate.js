@@ -9,6 +9,7 @@
  */
 
 import {ShardingTest} from "jstests/libs/shardingtest.js";
+import {isSlowBuild} from "jstests/sharding/libs/sharding_util.js";
 
 let st = new ShardingTest({
     shards: 2,
@@ -25,7 +26,8 @@ assert.commandWorked(st.s0.adminCommand({enablesharding: dbname, primaryShard: s
 let t = st.s0.getDB(dbname).getCollection(coll);
 
 let bulk = t.initializeUnorderedBulkOp();
-const numDocs = 200000;
+const numDocs = isSlowBuild(st.s0) ? 150000 : 200000;
+jsTest.log("Testing with " + numDocs + " documents");
 for (let i = 0; i < numDocs; i++) {
     bulk.insert({a: i});
 }
