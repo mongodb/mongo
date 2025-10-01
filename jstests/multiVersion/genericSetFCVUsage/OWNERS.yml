@@ -17,7 +17,7 @@ filters:
       - 10gen/query-optimization
   - "1_test_launching_replset.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "3_upgrade_replset.js":
     approvers:
       - 10gen/server-fcv

@@ -14,7 +14,7 @@ filters:
       - 10gen/query-execution-change-streams
   - "read_after_optime.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "release_memory/*":
     approvers:
       - 10gen/query-execution

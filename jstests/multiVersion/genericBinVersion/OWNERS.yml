@@ -8,7 +8,7 @@ filters:
       - 10gen/server-cluster-scalability
   - "command_registration_startup_behavior_fcv.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "*query_stats*":
     approvers:
       - 10gen/query-integration-observability
@@ -26,7 +26,7 @@ filters:
       - 10gen/server-fcv
   - "mixed_cluster_roles.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "mixed_replica_set_with_latest_primary.js":
     approvers:
       - 10gen/server-fcv
@@ -38,4 +38,4 @@ filters:
       - 10gen/server-catalog-and-routing-shard-catalog
   - "upgrade_during_vectored_insert.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers

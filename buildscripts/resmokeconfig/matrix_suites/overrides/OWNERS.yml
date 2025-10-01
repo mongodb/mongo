@@ -38,13 +38,13 @@ filters:
       - 10gen/server-workload-resilience
   - "fcv_upgrade_downgrade_primary_step_down_overrides.yml":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "primary_driven_index_builds.yml":
     approvers:
       - 10gen/server-index-builds
   - "replica_sets_kill_secondary.yml":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "recordids_replicated.yml":
     approvers:
       - 10gen/server-collection-write-path

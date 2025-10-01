@@ -20,4 +20,4 @@ filters:
       - 10gen/query-optimization-parsers
   - "vectored_insert_no_oplog_hole.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers

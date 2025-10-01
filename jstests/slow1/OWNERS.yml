@@ -11,4 +11,4 @@ filters:
       - 10gen/server-initial-sync
   - "replsets_priority1.js":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers

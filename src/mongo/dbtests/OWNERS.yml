@@ -38,7 +38,7 @@ filters:
       - 10gen/server-validate
   - "extended_validate_tests.cpp":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
       - 10gen/server-validate
   - "deferred_writer.cpp":
     approvers:
@@ -92,13 +92,13 @@ filters:
       - 10gen/server-networking-and-observability
   - "mock_replica_set*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "replica_set_tests.cpp":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "repltests.cpp":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "rollbacktests.cpp":
     approvers:
       - 10gen/server-recovery

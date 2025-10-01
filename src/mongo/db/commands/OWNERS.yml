@@ -102,7 +102,7 @@ filters:
       - 10gen/server-fcv
   - "snapshot_management*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "*compact*":
     approvers:
       - 10gen/server-compact
@@ -153,7 +153,7 @@ filters:
       - 10gen/server-networking-and-observability
   - "test_api_version_2_commands.cpp":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "shardsvr_resolve_view_command*":
     approvers:
       - 10gen/query-integration-search

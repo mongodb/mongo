@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "*initial_sync*":
     approvers:
       - 10gen/server-initial-sync

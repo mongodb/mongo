@@ -70,13 +70,13 @@ filters:
       - 10gen/server-workload-resilience
   - "fcv_upgrade_downgrade_primary_step_down_passthrough.yml":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "*primary_driven_index_builds.yml":
     approvers:
       - 10gen/server-index-builds
   - "replica_sets_kill_secondaries_jscore_passthrough.yml":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "replica_sets_recordids_replicated_jscore_passthrough.yml":
     approvers:
       - 10gen/server-collection-write-path

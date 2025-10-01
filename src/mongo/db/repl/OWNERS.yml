@@ -2,7 +2,7 @@ version: 1.0.0
 filters:
   - "*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "dbcheck*":
     approvers:
       - 10gen/server-dbcheck

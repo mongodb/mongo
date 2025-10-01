@@ -18,7 +18,7 @@ filters:
       - 10gen/query-integration-observability
   - "read_preference*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "server_read_concern*":
     approvers:
       - 10gen/server-rw-concerns

@@ -35,7 +35,7 @@ filters:
       - 10gen/server-programmability
   - "command_can_run_here*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "connection_health_metrics_parameter.idl":
     approvers:
       - 10gen/server-networking-and-observability
@@ -230,7 +230,7 @@ filters:
       - 10gen/server-storage-engine-integration
   - "mongod_options_replication.*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "mongod_options_storage.idl":
     approvers:
       - 10gen/server-storage-engine-integration
@@ -308,7 +308,7 @@ filters:
       - 10gen/server-workload-resilience
   - "replication_state_transition_lock_guard*":
     approvers:
-      - 10gen/server-replication
+      - 10gen/server-replication-reviewers
   - "local_executor*":
     approvers:
       - 10gen/server-catalog-and-routing-routing-and-topology
