@@ -50,7 +50,8 @@ namespace mongo {
  * shard. If the update is part of a multi statement transaction, we will attach the
  * pre image and the post image returned by the update stage. MongoS will use these to delete
  * the original doc and insert the new doc. If the update is a retryable write, we will attach
- * only the pre image.
+ * only the pre image. If the update is an insertion, caused by an upsert, an original predicate
+ * will be passed as the pre image.
  */
 class WouldChangeOwningShardInfo final : public ErrorExtraInfo {
 public:

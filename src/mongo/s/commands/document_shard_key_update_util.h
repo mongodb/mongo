@@ -187,7 +187,9 @@ BSONObj commitShardKeyUpdateTransaction(OperationContext* opCtx);
  * This method should not be called outside of this class. It is only temporarily exposed for
  * intermediary test coverage.
  */
-BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss, const BSONObj& updatePreImage);
+BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss,
+                                      const BSONObj& updatePreImageOrPredicate,
+                                      bool shouldUpsert);
 
 /*
  * Creates the BSONObj that will be used to insert the new document with the post-update image.
