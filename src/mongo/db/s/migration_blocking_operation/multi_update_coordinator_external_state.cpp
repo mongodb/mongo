@@ -65,11 +65,13 @@ auto runDDLOperationOnCurrentShard(OperationContext* opCtx,
     auto self = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, selfId));
     generic_argument_util::setMajorityWriteConcern(command, &opCtx->getWriteConcern());
     generic_argument_util::setDbVersionIfPresent(command, databaseVersion);
-    return uassertStatusOK(self->runCommand(opCtx,
-                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                            DatabaseName::kAdmin,
-                                            command.toBSON(),
-                                            Shard::RetryPolicy::kIdempotent));
+
+    const auto response = self->runCommand(opCtx,
+                                           ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                           DatabaseName::kAdmin,
+                                           command.toBSON(),
+                                           Shard::RetryPolicy::kIdempotent);
+    return uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
 }
 }  // namespace
 
