@@ -30,6 +30,7 @@
 #include "mongo/db/extension/host/load_extension.h"
 
 #include "mongo/db/extension/host/document_source_extension.h"
+#include "mongo/db/extension/host/load_stub_parsers.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -360,5 +361,32 @@ TEST_F(LoadExtensionsTest, LoadExtensionConfigErrors) {
     ASSERT_THROWS_CODE(
         ExtensionLoader::loadExtensionConfig("\\beginning"), AssertionException, 11031700);
     ASSERT_THROWS_CODE(ExtensionLoader::loadExtensionConfig("end\\"), AssertionException, 11031700);
+}
+
+TEST_F(LoadExtensionsTest, LoadStubParser) {
+    // Register a parse for the "$stub" stage, a model of what could be added by an extension.
+    const auto errorMsg =
+        "The extension stage '$stub' is not available because the corresponding extension is not "
+        "loaded.";
+    registerStubParser("$stub", errorMsg);
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    // Verify that attempting to parse a pipeline with the $stub stage fails with the proper error
+    // message.
+    std::vector<BSONObj> pipeline = {BSON("$stub" << BSONObj()), BSON("$limit" << 1)};
+    ASSERT_THROWS_CODE(Pipeline::parse(pipeline, expCtx), AssertionException, 10918500);
+    ASSERT_THROWS_WHAT(Pipeline::parse(pipeline, expCtx), AssertionException, errorMsg);
+}
+
+TEST_F(LoadExtensionsTest, LoadStubParserSilentlySkipsIfExists) {
+    // Register stub parsers for $match. This should silently skip the registration since $match is
+    // already registered.
+    registerStubParser("$match", "This should not work since $match is already registered.");
+
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+
+    std::vector<BSONObj> pipeline = {BSON("$match" << BSON("x" << 1))};
+    ASSERT_DOES_NOT_THROW(Pipeline::parse(pipeline, expCtx));
 }
 }  // namespace mongo::extension::host

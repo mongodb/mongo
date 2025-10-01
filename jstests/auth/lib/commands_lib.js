@@ -238,6 +238,10 @@ const skippedAuthTestingAggStages = [
     "$tumblingWindow",
     "$sessionWindow",
     "$validate",
+
+    // The following stages are stubs defined in aggregation_stage_stub_parsers.json.
+    "$stubStage",
+    "$testFoo",
 ];
 
 import {getUUIDFromListCollections} from "jstests/libs/uuid_util.js";

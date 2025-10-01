@@ -64,13 +64,25 @@ void DocumentSource::unregisterParser_forTest(const std::string& name) {
     parserMap.erase(name);
 }
 
-void DocumentSource::registerParser(std::string name, Parser parser, FeatureFlag* featureFlag) {
+void DocumentSource::registerParser(std::string name,
+                                    Parser parser,
+                                    FeatureFlag* featureFlag,
+                                    bool skipIfExists) {
     // Set of aggregation stages that are allowed to be overridden (via extensions).
     static const stdx::unordered_set<StringData> allowedOverrideStages = {
         DocumentSourceVectorSearch::kStageName,
     };
 
     auto it = parserMap.find(name);
+    if (skipIfExists && it != parserMap.end()) {
+        // Short-circuit if the stage is already registered and skipIfExists is true.
+        LOGV2_DEBUG(10918508,
+                    2,
+                    "Silently skipping registration of parser since name already exists",
+                    "name"_attr = name);
+        return;
+    }
+
     // Allow override only for stages in the allowed list, otherwise assert on duplicates.
     if (it != parserMap.end() && !allowedOverrideStages.contains(name)) {
         // Parser registration only takes place during startup, so any issues with parser
@@ -80,19 +92,19 @@ void DocumentSource::registerParser(std::string name, Parser parser, FeatureFlag
         LOGV2_FATAL(28707, "Cannot register duplicate aggregation stage.", "stageName"_attr = name);
     }
 
-
     parserMap[std::move(name)] = {std::move(parser), featureFlag};
 }
 
 void DocumentSource::registerParser(std::string name,
                                     SimpleParser simpleParser,
-                                    FeatureFlag* featureFlag) {
+                                    FeatureFlag* featureFlag,
+                                    bool skipIfExists) {
     Parser parser = [simpleParser = std::move(simpleParser)](
                         BSONElement stageSpec, const intrusive_ptr<ExpressionContext>& expCtx)
         -> std::list<intrusive_ptr<DocumentSource>> {
         return {simpleParser(std::move(stageSpec), expCtx)};
     };
-    return registerParser(std::move(name), std::move(parser), std::move(featureFlag));
+    return registerParser(std::move(name), std::move(parser), std::move(featureFlag), skipIfExists);
 }
 
 DocumentSource::Id DocumentSource::allocateId(StringData name) {

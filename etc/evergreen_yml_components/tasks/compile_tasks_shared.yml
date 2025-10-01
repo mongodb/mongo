@@ -247,6 +247,7 @@ tasks:
             "src/src/**/*.yml"
             "src/src/mongo/client/sdam/json_tests/sdam_tests/**"
             "src/src/mongo/client/sdam/json_tests/server_selection_tests/**"
+            "src/src/mongo/db/extension/test_examples/aggregation_stage_stub_parsers.json"
             "src/src/mongo/db/modules/atlas/evergreen/**"
             "src/src/mongo/db/modules/atlas/jstests/**"
             "src/src/mongo/db/modules/enterprise/docs/**"
