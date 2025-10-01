@@ -6,6 +6,9 @@ filters:
   - "README.md":
     approvers:
       - 10gen/devprod-correctness
+  - "add_remove_shards.py":
+    approvers:
+      - 10gen/server-catalog-and-routing-routing-and-topology
   - "analyze_shard_key.py":
     approvers:
       - 10gen/server-cluster-scalability

@@ -230,6 +230,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 # The following patterns are parsed from ./buildscripts/resmokelib/testing/hooks/OWNERS.yml
 /buildscripts/resmokelib/testing/hooks/**/* @10gen/mongo-default-approvers @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/README.md @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/resmokelib/testing/hooks/**/add_remove_shards.py @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/analyze_shard_key.py @10gen/server-cluster-scalability @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/queryable_server_hook.py @10gen/server-backup-restore @svc-auto-approve-bot
 /buildscripts/resmokelib/testing/hooks/**/change_streams.py @10gen/query-execution-change-streams @svc-auto-approve-bot

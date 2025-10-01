@@ -139,6 +139,7 @@ class _AddRemoveShardThread(threading.Thread):
     _NAMESPACE_NOT_FOUND = 26
     _INTERRUPTED = 11601
     _CONFLICTING_OPERATION_IN_PROGRESS = 117
+    _DATABASE_DROP_PENDING = 215
     _BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE = 12587
     _ILLEGAL_OPERATION = 20
     _SHARD_NOT_FOUND = 70
@@ -320,6 +321,10 @@ class _AddRemoveShardThread(threading.Thread):
             # run moveCollection.
             return True
 
+        if err.code == self._DATABASE_DROP_PENDING:
+            # A concurrent dropDatabase can prevent migrations.
+            return True
+
         if err.code == self._BACKGROUND_OPERATION_IN_PROGRESS_FOR_NAMESPACE:
             # Ongoing background operations (e.g. index builds) will prevent moveCollection until
             # they complete.
@@ -360,6 +365,9 @@ class _AddRemoveShardThread(threading.Thread):
             # A concurrent dropDatabase or dropCollection could have removed the database before we
             # run moveRange.
             return True
+        if err.code == self._DATABASE_DROP_PENDING:
+            # A concurrent dropDatabase can prevent migrations.
+            return True
         if err.code == self._RESHARD_COLLECTION_IN_PROGRESS:
             # A concurrent reshardCollection or unshardCollection could have started before we
             # run moveRange.
@@ -372,6 +380,10 @@ class _AddRemoveShardThread(threading.Thread):
     def _is_expected_move_primary_error_code(self, code):
         if code == self._NAMESPACE_NOT_FOUND:
             # A concurrent dropDatabase could have removed the database before we run movePrimary.
+            return True
+
+        if code == self._DATABASE_DROP_PENDING:
+            # A concurrent dropDatabase can prevent migrations.
             return True
 
         if code == self._CONFLICTING_OPERATION_IN_PROGRESS:
