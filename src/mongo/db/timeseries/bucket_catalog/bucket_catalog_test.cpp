@@ -30,6 +30,7 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
 #include <initializer_list>
+#include <limits>
 #include <ostream>
 #include <string>
 #include <utility>
@@ -55,6 +56,7 @@
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -2438,6 +2440,73 @@ TEST_F(BucketCatalogTest, GetCacheDerivedBucketMaxSizeRespectsAbsoluteMin) {
         /*storageCacheSize=*/1, /*workloadCardinality=*/1);
     ASSERT_EQ(effectiveMaxSize, gTimeseriesBucketMinSize.load());
     ASSERT_EQ(cacheDerivedBucketMaxSize, gTimeseriesBucketMinSize.load());
+}
+
+TEST_F(BucketCatalogTest, ExecutionStatsNumActiveBucketsSentinel) {
+    auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _uuid1);
+    auto collStatsVec = internal::releaseExecutionStatsFromBucketCatalog(
+        *_bucketCatalog, std::span<const UUID>(&_uuid1, 1));
+    ASSERT_EQ(collStatsVec.size(), 1);
+
+    auto& collStats = *collStatsVec[0];
+    auto& globalStats = _bucketCatalog->globalExecutionStats;
+
+    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
+    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+
+    // Set an initial value for the stats.
+    stats.incNumActiveBuckets(5);
+    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 5);
+    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 5);
+
+    // Removing collection's 'numActiveBuckets' should also set it to the sentinel value.
+    constexpr long long kNumActiveBucketsSentinel = std::numeric_limits<long long>::min();
+    removeCollectionExecutionGauges(globalStats, collStats);
+    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), kNumActiveBucketsSentinel);
+    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+
+    // Check no increment can be done anymore.
+    stats.incNumActiveBuckets();
+    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), kNumActiveBucketsSentinel);
+    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+
+    // Check no decrement can be done anymore.
+    stats.decNumActiveBuckets();
+    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), kNumActiveBucketsSentinel);
+    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+
+    // Reset all stats.
+    collStats.numActiveBuckets.swap(0);
+    globalStats.numActiveBuckets.swap(0);
+}
+
+TEST_F(BucketCatalogTest, ExecutionStatsNumActiveBucketsNonNegative) {
+    auto stats = internal::getOrInitializeExecutionStats(*_bucketCatalog, _uuid1);
+    auto collStatsVec = internal::releaseExecutionStatsFromBucketCatalog(
+        *_bucketCatalog, std::span<const UUID>(&_uuid1, 1));
+    ASSERT_EQ(collStatsVec.size(), 1);
+
+    auto& collStats = *collStatsVec[0];
+    auto& globalStats = _bucketCatalog->globalExecutionStats;
+
+    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
+    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+
+    // Cannot decrement 'numActiveBuckets' below 0.
+    stats.decNumActiveBuckets();
+    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
+    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 0);
+
+    // Global and collection stats should decrement by the same value.
+    globalStats.numActiveBuckets.fetchAndAddRelaxed(1);
+    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 1);
+    stats.decNumActiveBuckets();
+    ASSERT_EQ(collStats.numActiveBuckets.loadRelaxed(), 0);
+    ASSERT_EQ(globalStats.numActiveBuckets.loadRelaxed(), 1);
+
+    // Reset all stats.
+    collStats.numActiveBuckets.swap(0);
+    globalStats.numActiveBuckets.swap(0);
 }
 
 }  // namespace
