@@ -124,10 +124,12 @@ struct ProjectionPositionInfoRecorder {
 template <class T>
 void ProjectionPositionInfoRecorder<T>::recordValue(TypeTags tag, Value val) {
     static_cast<T*>(this)->onNewValue();
-    auto [cpyTag, cpyVal] = copyValue(tag, val);
     if (arrayStack.empty()) {
-        static_cast<T*>(this)->saveValue(cpyTag, cpyVal);
+        // Each recorder type will handle ownership.
+        static_cast<T*>(this)->saveValue(tag, val);
     } else {
+        // We always need value ownership when adding to an array, regardless of recorder type.
+        auto [cpyTag, cpyVal] = copyValue(tag, val);
         arrayStack.back()->push_back(cpyTag, cpyVal);
     }
 }
@@ -147,8 +149,7 @@ void ProjectionPositionInfoRecorder<T>::endArray() {
         arrayStack.pop_back();
         arrayStack.back()->push_back(TypeTags::Array, bitcastFrom<Array*>(releasedArray));
     } else {
-        static_cast<T*>(this)->saveValue(TypeTags::Array,
-                                         bitcastFrom<Array*>(arrayStack.front().release()));
+        static_cast<T*>(this)->saveOwnedArray(std::move(arrayStack.front()));
         arrayStack.clear();
     }
 }
@@ -168,8 +169,13 @@ struct BlockProjectionPositionInfoRecorder final
     void onNewValue() {
         isNewDoc = false;
     }
+    void saveOwnedArray(std::unique_ptr<Array> arr) {
+        outputArr->push_back(TypeTags::Array, bitcastFrom<Array*>(arr.release()));
+    }
     void saveValue(TypeTags tag, Value val) {
-        outputArr->push_back(tag, val);
+        // HeterogenousBlock's must own the values they contain.
+        auto [cpyTag, cpyVal] = value::copyValue(tag, val);
+        outputArr->push_back(cpyTag, cpyVal);
     }
 };
 
@@ -179,11 +185,18 @@ struct BlockProjectionPositionInfoRecorder final
  */
 struct ScalarProjectionPositionInfoRecorder final
     : ProjectionPositionInfoRecorder<ScalarProjectionPositionInfoRecorder> {
-    MoveableValueGuard extractValue();
-    MoveableValueGuard outputValue;
+    TagValueMaybeOwned extractValue();
+    TagValueMaybeOwned outputValue;
     void onNewValue() { /* Noop */ }
     void saveValue(TypeTags tag, Value val) {
-        outputValue = MoveableValueGuard{tag, val};
+        // If we have traversed an array, then this recorder owns the array and it will be saved
+        // with saveOwnedArray(). Otherwise the recorder just holds an unowned view into the input
+        // so we return an unowned view here.
+        outputValue = TagValueMaybeOwned::fromRaw(false /* owned */, tag, val);
+    }
+    void saveOwnedArray(std::unique_ptr<Array> arr) {
+        outputValue = TagValueMaybeOwned::fromRaw(
+            true /* owned */, TypeTags::Array, value::bitcastFrom<Array*>(arr.release()));
     }
 };
 

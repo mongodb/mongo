@@ -140,11 +140,10 @@ PlanState ExtractFieldPathsStage::getNext() {
 
     // Consume all outputs
     for (size_t i = 0; i < _recorders.size(); ++i) {
-        auto movableGuard = _recorders[i].extractValue();
-        // TODO SERVER-109926 Try to populate output slots with unowned views when possible
-        _outputAccessors[i].reset(true /* owned */, movableGuard.tag(), movableGuard.value());
-        // Ownership was transferred to the output accessor.
-        movableGuard.disown();
+        auto outputValue = _recorders[i].extractValue();
+        auto [owned, tag, value] = outputValue.releaseToRaw();
+        _outputAccessors[i].reset(owned, tag, value);
+        // Ownership was transferred to the output accessor (if the value was owned).
     }
 
     return trackPlanState(PlanState::ADVANCED);

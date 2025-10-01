@@ -146,8 +146,8 @@ public:
             // Verify the extracted values are correct.
             size_t idx = 0;
             for (auto& tc : testCases) {
-                value::MoveableValueGuard value = recorders[idx].extractValue();
-                auto [resultsTag, resultsVal] = value.get();
+                value::TagValueMaybeOwned output = recorders[idx].extractValue();
+                auto [resultsTag, resultsVal] = output.raw();
                 BSONObjBuilder tmp;
                 bson::appendValueToBsonObj(tmp, "result", resultsTag, resultsVal);
                 BSONObj resultObj = tmp.obj();  // Frees memory in tmp.
@@ -267,6 +267,13 @@ TEST_F(BsonWalkNodeScalarTest, Sanity) {
         BSONObj inputObj = fromjson("{a:{}}");
         std::vector<PathTestCase> tests{
             PathTestCase{.path = {Get{"a"}, Id{}}, .projectValue = fromjson("{result: {}}")}};
+        testPaths(tests, inputObj);
+    }
+    {
+        // Empty array in nested path.
+        BSONObj inputObj = fromjson("{a:{b: []}}");
+        std::vector<PathTestCase> tests{PathTestCase{.path = {Get{"a"}, Traverse{}, Get{"b"}, Id{}},
+                                                     .projectValue = fromjson("{result: []}")}};
         testPaths(tests, inputObj);
     }
     {

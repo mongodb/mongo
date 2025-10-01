@@ -203,6 +203,17 @@ TEST_F(ExtractFieldPathsStageTest, SinglePathNestedArrayTest) {
     runExtractFieldPathsTest(paths, inputs, outputs);
 }
 
+TEST_F(ExtractFieldPathsStageTest, SinglePathNestedArrayDeepValueTest) {
+    std::vector<FieldPath> paths{"a.b.c"};
+    std::vector<std::string> inputs{
+        "{a: [{b: [{c: \"not a StringSmall\"}, {c: {d: \"is a StringBig\"}}]}]}",
+        "{a: [{b: [{c: [1, 2, 3, 4]}]}, {b: [{c: \"Hello World!\"}]}]}"};
+    std::vector<std::string> outputs{"[[[\"not a StringSmall\", {d: \"is a StringBig\"}]]]",
+                                     "[[[[1, 2, 3, 4]], [\"Hello World!\"]]]"};
+
+    runExtractFieldPathsTest(paths, inputs, outputs);
+}
+
 TEST_F(ExtractFieldPathsStageTest, TwoPathsNestedArrayTest) {
     std::vector<FieldPath> paths{"a.b.c", "a.d.e"};
     std::vector<std::string> inputs{"{a: [{b: [{c: 1}]}, {d: [{e: 2}]}]}"};
@@ -290,6 +301,26 @@ TEST_F(ExtractFieldPathsStageTest, MultiPathLeafArrays) {
     std::vector<FieldPath> paths{"a", "b.c"};
     std::vector<std::string> inputs{"{a: [1, 2], b: [{c: [3, 4]}]}"};
     std::vector<std::string> outputs{"[[1, 2], [[3, 4]]]"};
+
+    runExtractFieldPathsTest(paths, inputs, outputs);
+}
+
+TEST_F(ExtractFieldPathsStageTest, MixedTypesDeepFirst) {
+    std::vector<FieldPath> paths{"a", "b.c", "b"};
+    std::vector<std::string> inputs{"{a: [1, 2], b: [{c: [3, \"stringBig\"]}]}",
+                                    "{a: 4, b: {c: 5}}"};
+    std::vector<std::string> outputs{"[[1, 2], [[3, \"stringBig\"]], [{c: [3, \"stringBig\"]}]]",
+                                     "[4, 5, {c: 5}]"};
+
+    runExtractFieldPathsTest(paths, inputs, outputs);
+}
+
+TEST_F(ExtractFieldPathsStageTest, MixedTypesShallowFirst) {
+    std::vector<FieldPath> paths{"a", "b.c", "b"};
+    std::vector<std::string> inputs{"{a: 1, b: {c: 2}}",
+                                    "{a: \"non-shallow value\", b: [{c: [3, 4]}]}"};
+    std::vector<std::string> outputs{"[1, 2, {c: 2}]",
+                                     "[\"non-shallow value\", [[3, 4]], [{c: [3, 4]}]]"};
 
     runExtractFieldPathsTest(paths, inputs, outputs);
 }

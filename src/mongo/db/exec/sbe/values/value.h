@@ -462,44 +462,58 @@ private:
 };
 
 /**
- * The same as ValueGuard, but with a move constructor, move assignment operator, and default
- * constructor.
+ * A value which behaves like a view or an owned value depending on 'owned' flag provided at
+ * runtime.
  */
-class MoveableValueGuard {
+class TagValueMaybeOwned {
 public:
-    MONGO_COMPILER_ALWAYS_INLINE MoveableValueGuard(const std::pair<TypeTags, Value> typedValue)
-        : MoveableValueGuard(typedValue.first, typedValue.second) {}
-    MONGO_COMPILER_ALWAYS_INLINE MoveableValueGuard(TypeTags tag, Value val)
-        : _tag(tag), _value(val) {}
-    MONGO_COMPILER_ALWAYS_INLINE MoveableValueGuard(bool owned, TypeTags tag, Value val)
-        : MoveableValueGuard(owned ? tag : TypeTags::Nothing, owned ? val : 0) {}
-    MONGO_COMPILER_ALWAYS_INLINE MoveableValueGuard(
-        const FastTuple<bool, value::TypeTags, value::Value>& tuple)
-        : MoveableValueGuard(tuple.a, tuple.b, tuple.c) {}
-    MoveableValueGuard() {
-        disown();
-    };
-    MoveableValueGuard(const MoveableValueGuard&) = delete;
-    MoveableValueGuard(MoveableValueGuard&& other) : _tag(other._tag), _value(other._value) {
-        other.disown();
-    }
-    MONGO_COMPILER_ALWAYS_INLINE ~MoveableValueGuard() {
-        releaseValue(_tag, _value);
+    static TagValueMaybeOwned fromRaw(FastTuple<bool, TypeTags, Value> tv) {
+        auto [o, t, v] = tv;
+        return TagValueMaybeOwned(o, t, v);
     }
 
-    MoveableValueGuard& operator=(const MoveableValueGuard&) = delete;
-    MoveableValueGuard& operator=(MoveableValueGuard&& other) {
-        if (this != &other) {
-            releaseValue(_tag, _value);
-            _tag = other._tag;
-            _value = other._value;
-            other.disown();
+    static TagValueMaybeOwned fromRaw(bool owned, TypeTags t, Value v) {
+        return TagValueMaybeOwned(owned, t, v);
+    }
+
+    TagValueMaybeOwned() : _owned(false), _tag(TypeTags::Nothing), _value(0) {}
+
+    TagValueMaybeOwned(TagValueMaybeOwned&& o) {
+        _tag = o._tag;
+        _value = o._value;
+        _owned = o._owned;
+        o.disownAndClear();
+    }
+
+    ~TagValueMaybeOwned() {
+        release();
+    }
+
+    TagValueMaybeOwned& operator=(TagValueMaybeOwned&& o) {
+        if (&o != this) {
+            release();
+            _tag = o._tag;
+            _value = o._value;
+            _owned = o._owned;
+            o.disownAndClear();
         }
         return *this;
     }
-    std::pair<TypeTags, Value> get() const {
+
+    TagValueMaybeOwned(const TagValueMaybeOwned&) = delete;
+
+    TagValueMaybeOwned& operator=(const TagValueMaybeOwned&) = delete;
+
+    std::pair<TypeTags, Value> raw() const {
         return {_tag, _value};
     }
+
+    FastTuple<bool, TypeTags, Value> releaseToRaw() {
+        FastTuple<bool, TypeTags, Value> ret{_owned, _tag, _value};
+        disownAndClear();
+        return ret;
+    }
+
     TypeTags tag() const {
         return _tag;
     }
@@ -507,16 +521,42 @@ public:
         return _value;
     }
 
-    // Used when ownership needs to be transferred away from this MovableValueGuard.
-    void disown() {
+    /**
+     * Relinquishes ownership and sets the stored tag/value to Nothing.
+     */
+    void disownAndClear() {
         _tag = TypeTags::Nothing;
         _value = 0;
+        _owned = false;
+    }
+
+    void makeView() {
+        _owned = false;
+    }
+
+    void makeOwned() {
+        if (!_owned) {
+            std::tie(_tag, _value) = value::copyValue(_tag, _value);
+            _owned = true;
+        }
     }
 
 private:
+    TagValueMaybeOwned(bool owned, TypeTags t, Value v) : _owned(owned), _tag(t), _value(v) {}
+
+    void release() {
+        if (_owned) {
+            releaseValue(_tag, _value);
+        }
+    }
+
+    bool _owned;
     TypeTags _tag;
     Value _value;
 };
+
+static_assert(sizeof(TagValueMaybeOwned) <= 16ULL,
+              "TagValueMaybeOwned should not be larger than 16 bytes");
 
 class ValueVectorGuard {
 public:

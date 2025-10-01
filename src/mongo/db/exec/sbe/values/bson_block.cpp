@@ -100,7 +100,7 @@ std::unique_ptr<HeterogeneousBlock> BlockProjectionPositionInfoRecorder::extract
     return out;
 }
 
-MoveableValueGuard ScalarProjectionPositionInfoRecorder::extractValue() {
+TagValueMaybeOwned ScalarProjectionPositionInfoRecorder::extractValue() {
     tassert(10926202, "expects empty arrayStack", arrayStack.empty());
     return std::move(outputValue);
 }
