@@ -796,7 +796,7 @@ BatchedCommandResponse WriteBatchResponseProcessor::generateClientResponseForBat
     if (_cmdRef.isBatchWriteCommand() &&
         _cmdRef.getBatchedCommandRequest().getBatchType() ==
             BatchedCommandRequest::BatchType_Update &&
-        _nModified >= 0) {
+        _nModified > 0) {
         resp.setNModified(_nModified);
     }
     resp.setRetriedStmtIds(getRetriedStmtIds());
