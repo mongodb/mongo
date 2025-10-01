@@ -58,9 +58,9 @@ docker-compose -f docker_compose/${suite}/docker-compose.yml up -d
 echo "ALL RUNNING CONTAINERS: "
 docker ps
 set +o errexit
-# add a 30 minute timeout so we have time to gather the logs and run the rest of the script
+# add a 1 hr timeout so we have time to gather the logs and run the rest of the script
 # when it hangs
-timeout -v 1800 docker exec workload buildscripts/resmoke.py run --suite ${suite} ${resmoke_args} --sanityCheck --externalSUT
+timeout -v 3600 docker exec workload buildscripts/resmoke.py run --suite ${suite} ${resmoke_args} --sanityCheck --externalSUT
 RET=$?
 set -o errexit
 

@@ -11,6 +11,10 @@ variables:
     commands:
       - func: "do setup"
       - func: "do setup for antithesis"
+      - command: timeout.update
+        params:
+          exec_timeout_secs: 7200 # 2 hrs
+          timeout_secs: 600 # 10 mins
       - func: "antithesis image build and push"
         vars:
           suite: suite_name
