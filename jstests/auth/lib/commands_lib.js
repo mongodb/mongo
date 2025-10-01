@@ -92,7 +92,10 @@ one argument, the connection object.
 */
 
 import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
-import {storageEngineIsWiredTigerOrInMemory} from "jstests/libs/storage_engine/storage_engine_utils.js";
+import {
+    storageEngineIsWiredTigerOrInMemory,
+    storageEngineIsWiredTiger,
+} from "jstests/libs/storage_engine/storage_engine_utils.js";
 import {getUriForColl} from "jstests/disk/libs/wt_file_helper.js";
 
 // constants
@@ -254,7 +257,8 @@ export const authCommandsLib = {
         {
             testname: "applyOps_container_insert",
             skipSharded: true,
-            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagPrimaryDrivenIndexBuilds"),
+            skipTest: (conn) =>
+                !isFeatureEnabled(conn, "featureFlagPrimaryDrivenIndexBuilds") || !storageEngineIsWiredTiger(),
             setup: function (db) {
                 const coll = "containerOpsColl";
                 db[coll].drop();
@@ -295,7 +299,8 @@ export const authCommandsLib = {
         {
             testname: "applyOps_container_delete",
             skipSharded: true,
-            skipTest: (conn) => !isFeatureEnabled(conn, "featureFlagPrimaryDrivenIndexBuilds"),
+            skipTest: (conn) =>
+                !isFeatureEnabled(conn, "featureFlagPrimaryDrivenIndexBuilds") || !storageEngineIsWiredTiger(),
             setup: function (db) {
                 const coll = "containerOpsColl";
                 db[coll].drop();
