@@ -406,16 +406,11 @@ public:
      * Registers a DocumentSource with a parsing function, so that when a stage with the given name
      * is encountered, it will call 'parser' to construct that stage.
      *
-     * If skipIfExists is true, and there is already a parser registered with the given name, the
-     * registration is silently skipped.
-     *
      * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
      * this file.
      */
-    static void registerParser(std::string name,
-                               Parser parser,
-                               FeatureFlag* featureFlag = nullptr,
-                               bool skipIfExists = false);
+    static void registerParser(std::string name, Parser parser, FeatureFlag* featureFlag = nullptr);
+
     /**
      * Convenience wrapper for the common case, when DocumentSource::Parser returns a list of one
      * DocumentSource.
@@ -425,8 +420,7 @@ public:
      */
     static void registerParser(std::string name,
                                SimpleParser simpleParser,
-                               FeatureFlag* featureFlag = nullptr,
-                               bool skipIfExists = false);
+                               FeatureFlag* featureFlag = nullptr);
 
     /**
      * Allocate and return a new, unique DocumentSource::Id value.

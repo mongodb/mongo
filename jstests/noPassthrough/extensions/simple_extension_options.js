@@ -4,14 +4,14 @@
  * @tags: [featureFlagExtensionsAPI]
  */
 import {assertErrorCode} from "jstests/aggregation/extras/utils.js";
-import {ShardingTest} from "jstests/libs/shardingtest.js";
 import {
+    withExtensions,
+    generateExtensionConfigWithOptions,
+    deleteExtensionConfigs,
     checkExtensionFailsToLoad,
     checkPlatformCompatibleWithExtensions,
-    deleteExtensionConfigs,
-    generateExtensionConfigWithOptions,
-    withExtensions,
 } from "jstests/noPassthrough/libs/extension_helpers.js";
+import {ShardingTest} from "jstests/libs/shardingtest.js";
 
 checkPlatformCompatibleWithExtensions();
 

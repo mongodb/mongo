@@ -82,12 +82,6 @@ public:
      */
     static stdx::unordered_map<std::string, ExtensionConfig> getLoadedExtensions();
 
-    /**
-     * Central path for all extension configuration files. Also holds
-     * aggregation_stage_stub_parsers.json.
-     */
-    static inline const std::filesystem::path kExtensionConfigPath{"/etc/mongo/extensions"};
-
 private:
     // Used to keep loaded extension 'SharedLibrary' objects alive for the lifetime of the server
     // and track what extensions have been loaded. Initialized during process initialization and
