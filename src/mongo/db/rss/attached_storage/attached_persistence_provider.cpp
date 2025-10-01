@@ -85,6 +85,10 @@ bool AttachedPersistenceProvider::shouldAvoidDuplicateCheckpoints() const {
     return false;
 }
 
+bool AttachedPersistenceProvider::shouldForceUpdateWithFullDocument() const {
+    return false;
+}
+
 bool AttachedPersistenceProvider::supportsLocalCollections() const {
     return true;
 }

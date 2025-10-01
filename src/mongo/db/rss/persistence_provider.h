@@ -105,11 +105,19 @@ public:
     virtual bool shouldDelayDataAccessDuringStartup() const = 0;
 
     /**
-     * If true, the system should take precautions to avoid taking multiple checkopints for the same
+     * If true, the system should take precautions to avoid taking multiple checkpoints for the same
      * stable timestamp. The underlying key-value engine likely does not provide the necessary
      * coordination by default.
      */
     virtual bool shouldAvoidDuplicateCheckpoints() const = 0;
+
+    /**
+     * If true, always do a full update of documents, instead of recording only the changes to
+     * represent an update.
+     *
+     * TODO SERVER-111602: remove this workaround.
+     */
+    virtual bool shouldForceUpdateWithFullDocument() const = 0;
 
     /**
      * If true, the storage provider supports the use of local, unreplicated collections.

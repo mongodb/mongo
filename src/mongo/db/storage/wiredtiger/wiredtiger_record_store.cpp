@@ -881,7 +881,7 @@ Status WiredTigerRecordStore::_updateRecord(
 }
 
 bool WiredTigerRecordStore::updateWithDamagesSupported() const {
-    return true;
+    return !_forceUpdateWithFullDocument;
 }
 
 StatusWith<RecordData> WiredTigerRecordStore::_updateWithDamages(OperationContext* opCtx,
