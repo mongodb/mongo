@@ -2314,7 +2314,7 @@ void IndexBuildsCoordinator::createIndexesOnEmptyCollection(OperationContext* op
 
     auto collectionUUID = collection->uuid();
 
-    auto nss = collection->ns();
+    const auto& nss = collection->ns();
     CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, nss);
 
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
