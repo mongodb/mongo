@@ -29,7 +29,6 @@ dependencies = [
     "pympler",
     "faker (==37.1.0)",
     "pymongo (==4.12.0)",
-    "numpy (==2.2.6)",
 ]
 
 [tool.poetry.dependencies]
@@ -154,6 +153,7 @@ ecdsa = "^0.19.0"
 asn1crypto = "^1.5.1"
 toml = ">=0.10.2,<0.11.0"
 filelock = "^3.18.0"
+numpy = { version = "2.2.6", markers = "platform_machine != 's390x' and platform_machine != 'ppc64le'" }
 
 # Werkzeug is needed for ocsp tests in ocsp_mock.py
 # version 3+ fails with "ImportError: cannot import name 'url_quote' from 'werkzeug.urls'"
