@@ -75,25 +75,6 @@ def _URange(s):
   raise InputError("invalid Unicode range %s" % (s,))
 
 
-def _UStr(v):
-  """Converts Unicode code point to hex string.
-
-    0x263a => '0x263A'.
-
-  Args:
-    v: code point to convert
-
-  Returns:
-    Unicode string
-
-  Raises:
-    InputError: the argument is not a valid Unicode value.
-  """
-  if v < 0 or v > _RUNE_MAX:
-    raise InputError("invalid Unicode value %s" % (v,))
-  return "0x%04X" % (v,)
-
-
 def _ParseContinue(s):
   """Parses a Unicode continuation field.
 

@@ -7,8 +7,8 @@ IFS=$'\n\t'
 set -vx
 
 NAME=re2
-REVISION="2023-11-01"
-VERSION="2023-11-01"
+REVISION="2025-08-12-mongo"
+VERSION="2025-08-12"
 
 DEST_DIR=$(git rev-parse --show-toplevel)/src/third_party/re2
 if [[ -d $DEST_DIR/dist ]]; then
@@ -16,12 +16,11 @@ if [[ -d $DEST_DIR/dist ]]; then
     exit 1
 fi
 
-git clone --branch 2023-11-01 git@github.com:mongodb-forks/re2.git $DEST_DIR/dist
+mkdir -p $DEST_DIR/dist
+
+git clone --branch $REVISION git@github.com:mongodb-forks/re2.git $DEST_DIR/dist
 pushd $DEST_DIR/dist
 find . -mindepth 1 -maxdepth 1 -name ".*" -exec rm -rf {} \;
-rm -rf app
-rm -rf benchlog
-rm -rf doc
-rm -rf lib
-rm -rf python
+rm -rf app benchlog doc lib python
+find . -maxdepth 1 -type f -not -regex ".*\(CONTRIBUTING.md\|LICENSE\|README.md\|SECURITY.md\)$" -delete
 popd

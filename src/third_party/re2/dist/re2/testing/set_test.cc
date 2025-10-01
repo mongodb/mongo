@@ -2,25 +2,30 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+#include "re2/set.h"
+
 #include <stddef.h>
-#include <string>
-#include <vector>
+
 #include <utility>
+#include <vector>
 
 #include "gtest/gtest.h"
-#include "util/logging.h"
 #include "re2/re2.h"
-#include "re2/set.h"
 
 namespace re2 {
 
 TEST(Set, Unanchored) {
   RE2::Set s(RE2::DefaultOptions, RE2::UNANCHORED);
 
+  ASSERT_EQ(s.Size(), 0);
   ASSERT_EQ(s.Add("foo", NULL), 0);
+  ASSERT_EQ(s.Size(), 1);
   ASSERT_EQ(s.Add("(", NULL), -1);
+  ASSERT_EQ(s.Size(), 1);
   ASSERT_EQ(s.Add("bar", NULL), 1);
+  ASSERT_EQ(s.Size(), 2);
   ASSERT_EQ(s.Compile(), true);
+  ASSERT_EQ(s.Size(), 2);
 
   ASSERT_EQ(s.Match("foobar", NULL), true);
   ASSERT_EQ(s.Match("fooba", NULL), true);
@@ -28,16 +33,16 @@ TEST(Set, Unanchored) {
 
   std::vector<int> v;
   ASSERT_EQ(s.Match("foobar", &v), true);
-  ASSERT_EQ(v.size(), 2);
+  ASSERT_EQ(v.size(), size_t{2});
   ASSERT_EQ(v[0], 0);
   ASSERT_EQ(v[1], 1);
 
   ASSERT_EQ(s.Match("fooba", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 0);
 
   ASSERT_EQ(s.Match("oobar", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 1);
 }
 
@@ -56,21 +61,21 @@ TEST(Set, UnanchoredFactored) {
 
   std::vector<int> v;
   ASSERT_EQ(s.Match("foobar", &v), true);
-  ASSERT_EQ(v.size(), 2);
+  ASSERT_EQ(v.size(), size_t{2});
   ASSERT_EQ(v[0], 0);
   ASSERT_EQ(v[1], 1);
 
   ASSERT_EQ(s.Match("obarfoobaroo", &v), true);
-  ASSERT_EQ(v.size(), 2);
+  ASSERT_EQ(v.size(), size_t{2});
   ASSERT_EQ(v[0], 0);
   ASSERT_EQ(v[1], 1);
 
   ASSERT_EQ(s.Match("fooba", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 0);
 
   ASSERT_EQ(s.Match("oobar", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 }
 
 TEST(Set, UnanchoredDollar) {
@@ -84,11 +89,11 @@ TEST(Set, UnanchoredDollar) {
 
   std::vector<int> v;
   ASSERT_EQ(s.Match("foo", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 0);
 
   ASSERT_EQ(s.Match("foobar", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 }
 
 TEST(Set, UnanchoredWordBoundary) {
@@ -103,14 +108,14 @@ TEST(Set, UnanchoredWordBoundary) {
 
   std::vector<int> v;
   ASSERT_EQ(s.Match("foo", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 0);
 
   ASSERT_EQ(s.Match("foobar", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 
   ASSERT_EQ(s.Match("foo bar", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 0);
 }
 
@@ -130,20 +135,20 @@ TEST(Set, Anchored) {
 
   std::vector<int> v;
   ASSERT_EQ(s.Match("foobar", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 
   ASSERT_EQ(s.Match("fooba", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 
   ASSERT_EQ(s.Match("oobar", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 
   ASSERT_EQ(s.Match("foo", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 0);
 
   ASSERT_EQ(s.Match("bar", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 1);
 }
 
@@ -157,10 +162,10 @@ TEST(Set, EmptyUnanchored) {
 
   std::vector<int> v;
   ASSERT_EQ(s.Match("", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 
   ASSERT_EQ(s.Match("foobar", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 }
 
 TEST(Set, EmptyAnchored) {
@@ -173,10 +178,10 @@ TEST(Set, EmptyAnchored) {
 
   std::vector<int> v;
   ASSERT_EQ(s.Match("", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 
   ASSERT_EQ(s.Match("foobar", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 }
 
 TEST(Set, Prefix) {
@@ -191,14 +196,14 @@ TEST(Set, Prefix) {
 
   std::vector<int> v;
   ASSERT_EQ(s.Match("/prefix", &v), false);
-  ASSERT_EQ(v.size(), 0);
+  ASSERT_EQ(v.size(), size_t{0});
 
   ASSERT_EQ(s.Match("/prefix/", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 0);
 
   ASSERT_EQ(s.Match("/prefix/42", &v), true);
-  ASSERT_EQ(v.size(), 1);
+  ASSERT_EQ(v.size(), size_t{1});
   ASSERT_EQ(v[0], 0);
 }
 

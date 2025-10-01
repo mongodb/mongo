@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+#include <stddef.h>
+
+#include <string>
+#include <vector>
+
 #include "absl/base/macros.h"
 #include "gtest/gtest.h"
-#include "re2/prog.h"
-#include "re2/regexp.h"
-#include "re2/testing/tester.h"
 #include "re2/testing/exhaustive_tester.h"
+#include "re2/testing/tester.h"
 
 // For target `log' in the Makefile.
 #ifndef LOGGING

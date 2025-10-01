@@ -9,8 +9,8 @@
 #include "absl/base/macros.h"
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
-#include "util/utf.h"
 #include "re2/regexp.h"
+#include "util/utf.h"
 
 namespace re2 {
 

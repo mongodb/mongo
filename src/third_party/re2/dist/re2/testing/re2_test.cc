@@ -5,25 +5,29 @@
 
 // TODO: Test extractions for PartialMatch/Consume
 
+#include "re2/re2.h"
+
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
-#if !defined(_MSC_VER) && !defined(__CYGWIN__) && !defined(__MINGW32__)
-#include <sys/mman.h>
-#include <unistd.h>  /* for sysconf */
-#endif
 
 #include "absl/base/macros.h"
+#include "absl/log/absl_log.h"
 #include "absl/strings/str_format.h"
+#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
-#include "util/logging.h"
-#include "re2/re2.h"
 #include "re2/regexp.h"
+
+#if !defined(_MSC_VER) && !defined(__CYGWIN__) && !defined(__MINGW32__)
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 namespace re2 {
 
@@ -554,14 +558,14 @@ TEST(Capture, NamedGroups) {
     RE2 re("(hello world)");
     ASSERT_EQ(re.NumberOfCapturingGroups(), 1);
     const std::map<std::string, int>& m = re.NamedCapturingGroups();
-    ASSERT_EQ(m.size(), 0);
+    ASSERT_EQ(m.size(), size_t{0});
   }
 
   {
     RE2 re("(?P<A>expr(?P<B>expr)(?P<C>expr))((expr)(?P<D>expr))");
     ASSERT_EQ(re.NumberOfCapturingGroups(), 6);
     const std::map<std::string, int>& m = re.NamedCapturingGroups();
-    ASSERT_EQ(m.size(), 4);
+    ASSERT_EQ(m.size(), size_t{4});
     ASSERT_EQ(m.find("A")->second, 1);
     ASSERT_EQ(m.find("B")->second, 2);
     ASSERT_EQ(m.find("C")->second, 3);
@@ -683,7 +687,7 @@ TEST(RE2, FullMatchStringViewArg) {
   absl::string_view sp;
   // string_view-arg
   ASSERT_TRUE(RE2::FullMatch("ruby:1234", "(\\w+):(\\d+)", &sp, &i));
-  ASSERT_EQ(sp.size(), 4);
+  ASSERT_EQ(sp.size(), size_t{4});
   ASSERT_TRUE(memcmp(sp.data(), "ruby", 4) == 0);
   ASSERT_EQ(i, 1234);
 }
@@ -773,7 +777,7 @@ TEST(RE2, NULTerminated) {
   v = static_cast<char*>(mmap(NULL, 2*pagesize, PROT_READ|PROT_WRITE,
                               MAP_ANONYMOUS|MAP_PRIVATE, -1, 0));
   ASSERT_TRUE(v != reinterpret_cast<char*>(-1));
-  LOG(INFO) << "Memory at " << (void*)v;
+  ABSL_LOG(INFO) << "Memory at " << reinterpret_cast<void*>(v);
   ASSERT_EQ(munmap(v + pagesize, pagesize), 0) << " error " << errno;
   v[pagesize - 1] = '1';
 
@@ -791,6 +795,11 @@ TEST(RE2, FullMatchTypeTests) {
     char c;
     ASSERT_TRUE(RE2::FullMatch("Hello", "(H)ello", &c));
     ASSERT_EQ(c, 'H');
+  }
+  {
+    signed char c;
+    ASSERT_TRUE(RE2::FullMatch("Hello", "(H)ello", &c));
+    ASSERT_EQ(c, static_cast<signed char>('H'));
   }
   {
     unsigned char c;
@@ -837,7 +846,7 @@ TEST(RE2, FullMatchTypeTests) {
   {
     uint32_t v;
     static const uint32_t max = UINT32_C(0xffffffff);
-    ASSERT_TRUE(RE2::FullMatch("100",         "(\\d+)", &v)); ASSERT_EQ(v, 100);
+    ASSERT_TRUE(RE2::FullMatch("100",         "(\\d+)", &v)); ASSERT_EQ(v, uint32_t{100});
     ASSERT_TRUE(RE2::FullMatch("4294967295",  "(\\d+)", &v)); ASSERT_EQ(v, max);
     ASSERT_FALSE(RE2::FullMatch("4294967296", "(\\d+)", &v));
     ASSERT_FALSE(RE2::FullMatch("-1",         "(\\d+)", &v));
@@ -875,7 +884,7 @@ TEST(RE2, FullMatchTypeTests) {
     static const uint64_t max = UINT64_C(0xffffffffffffffff);
     std::string str;
 
-    ASSERT_TRUE(RE2::FullMatch("100",  "(-?\\d+)", &v));  ASSERT_EQ(v, 100);
+    ASSERT_TRUE(RE2::FullMatch("100",  "(-?\\d+)", &v));  ASSERT_EQ(v, uint64_t{100});
     ASSERT_TRUE(RE2::FullMatch("-100", "(-?\\d+)", &v2)); ASSERT_EQ(v2, -100);
 
     str = std::to_string(max);
@@ -893,11 +902,11 @@ TEST(RE2, FloatingPointFullMatchTypes) {
     float v;
     ASSERT_TRUE(RE2::FullMatch("100",   "(.*)", &v)); ASSERT_EQ(v, 100);
     ASSERT_TRUE(RE2::FullMatch("-100.", "(.*)", &v)); ASSERT_EQ(v, -100);
-    ASSERT_TRUE(RE2::FullMatch("1e23",  "(.*)", &v)); ASSERT_EQ(v, float(1e23));
+    ASSERT_TRUE(RE2::FullMatch("1e23",  "(.*)", &v)); ASSERT_EQ(v, float{1e23});
     ASSERT_TRUE(RE2::FullMatch(" 100",  "(.*)", &v)); ASSERT_EQ(v, 100);
 
     ASSERT_TRUE(RE2::FullMatch(zeros + "1e23",  "(.*)", &v));
-    ASSERT_EQ(v, float(1e23));
+    ASSERT_EQ(v, float{1e23});
 
     // 6700000000081920.1 is an edge case.
     // 6700000000081920 is exactly halfway between
@@ -926,9 +935,11 @@ TEST(RE2, FloatingPointFullMatchTypes) {
     double v;
     ASSERT_TRUE(RE2::FullMatch("100",   "(.*)", &v)); ASSERT_EQ(v, 100);
     ASSERT_TRUE(RE2::FullMatch("-100.", "(.*)", &v)); ASSERT_EQ(v, -100);
-    ASSERT_TRUE(RE2::FullMatch("1e23",  "(.*)", &v)); ASSERT_EQ(v, 1e23);
+    ASSERT_TRUE(RE2::FullMatch("1e23",  "(.*)", &v)); ASSERT_EQ(v, double{1e23});
+    ASSERT_TRUE(RE2::FullMatch(" 100",  "(.*)", &v)); ASSERT_EQ(v, 100);
+
     ASSERT_TRUE(RE2::FullMatch(zeros + "1e23", "(.*)", &v));
-    ASSERT_EQ(v, double(1e23));
+    ASSERT_EQ(v, double{1e23});
 
     ASSERT_TRUE(RE2::FullMatch("0.1", "(.*)", &v));
     ASSERT_EQ(v, 0.1) << absl::StrFormat("%.17g != %.17g", v, 0.1);
@@ -1562,7 +1573,7 @@ TEST(RE2, Bug18391750) {
 
 TEST(RE2, Bug18458852) {
   // Bug in parser accepting invalid (too large) rune,
-  // causing compiler to fail in DCHECK in UTF-8
+  // causing compiler to fail in ABSL_DCHECK() in UTF-8
   // character class code.
   const char b[] = {
       (char)0x28, (char)0x05, (char)0x05, (char)0x41, (char)0x41, (char)0x28,
@@ -1598,7 +1609,7 @@ TEST(RE2, Bug18523943) {
 
 TEST(RE2, Bug21371806) {
   // Bug in parser accepting Unicode groups in Latin-1 mode,
-  // causing compiler to fail in DCHECK in prog.cc.
+  // causing compiler to fail in ABSL_DCHECK() in prog.cc.
 
   RE2::Options opt;
   opt.set_encoding(RE2::Options::EncodingLatin1);
@@ -1656,6 +1667,33 @@ TEST(RE2, Issue310) {
   RE2 plus("(?:|a)+");
   ASSERT_TRUE(plus.Match(s, 0, s.size(), RE2::UNANCHORED, &m, 1));
   ASSERT_EQ(m, "") << " got m='" << m << "', want ''";
+}
+
+TEST(RE2, Issue477) {
+  // Regexp::LeadingString didn't output Latin1 into flags.
+  // In the given pattern, 0xA5 should be factored out, but
+  // shouldn't lose its Latin1-ness in the process. Because
+  // that was happening, the prefix for accel was 0xC2 0xA5
+  // instead of 0xA5. Note that the former doesn't occur in
+  // the given input and so replacements weren't occurring.
+
+  const char bytes[] = {
+      (char)0xa5, (char)0xd1, (char)0xa5, (char)0xd1,
+      (char)0x61, (char)0x63, (char)0xa5, (char)0x64,
+  };
+  std::string s(bytes, ABSL_ARRAYSIZE(bytes));
+  RE2 re("\xa5\xd1|\xa5\x64", RE2::Latin1);
+  int n = RE2::GlobalReplace(&s, re, "");
+  ASSERT_EQ(n, 3);
+  ASSERT_EQ(s, "\x61\x63");
+}
+
+TEST(RE2, InitNULL) {
+  // RE2::RE2 accepts NULL. Make sure it keeps doing that.
+  RE2 re(NULL);
+  ASSERT_TRUE(re.ok());
+  ASSERT_TRUE(RE2::FullMatch("", re));
+  ASSERT_TRUE(RE2::FullMatch("", NULL));
 }
 
 }  // namespace re2

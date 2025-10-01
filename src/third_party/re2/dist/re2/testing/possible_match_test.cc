@@ -3,13 +3,15 @@
 // license that can be found in the LICENSE file.
 
 #include <string.h>
+
 #include <string>
 #include <vector>
 
 #include "absl/base/macros.h"
+#include "absl/log/absl_log.h"
 #include "absl/strings/escaping.h"
+#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
-#include "util/logging.h"
 #include "re2/prog.h"
 #include "re2/re2.h"
 #include "re2/regexp.h"
@@ -113,7 +115,7 @@ TEST(PossibleMatchRange, HandWritten) {
       const PrefixTest& t = tests[i];
       std::string min, max;
       if (j == 0) {
-        LOG(INFO) << "Checking regexp=" << absl::CEscape(t.regexp);
+        ABSL_LOG(INFO) << "Checking regexp=" << absl::CEscape(t.regexp);
         Regexp* re = Regexp::Parse(t.regexp, Regexp::LikePerl, NULL);
         ASSERT_TRUE(re != NULL);
         Prog* prog = re->CompileToProg(0);
@@ -202,7 +204,7 @@ class PossibleMatchTester : public RegexpGenerator {
 void PossibleMatchTester::HandleRegexp(const std::string& regexp) {
   regexps_++;
 
-  VLOG(3) << absl::CEscape(regexp);
+  ABSL_VLOG(3) << absl::CEscape(regexp);
 
   RE2 re(regexp, RE2::Latin1);
   ASSERT_EQ(re.error(), "");
@@ -214,7 +216,8 @@ void PossibleMatchTester::HandleRegexp(const std::string& regexp) {
     // complicated expressions.
     if(strstr(regexp.c_str(), "\\C*"))
       return;
-    LOG(QFATAL) << "PossibleMatchRange failed on: " << absl::CEscape(regexp);
+    ABSL_LOG(QFATAL) << "PossibleMatchRange failed on: "
+                     << absl::CEscape(regexp);
   }
 
   strgen_.Reset();
@@ -241,8 +244,8 @@ TEST(PossibleMatchRange, Exhaustive) {
                  RegexpGenerator::EgrepOps(),
                  stringlen, Explode("ab4"));
   t.Generate();
-  LOG(INFO) << t.regexps() << " regexps, "
-            << t.tests() << " tests";
+  ABSL_LOG(INFO) << t.regexps() << " regexps, "
+                 << t.tests() << " tests";
 }
 
 }  // namespace re2

@@ -47,21 +47,23 @@
 //
 // See sparse_array.h for implementation details.
 
-// Doing this simplifies the logic below.
-#ifndef __has_feature
-#define __has_feature(x) 0
-#endif
-
 #include <assert.h>
 #include <stdint.h>
-#if __has_feature(memory_sanitizer)
-#include <sanitizer/msan_interface.h>
-#endif
+
 #include <algorithm>
 #include <memory>
 #include <utility>
 
 #include "re2/pod_array.h"
+
+// Doing this simplifies the logic below.
+#ifndef __has_feature
+#define __has_feature(x) 0
+#endif
+
+#if __has_feature(memory_sanitizer)
+#include <sanitizer/msan_interface.h>
+#endif
 
 namespace re2 {
 

@@ -5,17 +5,19 @@
 #include "re2/prefilter.h"
 
 #include <stddef.h>
-#include <stdint.h>
+
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
 #include "absl/strings/str_format.h"
-#include "util/logging.h"
-#include "util/utf.h"
 #include "re2/re2.h"
+#include "re2/regexp.h"
 #include "re2/unicode_casefold.h"
 #include "re2/walker-inl.h"
+#include "util/utf.h"
 
 namespace re2 {
 
@@ -300,8 +302,8 @@ void Prefilter::CrossProduct(const SSet& a, const SSet& b, SSet* dst) {
 Prefilter::Info* Prefilter::Info::Concat(Info* a, Info* b) {
   if (a == NULL)
     return b;
-  DCHECK(a->is_exact_);
-  DCHECK(b && b->is_exact_);
+  ABSL_DCHECK(a->is_exact_);
+  ABSL_DCHECK(b && b->is_exact_);
   Info *ab = new Info();
 
   CrossProduct(a->exact_, b->exact_, &ab->exact_);
@@ -450,9 +452,9 @@ typedef CharClass::iterator CCIter;
 Prefilter::Info* Prefilter::Info::CClass(CharClass *cc,
                                          bool latin1) {
   if (ExtraDebug) {
-    LOG(ERROR) << "CharClassInfo:";
+    ABSL_LOG(ERROR) << "CharClassInfo:";
     for (CCIter i = cc->begin(); i != cc->end(); ++i)
-      LOG(ERROR) << "  " << i->lo << "-" << i->hi;
+      ABSL_LOG(ERROR) << "  " << i->lo << "-" << i->hi;
   }
 
   // If the class is too large, it's okay to overestimate.
@@ -473,7 +475,7 @@ Prefilter::Info* Prefilter::Info::CClass(CharClass *cc,
   a->is_exact_ = true;
 
   if (ExtraDebug)
-    LOG(ERROR) << " = " << a->ToString();
+    ABSL_LOG(ERROR) << " = " << a->ToString();
 
   return a;
 }
@@ -501,7 +503,7 @@ class Prefilter::Info::Walker : public Regexp::Walker<Prefilter::Info*> {
 
 Prefilter::Info* Prefilter::BuildInfo(Regexp* re) {
   if (ExtraDebug)
-    LOG(ERROR) << "BuildPrefilter::Info: " << re->ToString();
+    ABSL_LOG(ERROR) << "BuildPrefilter::Info: " << re->ToString();
 
   bool latin1 = (re->parse_flags() & Regexp::Latin1) != 0;
   Prefilter::Info::Walker w(latin1);
@@ -531,7 +533,7 @@ Prefilter::Info* Prefilter::Info::Walker::PostVisit(
     default:
     case kRegexpRepeat:
       info = EmptyString();
-      LOG(DFATAL) << "Bad regexp op " << re->op();
+      ABSL_LOG(DFATAL) << "Bad regexp op " << re->op();
       break;
 
     case kRegexpNoMatch:
@@ -634,8 +636,8 @@ Prefilter::Info* Prefilter::Info::Walker::PostVisit(
   }
 
   if (ExtraDebug)
-    LOG(ERROR) << "BuildInfo " << re->ToString()
-               << ": " << (info ? info->ToString() : "");
+    ABSL_LOG(ERROR) << "BuildInfo " << re->ToString()
+                    << ": " << (info ? info->ToString() : "");
 
   return info;
 }
@@ -662,7 +664,7 @@ Prefilter* Prefilter::FromRegexp(Regexp* re) {
 std::string Prefilter::DebugString() const {
   switch (op_) {
     default:
-      LOG(DFATAL) << "Bad op in Prefilter::DebugString: " << op_;
+      ABSL_LOG(DFATAL) << "Bad op in Prefilter::DebugString: " << op_;
       return absl::StrFormat("op%d", op_);
     case NONE:
       return "*no-matches*";

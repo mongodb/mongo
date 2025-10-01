@@ -10,14 +10,17 @@
 // expression symbolically.
 
 #include <stdint.h>
+
+#include <cstring>
 #include <functional>
 #include <string>
-#include <vector>
 #include <type_traits>
+#include <vector>
 
 #include "absl/base/call_once.h"
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
 #include "absl/strings/string_view.h"
-#include "util/logging.h"
 #include "re2/pod_array.h"
 #include "re2/re2.h"
 #include "re2/sparse_array.h"
@@ -79,20 +82,44 @@ class Prog {
 
     // Getters
     int id(Prog* p) { return static_cast<int>(this - p->inst_.data()); }
-    InstOp opcode() { return static_cast<InstOp>(out_opcode_&7); }
-    int last()      { return (out_opcode_>>3)&1; }
-    int out()       { return out_opcode_>>4; }
-    int out1()      { DCHECK(opcode() == kInstAlt || opcode() == kInstAltMatch); return out1_; }
-    int cap()       { DCHECK_EQ(opcode(), kInstCapture); return cap_; }
-    int lo()        { DCHECK_EQ(opcode(), kInstByteRange); return lo_; }
-    int hi()        { DCHECK_EQ(opcode(), kInstByteRange); return hi_; }
-    int foldcase()  { DCHECK_EQ(opcode(), kInstByteRange); return hint_foldcase_&1; }
-    int hint()      { DCHECK_EQ(opcode(), kInstByteRange); return hint_foldcase_>>1; }
-    int match_id()  { DCHECK_EQ(opcode(), kInstMatch); return match_id_; }
-    EmptyOp empty() { DCHECK_EQ(opcode(), kInstEmptyWidth); return empty_; }
+    InstOp opcode() { return static_cast<InstOp>(out_opcode_ & 7); }
+    int last() { return (out_opcode_ >> 3) & 1; }
+    int out() { return out_opcode_ >> 4; }
+    int out1() {
+      ABSL_DCHECK(opcode() == kInstAlt || opcode() == kInstAltMatch);
+      return out1_;
+    }
+    int cap() {
+      ABSL_DCHECK_EQ(opcode(), kInstCapture);
+      return cap_;
+    }
+    int lo() {
+      ABSL_DCHECK_EQ(opcode(), kInstByteRange);
+      return lo_;
+    }
+    int hi() {
+      ABSL_DCHECK_EQ(opcode(), kInstByteRange);
+      return hi_;
+    }
+    int foldcase() {
+      ABSL_DCHECK_EQ(opcode(), kInstByteRange);
+      return hint_foldcase_ & 1;
+    }
+    int hint() {
+      ABSL_DCHECK_EQ(opcode(), kInstByteRange);
+      return hint_foldcase_ >> 1;
+    }
+    int match_id() {
+      ABSL_DCHECK_EQ(opcode(), kInstMatch);
+      return match_id_;
+    }
+    EmptyOp empty() {
+      ABSL_DCHECK_EQ(opcode(), kInstEmptyWidth);
+      return empty_;
+    }
 
     bool greedy(Prog* p) {
-      DCHECK_EQ(opcode(), kInstAltMatch);
+      ABSL_DCHECK_EQ(opcode(), kInstAltMatch);
       return p->inst(out())->opcode() == kInstByteRange ||
              (p->inst(out())->opcode() == kInstNop &&
               p->inst(p->inst(out())->out())->opcode() == kInstByteRange);
@@ -100,7 +127,7 @@ class Prog {
 
     // Does this inst (an kInstByteRange) match c?
     inline bool Matches(int c) {
-      DCHECK_EQ(opcode(), kInstByteRange);
+      ABSL_DCHECK_EQ(opcode(), kInstByteRange);
       if (foldcase() && 'A' <= c && c <= 'Z')
         c += 'a' - 'A';
       return lo_ <= c && c <= hi_;
@@ -221,7 +248,7 @@ class Prog {
   // Accelerates to the first likely occurrence of the prefix.
   // Returns a pointer to the first byte or NULL if not found.
   const void* PrefixAccel(const void* data, size_t size) {
-    DCHECK(can_prefix_accel());
+    ABSL_DCHECK(can_prefix_accel());
     if (prefix_foldcase_) {
       return PrefixAccel_ShiftDFA(data, size);
     } else if (prefix_size_ != 1) {

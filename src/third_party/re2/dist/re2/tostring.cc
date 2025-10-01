@@ -6,13 +6,14 @@
 // Tested by parse_test.cc
 
 #include <string.h>
+
 #include <string>
 
+#include "absl/log/absl_log.h"
 #include "absl/strings/str_format.h"
-#include "util/logging.h"
-#include "util/utf.h"
 #include "re2/regexp.h"
 #include "re2/walker-inl.h"
+#include "util/utf.h"
 
 namespace re2 {
 
@@ -101,7 +102,7 @@ int ToStringWalker::PreVisit(Regexp* re, int parent_arg, bool* stop) {
     case kRegexpCapture:
       t_->append("(");
       if (re->cap() == 0)
-        LOG(DFATAL) << "kRegexpCapture cap() == 0";
+        ABSL_LOG(DFATAL) << "kRegexpCapture cap() == 0";
       if (re->name()) {
         t_->append("?P<");
         t_->append(*re->name());
@@ -184,7 +185,7 @@ int ToStringWalker::PostVisit(Regexp* re, int parent_arg, int pre_arg,
       if ((*t_)[t_->size()-1] == '|')
         t_->erase(t_->size()-1);
       else
-        LOG(DFATAL) << "Bad final char: " << t_;
+        ABSL_LOG(DFATAL) << "Bad final char: " << t_;
       if (prec < PrecAlternate)
         t_->append(")");
       break;

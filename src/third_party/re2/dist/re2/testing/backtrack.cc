@@ -13,7 +13,7 @@
 // THIS CODE SHOULD NEVER BE USED IN PRODUCTION:
 //   - It uses a ton of memory.
 //   - It uses a ton of stack.
-//   - It uses CHECK and LOG(FATAL).
+//   - It uses ABSL_CHECK() and ABSL_LOG(FATAL).
 //   - It implements unanchored search by repeated anchored search.
 //
 // On the other hand, it is very simple and a good reference
@@ -28,7 +28,9 @@
 #include <string.h>
 
 #include "absl/base/macros.h"
-#include "util/logging.h"
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
+#include "absl/strings/string_view.h"
 #include "re2/pod_array.h"
 #include "re2/prog.h"
 #include "re2/regexp.h"
@@ -111,7 +113,7 @@ bool Backtracker::Search(absl::string_view text, absl::string_view context,
   endmatch_ = prog_->anchor_end();
   submatch_ = submatch;
   nsubmatch_ = nsubmatch;
-  CHECK_LT(2*nsubmatch_, static_cast<int>(ABSL_ARRAYSIZE(cap_)));
+  ABSL_CHECK_LT(2*nsubmatch_, static_cast<int>(ABSL_ARRAYSIZE(cap_)));
   memset(cap_, 0, sizeof cap_);
 
   // We use submatch_[0] for our own bookkeeping,
@@ -157,10 +159,10 @@ bool Backtracker::Visit(int id, const char* p) {
   // Check bitmap.  If we've already explored from here,
   // either it didn't match or it did but we're hoping for a better match.
   // Either way, don't go down that road again.
-  CHECK(p <= text_.data() + text_.size());
+  ABSL_CHECK(p <= text_.data() + text_.size());
   int n = id * static_cast<int>(text_.size()+1) +
           static_cast<int>(p-text_.data());
-  CHECK_LT(n/32, visited_.size());
+  ABSL_CHECK_LT(n/32, visited_.size());
   if (visited_[n/32] & (1 << (n&31)))
     return false;
   visited_[n/32] |= 1 << (n&31);
@@ -188,7 +190,7 @@ bool Backtracker::Try(int id, const char* p) {
   Prog::Inst* ip = prog_->inst(id);
   switch (ip->opcode()) {
     default:
-      LOG(FATAL) << "Unexpected opcode: " << (int)ip->opcode();
+      ABSL_LOG(FATAL) << "Unexpected opcode: " << ip->opcode();
       return false;  // not reached
 
     case kInstAltMatch:

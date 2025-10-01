@@ -33,4 +33,3 @@ TEST(EgrepLiterals, UTF8) {
 }
 
 }  // namespace re2
-

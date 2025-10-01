@@ -20,22 +20,26 @@
 // Then RunPostfix turns each sequence into a regular expression
 // and passes the regexp to HandleRegexp.
 
+#include "re2/testing/regexp_generator.h"
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+
 #include <memory>
+#include <random>
 #include <stack>
 #include <string>
 #include <vector>
 
 #include "absl/base/macros.h"
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
 #include "absl/strings/escaping.h"
 #include "absl/strings/str_format.h"
-#include "gtest/gtest.h"
-#include "util/logging.h"
+#include "absl/strings/string_view.h"
 #include "util/utf.h"
-#include "re2/testing/regexp_generator.h"
 
 namespace re2 {
 
@@ -196,13 +200,13 @@ void RegexpGenerator::RunPostfix(const std::vector<std::string>& post) {
   for (size_t i = 0; i < post.size(); i++) {
     switch (CountArgs(post[i])) {
       default:
-        LOG(FATAL) << "Bad operator: " << post[i];
+        ABSL_LOG(FATAL) << "Bad operator: " << post[i];
       case 0:
         regexps.push(post[i]);
         break;
       case 1: {
         auto fmt = absl::ParsedFormat<'s'>::New(post[i]);
-        CHECK(fmt != nullptr);
+        ABSL_CHECK(fmt != nullptr);
         std::string a = regexps.top();
         regexps.pop();
         regexps.push("(?:" + absl::StrFormat(*fmt, a) + ")");
@@ -210,7 +214,7 @@ void RegexpGenerator::RunPostfix(const std::vector<std::string>& post) {
       }
       case 2: {
         auto fmt = absl::ParsedFormat<'s', 's'>::New(post[i]);
-        CHECK(fmt != nullptr);
+        ABSL_CHECK(fmt != nullptr);
         std::string b = regexps.top();
         regexps.pop();
         std::string a = regexps.top();
@@ -232,7 +236,7 @@ void RegexpGenerator::RunPostfix(const std::vector<std::string>& post) {
       absl::PrintF("  %s\n", absl::CEscape(regexps.top()));
       regexps.pop();
     }
-    LOG(FATAL) << "Bad regexp program.";
+    ABSL_LOG(FATAL) << "Bad regexp program.";
   }
 
   HandleRegexp(regexps.top());

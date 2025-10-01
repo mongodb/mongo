@@ -4,14 +4,15 @@
 
 // Test parse.cc, dump.cc, and tostring.cc.
 
+#include "re2/regexp.h"
+
 #include <stddef.h>
+
 #include <map>
 #include <string>
 #include <vector>
 
 #include "gtest/gtest.h"
-#include "util/logging.h"
-#include "re2/regexp.h"
 
 namespace re2 {
 
@@ -53,8 +54,8 @@ TEST(Regexp, NamedCaptures) {
   EXPECT_EQ(4, x->NumCaptures());
   const std::map<std::string, int>* have = x->NamedCaptures();
   EXPECT_TRUE(have != NULL);
-  EXPECT_EQ(2, have->size());  // there are only two named groups in
-                               // the regexp: 'g1' and 'g2'.
+  // there are only two named groups in the regexp: 'g1' and 'g2'.
+  EXPECT_EQ(size_t{2}, have->size());
   std::map<std::string, int> want;
   want["g1"] = 1;
   want["g2"] = 3;
@@ -72,7 +73,7 @@ TEST(Regexp, CaptureNames) {
   EXPECT_EQ(4, x->NumCaptures());
   const std::map<int, std::string>* have = x->CaptureNames();
   EXPECT_TRUE(have != NULL);
-  EXPECT_EQ(3, have->size());
+  EXPECT_EQ(size_t{3}, have->size());
   std::map<int, std::string> want;
   want[1] = "g1";
   want[3] = "g2";

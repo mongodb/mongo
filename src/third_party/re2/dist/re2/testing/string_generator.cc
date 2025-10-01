@@ -6,14 +6,17 @@
 // maxlen letters using the set of letters in alpha.
 // Fetch strings using a Java-like Next()/HasNext() interface.
 
+#include "re2/testing/string_generator.h"
+
 #include <stddef.h>
 #include <stdint.h>
+
+#include <random>
 #include <string>
 #include <vector>
 
-#include "gtest/gtest.h"
-#include "util/logging.h"
-#include "re2/testing/string_generator.h"
+#include "absl/log/absl_check.h"
+#include "absl/strings/string_view.h"
 
 namespace re2 {
 
@@ -82,7 +85,7 @@ bool StringGenerator::RandomDigits() {
 // after computing the string, so that it knows the answer
 // for subsequent HasNext() calls.
 absl::string_view StringGenerator::Next() {
-  CHECK(hasnext_);
+  ABSL_CHECK(hasnext_);
   if (generate_null_) {
     generate_null_ = false;
     sp_ = absl::string_view();
@@ -112,8 +115,8 @@ void StringGenerator::GenerateNULL() {
 }
 
 std::string DeBruijnString(int n) {
-  CHECK_GE(n, 1);
-  CHECK_LE(n, 29);
+  ABSL_CHECK_GE(n, 1);
+  ABSL_CHECK_LE(n, 29);
   const size_t size = size_t{1} << static_cast<size_t>(n);
   const size_t mask = size - 1;
   std::vector<bool> did(size, false);
@@ -131,10 +134,10 @@ std::string DeBruijnString(int n) {
     } else {
       s += '0';
     }
-    CHECK(!did[bits]);
+    ABSL_CHECK(!did[bits]);
     did[bits] = true;
   }
-  CHECK_EQ(s.size(), static_cast<size_t>(n - 1) + size);
+  ABSL_CHECK_EQ(s.size(), static_cast<size_t>(n - 1) + size);
   return s;
 }
 

@@ -20,10 +20,13 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
 #include <limits>
 #include <utility>
 
-#include "util/logging.h"
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
+#include "absl/strings/string_view.h"
 #include "re2/pod_array.h"
 #include "re2/prog.h"
 #include "re2/regexp.h"
@@ -107,9 +110,9 @@ void BitState::Push(int id, const char* p) {
   if (njob_ >= job_.size()) {
     GrowStack();
     if (njob_ >= job_.size()) {
-      LOG(DFATAL) << "GrowStack() failed: "
-                  << "njob_ = " << njob_ << ", "
-                  << "job_.size() = " << job_.size();
+      ABSL_LOG(DFATAL) << "GrowStack() failed: "
+                       << "njob_ = " << njob_ << ", "
+                       << "job_.size() = " << job_.size();
       return;
     }
   }
@@ -167,7 +170,7 @@ bool BitState::TrySearch(int id0, const char* p0) {
     Prog::Inst* ip = prog_->inst(id);
     switch (ip->opcode()) {
       default:
-        LOG(DFATAL) << "Unexpected opcode: " << ip->opcode();
+        ABSL_LOG(DFATAL) << "Unexpected opcode: " << ip->opcode();
         return false;
 
       case kInstFail:
@@ -233,7 +236,7 @@ bool BitState::TrySearch(int id0, const char* p0) {
       CheckAndLoop:
         // Sanity check: id is the head of its list, which must
         // be the case if id-1 is the last of *its* list. :)
-        DCHECK(id == 0 || prog_->inst(id-1)->last());
+        ABSL_DCHECK(id == 0 || prog_->inst(id-1)->last());
         if (ShouldVisit(id, p))
           goto Loop;
         break;

@@ -13,7 +13,8 @@
 #include <string>
 #include <vector>
 
-#include "util/logging.h"
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
 
 namespace re2 {
 
@@ -42,7 +43,7 @@ class Prefilter {
 
   // The children of the Prefilter node.
   std::vector<Prefilter*>* subs() {
-    DCHECK(op_ == AND || op_ == OR);
+    ABSL_DCHECK(op_ == AND || op_ == OR);
     return subs_;
   }
 

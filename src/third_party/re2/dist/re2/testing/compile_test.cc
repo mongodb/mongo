@@ -4,13 +4,16 @@
 
 // Test prog.cc, compile.cc
 
+#include <stddef.h>
+
 #include <string>
 
 #include "absl/base/macros.h"
+#include "absl/log/absl_log.h"
+#include "absl/strings/string_view.h"
 #include "gtest/gtest.h"
-#include "util/logging.h"
-#include "re2/regexp.h"
 #include "re2/prog.h"
+#include "re2/regexp.h"
 
 namespace re2 {
 
@@ -132,13 +135,13 @@ TEST(TestRegexpCompileToProg, Simple) {
     const re2::Test& t = tests[i];
     Regexp* re = Regexp::Parse(t.regexp, Regexp::PerlX|Regexp::Latin1, NULL);
     if (re == NULL) {
-      LOG(ERROR) << "Cannot parse: " << t.regexp;
+      ABSL_LOG(ERROR) << "Cannot parse: " << t.regexp;
       failed++;
       continue;
     }
     Prog* prog = re->CompileToProg(0);
     if (prog == NULL) {
-      LOG(ERROR) << "Cannot compile: " << t.regexp;
+      ABSL_LOG(ERROR) << "Cannot compile: " << t.regexp;
       re->Decref();
       failed++;
       continue;
@@ -146,9 +149,9 @@ TEST(TestRegexpCompileToProg, Simple) {
     ASSERT_TRUE(re->CompileToProg(1) == NULL);
     std::string s = prog->Dump();
     if (s != t.code) {
-      LOG(ERROR) << "Incorrect compiled code for: " << t.regexp;
-      LOG(ERROR) << "Want:\n" << t.code;
-      LOG(ERROR) << "Got:\n" << s;
+      ABSL_LOG(ERROR) << "Incorrect compiled code for: " << t.regexp;
+      ABSL_LOG(ERROR) << "Want:\n" << t.code;
+      ABSL_LOG(ERROR) << "Got:\n" << s;
       failed++;
     }
     delete prog;

@@ -19,11 +19,12 @@
 #include <string>
 
 #include "absl/base/macros.h"
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
-#include "util/logging.h"
-#include "util/utf.h"
 #include "re2/regexp.h"
+#include "util/utf.h"
 
 namespace re2 {
 
@@ -96,17 +97,25 @@ static void DumpRegexpAppending(Regexp* re, std::string* s) {
       break;
     case kRegexpLiteral: {
       Rune r = re->rune();
-      char buf[UTFmax+1];
-      buf[runetochar(buf, &r)] = 0;
-      s->append(buf);
+      if (re->parse_flags() & Regexp::Latin1) {
+        s->push_back(r);
+      } else {
+        char buf[UTFmax+1];
+        buf[runetochar(buf, &r)] = 0;
+        s->append(buf);
+      }
       break;
     }
     case kRegexpLiteralString:
       for (int i = 0; i < re->nrunes(); i++) {
         Rune r = re->runes()[i];
-        char buf[UTFmax+1];
-        buf[runetochar(buf, &r)] = 0;
-        s->append(buf);
+        if (re->parse_flags() & Regexp::Latin1) {
+          s->push_back(r);
+        } else {
+          char buf[UTFmax+1];
+          buf[runetochar(buf, &r)] = 0;
+          s->append(buf);
+        }
       }
       break;
     case kRegexpConcat:
@@ -121,7 +130,7 @@ static void DumpRegexpAppending(Regexp* re, std::string* s) {
       break;
     case kRegexpCapture:
       if (re->cap() == 0)
-        LOG(DFATAL) << "kRegexpCapture cap() == 0";
+        ABSL_LOG(DFATAL) << "kRegexpCapture cap() == 0";
       if (re->name()) {
         s->append(*re->name());
         s->append(":");
@@ -153,7 +162,7 @@ static void DumpRegexpAppending(Regexp* re, std::string* s) {
 std::string Regexp::Dump() {
   // Make sure that we are being called from a unit test.
   // Should cause a link error if used outside of testing.
-  CHECK(!::testing::TempDir().empty());
+  ABSL_CHECK(!::testing::TempDir().empty());
 
   std::string s;
   DumpRegexpAppending(this, &s);

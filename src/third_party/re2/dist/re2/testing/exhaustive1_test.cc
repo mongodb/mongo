@@ -9,6 +9,7 @@
 
 #include "gtest/gtest.h"
 #include "re2/testing/exhaustive_tester.h"
+#include "re2/testing/regexp_generator.h"
 
 namespace re2 {
 

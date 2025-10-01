@@ -16,7 +16,8 @@
 #include <stack>
 
 #include "absl/base/macros.h"
-#include "util/logging.h"
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
 #include "re2/regexp.h"
 
 namespace re2 {
@@ -147,7 +148,7 @@ template<typename T> Regexp::Walker<T>::~Walker() {
 // Logs DFATAL if stack is not already clear.
 template<typename T> void Regexp::Walker<T>::Reset() {
   if (!stack_.empty()) {
-    LOG(DFATAL) << "Stack not empty.";
+    ABSL_LOG(DFATAL) << "Stack not empty.";
     while (!stack_.empty()) {
       if (stack_.top().re->nsub_ > 1)
         delete[] stack_.top().child_args;
@@ -161,7 +162,7 @@ template<typename T> T Regexp::Walker<T>::WalkInternal(Regexp* re, T top_arg,
   Reset();
 
   if (re == NULL) {
-    LOG(DFATAL) << "Walk NULL";
+    ABSL_LOG(DFATAL) << "Walk NULL";
     return top_arg;
   }
 
@@ -191,7 +192,7 @@ template<typename T> T Regexp::Walker<T>::WalkInternal(Regexp* re, T top_arg,
           s->child_args = &s->child_arg;
         else if (re->nsub_ > 1)
           s->child_args = new T[re->nsub_];
-        ABSL_FALLTHROUGH_INTENDED;
+        [[fallthrough]];
       }
       default: {
         if (re->nsub_ > 0) {

@@ -772,7 +772,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "pkg:github/google/re2@2023-11-01",
+      "bom-ref": "pkg:github/google/re2@2025-08-12",
       "supplier": {
         "name": "Google LLC",
         "url": [
@@ -782,7 +782,7 @@
       "author": "The RE2 Authors",
       "group": "google.opensource",
       "name": "re2",
-      "version": "2023-11-01",
+      "version": "2025-08-12",
       "description": "RE2 is a fast, safe, thread-friendly alternative to backtracking regular expression engines like those used in PCRE, Perl, and Python. It is a C++ library.",
       "licenses": [
         {
@@ -792,8 +792,8 @@
         }
       ],
       "copyright": "Copyright (c) 2009 The RE2 Authors. All rights reserved.",
-      "cpe": "cpe:2.3:h:google:re2:2023-11-01:*:*:*:*:*:*:*",
-      "purl": "pkg:github/google/re2@2023-11-01",
+      "cpe": "cpe:2.3:h:google:re2:2025-08-12:*:*:*:*:*:*:*",
+      "purl": "pkg:github/google/re2@2025-08-12",
       "properties": [
         {
           "name": "internal:team_responsible",
@@ -2966,7 +2966,7 @@
         "pkg:github/fmtlib/fmt@11.1.3",
         "pkg:github/facebook/folly@v2025.04.21.00",
         "pkg:github/google/benchmark@v1.5.2",
-        "pkg:github/google/re2@2023-11-01",
+        "pkg:github/google/re2@2025-08-12",
         "pkg:github/google/snappy@1.1.10",
         "pkg:github/google/tcmalloc@093ba93c1bd6dca03b0a8334f06d01b019244291",
         "pkg:github/google/googletest@v1.17.0",
@@ -3089,7 +3089,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:github/google/re2@2023-11-01",
+      "ref": "pkg:github/google/re2@2025-08-12",
       "dependsOn": []
     },
     {

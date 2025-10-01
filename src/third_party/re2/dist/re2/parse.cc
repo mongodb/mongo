@@ -16,24 +16,24 @@
 // and recognizes the Perl escape sequences \d, \s, \w, \D, \S, and \W.
 // See regexp.h for rationale.
 
-#include <ctype.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+
 #include <algorithm>
-#include <map>
 #include <string>
 #include <vector>
 
 #include "absl/base/macros.h"
+#include "absl/log/absl_log.h"
 #include "absl/strings/ascii.h"
-#include "util/logging.h"
-#include "util/utf.h"
+#include "absl/strings/string_view.h"
 #include "re2/pod_array.h"
 #include "re2/regexp.h"
 #include "re2/unicode_casefold.h"
 #include "re2/unicode_groups.h"
 #include "re2/walker-inl.h"
+#include "util/utf.h"
 
 #if defined(RE2_USE_ICU)
 #include "unicode/uniset.h"
@@ -303,7 +303,7 @@ Rune ApplyFold(const CaseFold* f, Rune r) {
     case EvenOddSkip:  // even <-> odd but only applies to every other
       if ((r - f->lo) % 2)
         return r;
-      ABSL_FALLTHROUGH_INTENDED;
+      [[fallthrough]];
     case EvenOdd:  // even <-> odd
       if (r%2 == 0)
         return r + 1;
@@ -312,7 +312,7 @@ Rune ApplyFold(const CaseFold* f, Rune r) {
     case OddEvenSkip:  // odd <-> even but only applies to every other
       if ((r - f->lo) % 2)
         return r;
-      ABSL_FALLTHROUGH_INTENDED;
+      [[fallthrough]];
     case OddEven:  // odd <-> even
       if (r%2 == 1)
         return r + 1;
@@ -338,6 +338,20 @@ Rune CycleFoldRune(Rune r) {
 }
 
 // Add lo-hi to the class, along with their fold-equivalent characters.
+static void AddFoldedRangeLatin1(CharClassBuilder* cc, Rune lo, Rune hi) {
+  while (lo <= hi) {
+    cc->AddRange(lo, lo);
+    if ('A' <= lo && lo <= 'Z') {
+      cc->AddRange(lo - 'A' + 'a', lo - 'A' + 'a');
+    }
+    if ('a' <= lo && lo <= 'z') {
+      cc->AddRange(lo - 'a' + 'A', lo - 'a' + 'A');
+    }
+    lo++;
+  }
+}
+
+// Add lo-hi to the class, along with their fold-equivalent characters.
 // If lo-hi is already in the class, assume that the fold-equivalent
 // chars are there too, so there's no work to do.
 static void AddFoldedRange(CharClassBuilder* cc, Rune lo, Rune hi, int depth) {
@@ -346,7 +360,7 @@ static void AddFoldedRange(CharClassBuilder* cc, Rune lo, Rune hi, int depth) {
   // current Unicode tables.  make_unicode_casefold.py checks that
   // the cycles are not too long, and we double-check here using depth.
   if (depth > 10) {
-    LOG(DFATAL) << "AddFoldedRange recurses too much.";
+    ABSL_LOG(DFATAL) << "AddFoldedRange recurses too much.";
     return;
   }
 
@@ -394,17 +408,26 @@ static void AddFoldedRange(CharClassBuilder* cc, Rune lo, Rune hi, int depth) {
 // Pushes the literal rune r onto the stack.
 bool Regexp::ParseState::PushLiteral(Rune r) {
   // Do case folding if needed.
-  if ((flags_ & FoldCase) && CycleFoldRune(r) != r) {
-    Regexp* re = new Regexp(kRegexpCharClass, flags_ & ~FoldCase);
-    re->ccb_ = new CharClassBuilder;
-    Rune r1 = r;
-    do {
-      if (!(flags_ & NeverNL) || r != '\n') {
-        re->ccb_->AddRange(r, r);
-      }
-      r = CycleFoldRune(r);
-    } while (r != r1);
-    return PushRegexp(re);
+  if (flags_ & FoldCase) {
+    if (flags_ & Latin1 && (('A' <= r && r <= 'Z') ||
+                            ('a' <= r && r <= 'z'))) {
+      Regexp* re = new Regexp(kRegexpCharClass, flags_ & ~FoldCase);
+      re->ccb_ = new CharClassBuilder;
+      AddFoldedRangeLatin1(re->ccb_, r, r);
+      return PushRegexp(re);
+    }
+    if (!(flags_ & Latin1) && CycleFoldRune(r) != r) {
+      Regexp* re = new Regexp(kRegexpCharClass, flags_ & ~FoldCase);
+      re->ccb_ = new CharClassBuilder;
+      Rune r1 = r;
+      do {
+        if (!(flags_ & NeverNL) || r != '\n') {
+          re->ccb_->AddRange(r, r);
+        }
+        r = CycleFoldRune(r);
+      } while (r != r1);
+      return PushRegexp(re);
+    }
   }
 
   // Exclude newline if applicable.
@@ -556,7 +579,7 @@ int RepetitionWalker::PostVisit(Regexp* re, int parent_arg, int pre_arg,
 int RepetitionWalker::ShortVisit(Regexp* re, int parent_arg) {
   // Should never be called: we use Walk(), not WalkExponential().
 #ifndef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
-  LOG(DFATAL) << "RepetitionWalker::ShortVisit called";
+  ABSL_LOG(DFATAL) << "RepetitionWalker::ShortVisit called";
 #endif
   return 0;
 }
@@ -776,7 +799,8 @@ Rune* Regexp::LeadingString(Regexp* re, int* nrune,
   while (re->op() == kRegexpConcat && re->nsub() > 0)
     re = re->sub()[0];
 
-  *flags = static_cast<Regexp::ParseFlags>(re->parse_flags_ & Regexp::FoldCase);
+  *flags = static_cast<Regexp::ParseFlags>(re->parse_flags_ &
+                                           (Regexp::FoldCase | Regexp::Latin1));
 
   if (re->op() == kRegexpLiteral) {
     *nrune = 1;
@@ -843,7 +867,7 @@ void Regexp::RemoveLeadingString(Regexp* re, int n) {
         case 0:
         case 1:
           // Impossible.
-          LOG(DFATAL) << "Concat of " << re->nsub();
+          ABSL_LOG(DFATAL) << "Concat of " << re->nsub();
           re->submany_ = NULL;
           re->op_ = kRegexpEmptyMatch;
           break;
@@ -973,7 +997,7 @@ int Regexp::FactorAlternation(Regexp** sub, int nsub, ParseFlags flags) {
             i += iter->nsub;
             break;
           default:
-            LOG(DFATAL) << "unknown round: " << round;
+            ABSL_LOG(DFATAL) << "unknown round: " << round;
             break;
         }
         // If we are done, copy until the end of sub.
@@ -1012,7 +1036,7 @@ int Regexp::FactorAlternation(Regexp** sub, int nsub, ParseFlags flags) {
           continue;
         }
       default:
-        LOG(DFATAL) << "unknown round: " << round;
+        ABSL_LOG(DFATAL) << "unknown round: " << round;
         break;
     }
 
@@ -1175,16 +1199,26 @@ void FactorAlternationImpl::Round3(Regexp** sub, int nsub,
         if (re->op() == kRegexpCharClass) {
           CharClass* cc = re->cc();
           for (CharClass::iterator it = cc->begin(); it != cc->end(); ++it)
-            ccb.AddRange(it->lo, it->hi);
+            ccb.AddRangeFlags(it->lo, it->hi, re->parse_flags());
         } else if (re->op() == kRegexpLiteral) {
-          ccb.AddRangeFlags(re->rune(), re->rune(), re->parse_flags());
+          if (re->parse_flags() & Regexp::FoldCase) {
+            // AddFoldedRange() can terminate prematurely if the character class
+            // already contains the rune. For example, if it contains 'a' and we
+            // want to add folded 'a', it sees 'a' and stops without adding 'A'.
+            // To avoid that, we use an empty character class and then merge it.
+            CharClassBuilder tmp;
+            tmp.AddRangeFlags(re->rune(), re->rune(), re->parse_flags());
+            ccb.AddCharClass(&tmp);
+          } else {
+            ccb.AddRangeFlags(re->rune(), re->rune(), re->parse_flags());
+          }
         } else {
-          LOG(DFATAL) << "RE2: unexpected op: " << re->op() << " "
-                      << re->ToString();
+          ABSL_LOG(DFATAL) << "RE2: unexpected op: " << re->op() << " "
+                           << re->ToString();
         }
         re->Decref();
       }
-      Regexp* re = Regexp::NewCharClass(ccb.GetCharClass(), flags);
+      Regexp* re = Regexp::NewCharClass(ccb.GetCharClass(), flags & ~Regexp::FoldCase);
       splices->emplace_back(re, sub + start, i - start);
     }
 
@@ -1441,7 +1475,7 @@ static int UnHex(int c) {
     return c - 'A' + 10;
   if ('a' <= c && c <= 'f')
     return c - 'a' + 10;
-  LOG(DFATAL) << "Bad hex digit " << c;
+  ABSL_LOG(DFATAL) << "Bad hex digit " << c;
   return 0;
 }
 
@@ -1490,7 +1524,7 @@ static bool ParseEscape(absl::string_view* s, Rune* rp,
       // Single non-zero octal digit is a backreference; not supported.
       if (s->empty() || (*s)[0] < '0' || (*s)[0] > '7')
         goto BadEscape;
-      ABSL_FALLTHROUGH_INTENDED;
+      [[fallthrough]];
     case '0':
       // consume up to three octal digits; already have one.
       code = c - '0';
@@ -1612,10 +1646,15 @@ void CharClassBuilder::AddRangeFlags(
   }
 
   // If folding case, add fold-equivalent characters too.
-  if (parse_flags & Regexp::FoldCase)
-    AddFoldedRange(this, lo, hi, 0);
-  else
+  if (parse_flags & Regexp::FoldCase) {
+    if (parse_flags & Regexp::Latin1) {
+      AddFoldedRangeLatin1(this, lo, hi);
+    } else {
+      AddFoldedRange(this, lo, hi, 0);
+    }
+  } else {
     AddRange(lo, hi);
+  }
 }
 
 // Look for a group with the given name.
@@ -2056,7 +2095,18 @@ bool Regexp::ParseState::ParsePerlFlags(absl::string_view* s) {
   // Caller is supposed to check this.
   if (!(flags_ & PerlX) || t.size() < 2 || t[0] != '(' || t[1] != '?') {
     status_->set_code(kRegexpInternalError);
-    LOG(DFATAL) << "Bad call to ParseState::ParsePerlFlags";
+    ABSL_LOG(DFATAL) << "Bad call to ParseState::ParsePerlFlags";
+    return false;
+  }
+
+  // Check for look-around assertions. This is NOT because we support them! ;)
+  // As per https://github.com/google/re2/issues/468, we really want to report
+  // kRegexpBadPerlOp (not kRegexpBadNamedCapture) for look-behind assertions.
+  // Additionally, it would be nice to report not "(?<", but "(?<=" or "(?<!".
+  if ((t.size() > 3 && (t[2] == '=' || t[2] == '!')) ||
+      (t.size() > 4 && t[2] == '<' && (t[3] == '=' || t[3] == '!'))) {
+    status_->set_code(kRegexpBadPerlOp);
+    status_->set_error_arg(absl::string_view(t.data(), t[2] == '<' ? 4 : 3));
     return false;
   }
 

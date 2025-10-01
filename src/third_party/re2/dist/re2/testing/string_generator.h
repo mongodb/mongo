@@ -10,6 +10,7 @@
 // Fetch strings using a Java-like Next()/HasNext() interface.
 
 #include <stdint.h>
+
 #include <random>
 #include <string>
 #include <vector>

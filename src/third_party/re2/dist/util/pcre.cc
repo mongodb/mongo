@@ -16,16 +16,17 @@
 #include <utility>
 
 #include "absl/flags/flag.h"
+#include "absl/log/absl_check.h"
+#include "absl/log/absl_log.h"
 #include "absl/strings/str_format.h"
-#include "util/logging.h"
 #include "util/pcre.h"
 
 // Silence warnings about the wacky formatting in the operator() functions.
-#if !defined(__clang__) && defined(__GNUC__)
+#if defined(__GNUC__)
 #pragma GCC diagnostic ignored "-Wmisleading-indentation"
 #endif
 
-#define PCREPORT(level) LOG(level)
+#define PCREPORT(level) ABSL_LOG(level)
 
 // Default PCRE limits.
 // Defaults chosen to allow a plausible amount of CPU and

@@ -5,10 +5,12 @@
 #include <fuzzer/FuzzedDataProvider.h>
 #include <stddef.h>
 #include <stdint.h>
+
 #include <algorithm>
 #include <string>
 #include <vector>
 
+#include "absl/strings/string_view.h"
 #include "re2/filtered_re2.h"
 #include "re2/re2.h"
 #include "re2/regexp.h"

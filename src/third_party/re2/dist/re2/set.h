@@ -53,6 +53,10 @@ class RE2::Set {
   // the error message from the parser.
   int Add(absl::string_view pattern, std::string* error);
 
+  // Returns the number of patterns in the set.
+  // Can be called before or after Compile().
+  int Size() const;
+
   // Compiles the set in preparation for matching.
   // Returns false if the compiler runs out of memory.
   // Add() must not be called again after Compile().
@@ -62,6 +66,7 @@ class RE2::Set {
   // Returns true if text matches at least one of the regexps in the set.
   // Fills v (if not NULL) with the indices of the matching regexps.
   // Callers must not expect v to be sorted.
+  // The indices are in the half-open interval [0, Size()).
   bool Match(absl::string_view text, std::vector<int>* v) const;
 
   // As above, but populates error_info (if not NULL) when none of the regexps

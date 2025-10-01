@@ -6,6 +6,7 @@
 #define RE2_TESTING_EXHAUSTIVE_TESTER_H_
 
 #include <stdint.h>
+
 #include <string>
 #include <vector>
 

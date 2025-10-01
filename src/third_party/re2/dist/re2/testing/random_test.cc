@@ -4,7 +4,6 @@
 
 // Random testing of regular expression matching.
 
-#include <stdio.h>
 #include <string>
 #include <vector>
 
@@ -12,6 +11,7 @@
 #include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 #include "re2/testing/exhaustive_tester.h"
+#include "re2/testing/regexp_generator.h"
 
 ABSL_FLAG(int, regexpseed, 404, "Random regexp seed.");
 ABSL_FLAG(int, regexpcount, 100, "How many random regexps to generate.");

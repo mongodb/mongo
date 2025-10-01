@@ -6,14 +6,13 @@
 
 #include <stdint.h>
 
-#include "absl/base/macros.h"
-#include "util/logging.h"
+#include "absl/log/absl_check.h"
 
 namespace re2 {
 
 int Bitmap256::FindNextSetBit(int c) const {
-  DCHECK_GE(c, 0);
-  DCHECK_LE(c, 255);
+  ABSL_DCHECK_GE(c, 0);
+  ABSL_DCHECK_LE(c, 255);
 
   // Check the word that contains the bit. Mask out any lower bits.
   int i = c / 64;
@@ -27,15 +26,15 @@ int Bitmap256::FindNextSetBit(int c) const {
     case 1:
       if (words_[1] != 0)
         return (1 * 64) + FindLSBSet(words_[1]);
-      ABSL_FALLTHROUGH_INTENDED;
+      [[fallthrough]];
     case 2:
       if (words_[2] != 0)
         return (2 * 64) + FindLSBSet(words_[2]);
-      ABSL_FALLTHROUGH_INTENDED;
+      [[fallthrough]];
     case 3:
       if (words_[3] != 0)
         return (3 * 64) + FindLSBSet(words_[3]);
-      ABSL_FALLTHROUGH_INTENDED;
+      [[fallthrough]];
     default:
       return -1;
   }

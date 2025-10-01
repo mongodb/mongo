@@ -39,10 +39,10 @@
 // supplied pattern exactly.
 //
 // Example: successful match
-//    CHECK(PCRE::FullMatch("hello", "h.*o"));
+//    ABSL_CHECK(PCRE::FullMatch("hello", "h.*o"));
 //
 // Example: unsuccessful match (requires full match):
-//    CHECK(!PCRE::FullMatch("hello", "e"));
+//    ABSL_CHECK(!PCRE::FullMatch("hello", "e"));
 //
 // -----------------------------------------------------------------------
 // UTF-8 AND THE MATCHING INTERFACE:
@@ -58,7 +58,7 @@
 //
 // Example:
 //    PCRE re(utf8_pattern, PCRE::UTF8);
-//    CHECK(PCRE::FullMatch(utf8_string, re));
+//    ABSL_CHECK(PCRE::FullMatch(utf8_string, re));
 //
 // -----------------------------------------------------------------------
 // MATCHING WITH SUBSTRING EXTRACTION:
@@ -68,22 +68,22 @@
 // Example: extracts "ruby" into "s" and 1234 into "i"
 //    int i;
 //    std::string s;
-//    CHECK(PCRE::FullMatch("ruby:1234", "(\\w+):(\\d+)", &s, &i));
+//    ABSL_CHECK(PCRE::FullMatch("ruby:1234", "(\\w+):(\\d+)", &s, &i));
 //
 // Example: fails because string cannot be stored in integer
-//    CHECK(!PCRE::FullMatch("ruby", "(.*)", &i));
+//    ABSL_CHECK(!PCRE::FullMatch("ruby", "(.*)", &i));
 //
 // Example: fails because there aren't enough sub-patterns:
-//    CHECK(!PCRE::FullMatch("ruby:1234", "\\w+:\\d+", &s));
+//    ABSL_CHECK(!PCRE::FullMatch("ruby:1234", "\\w+:\\d+", &s));
 //
 // Example: does not try to extract any extra sub-patterns
-//    CHECK(PCRE::FullMatch("ruby:1234", "(\\w+):(\\d+)", &s));
+//    ABSL_CHECK(PCRE::FullMatch("ruby:1234", "(\\w+):(\\d+)", &s));
 //
 // Example: does not try to extract into NULL
-//    CHECK(PCRE::FullMatch("ruby:1234", "(\\w+):(\\d+)", NULL, &i));
+//    ABSL_CHECK(PCRE::FullMatch("ruby:1234", "(\\w+):(\\d+)", NULL, &i));
 //
 // Example: integer overflow causes failure
-//    CHECK(!PCRE::FullMatch("ruby:1234567891234", "\\w+:(\\d+)", &i));
+//    ABSL_CHECK(!PCRE::FullMatch("ruby:1234567891234", "\\w+:(\\d+)", &i));
 //
 // -----------------------------------------------------------------------
 // PARTIAL MATCHES
@@ -92,12 +92,12 @@
 // to match any substring of the text.
 //
 // Example: simple search for a string:
-//      CHECK(PCRE::PartialMatch("hello", "ell"));
+//      ABSL_CHECK(PCRE::PartialMatch("hello", "ell"));
 //
 // Example: find first number in a string
 //      int number;
-//      CHECK(PCRE::PartialMatch("x*100 + 20", "(\\d+)", &number));
-//      CHECK_EQ(number, 100);
+//      ABSL_CHECK(PCRE::PartialMatch("x*100 + 20", "(\\d+)", &number));
+//      ABSL_CHECK_EQ(number, 100);
 //
 // -----------------------------------------------------------------------
 // PPCRE-COMPILED PCREGULAR EXPPCRESSIONS
@@ -157,7 +157,7 @@
 //
 // Example:
 //   int a, b, c, d;
-//   CHECK(PCRE::FullMatch("100 40 0100 0x40", "(.*) (.*) (.*) (.*)",
+//   ABSL_CHECK(PCRE::FullMatch("100 40 0100 0x40", "(.*) (.*) (.*) (.*)",
 //         Octal(&a), Hex(&b), CRadix(&c), CRadix(&d));
 // will leave 64 in a, b, c, and d.
 
@@ -379,7 +379,7 @@ class PCRE {
   // text.  E.g.,
   //
   //   std::string s = "yabba dabba doo";
-  //   CHECK(PCRE::Replace(&s, "b+", "d"));
+  //   ABSL_CHECK(PCRE::Replace(&s, "b+", "d"));
   //
   // will leave "s" containing "yada dabba doo"
   //
@@ -393,7 +393,7 @@ class PCRE {
   // re-matching.  E.g.,
   //
   //   std::string s = "yabba dabba doo";
-  //   CHECK(PCRE::GlobalReplace(&s, "b+", "d"));
+  //   ABSL_CHECK(PCRE::GlobalReplace(&s, "b+", "d"));
   //
   // will leave "s" containing "yada dada doo"
   //
@@ -417,7 +417,7 @@ class PCRE {
   //   * The @p rewrite string doesn't have any syntax errors
   //       ('\' followed by anything besides [0-9] and '\').
   // Making this test will guarantee that "replace" and "extract"
-  // operations won't LOG(ERROR) or fail because of a bad rewrite
+  // operations won't ABSL_LOG(ERROR) or fail because of a bad rewrite
   // string.
   // @param rewrite The proposed rewrite string.
   // @param error An error message is recorded here, iff we return false.
