@@ -356,6 +356,20 @@ buildvariants:
       - name: .cluster_scalability_only
 
   - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
+    name: enterprise-amazon-linux2023-arm64-all-feature-flags-execution-control-with-prioritization
+    display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Execution Control with Prioritization"
+    tags: ["suggested"]
+    cron: "0 1 * * *" # From the ${project_nightly_cron} parameter.
+    expansions:
+      <<: *amazon_linux2023_arm64_all_feature_flags_dynamic_expansions
+      test_flags: >-
+        --runAllFeatureFlagTests
+        --mongodSetParameters="{storageEngineConcurrencyAdjustmentAlgorithm: fixedConcurrentTransactionsWithPrioritization}"
+        --excludeWithAnyTags=incompatible_with_execution_control_with_prioritization
+    tasks:
+      - name: noPassthroughWithMongod_gen
+
+  - <<: *enterprise-amazon-linux2023-arm64-all-feature-flags-template
     name: enterprise-amazon-linux2023-arm64-all-feature-flags-magic-restore
     display_name: "*| Amazon Linux 2023 arm64 Enterprise (all feature flags) Magic Restore Tasks"
     tags: ["suggested"]
