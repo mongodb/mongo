@@ -62,6 +62,8 @@
 
 namespace mongo {
 
+const BSONObj kNoHighWaterMark;
+
 const BSONObj AsyncResultsMerger::kWholeSortKeySortPattern =
     BSON(AsyncResultsMerger::kSortKeyField << 1);
 
@@ -180,7 +182,7 @@ AsyncResultsMerger::AsyncResultsMerger(OperationContext* opCtx,
 
     // If this is a change stream, then we expect to have already received PBRTs from every shard.
     invariant(_promisedMinSortKeys.empty() || _promisedMinSortKeys.size() == _remotes.size());
-    _setInitialHighWaterMark();
+    _determineInitialHighWaterMark();
 }
 
 AsyncResultsMerger::~AsyncResultsMerger() = default;
@@ -286,6 +288,11 @@ bool AsyncResultsMerger::checkHighWaterMarkIsMonotonicallyIncreasing(
     return compareSortKeys(current, proposed, sortKeyPattern) <= 0;
 }
 
+bool AsyncResultsMerger::checkHighWaterMarkIsMonotonicallyDecreasing(
+    const BSONObj& current, const BSONObj& proposed, const BSONObj& sortKeyPattern) {
+    return compareSortKeys(current, proposed, sortKeyPattern) >= 0;
+}
+
 void AsyncResultsMerger::addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
                                             const ShardTag& tag) {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -367,7 +374,9 @@ void AsyncResultsMerger::closeShardCursors(const stdx::unordered_set<ShardId>& s
                                   }),
                    _remotes.end());
 
-    _rebuildMergeQueueFromRemainingRemotes(lk);
+    if (_params.getSort()) {
+        _rebuildMergeQueueFromRemainingRemotes(lk);
+    }
 }
 
 void AsyncResultsMerger::setNextHighWaterMarkDeterminingStrategy(
@@ -380,10 +389,54 @@ void AsyncResultsMerger::setNextHighWaterMarkDeterminingStrategy(
     _nextHighWaterMarkDeterminingStrategy = std::move(nextHighWaterMarkDeterminingStrategy);
 }
 
+void AsyncResultsMerger::enableUndoNextReadyMode() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _undoModeEnabled = true;
+}
+
+void AsyncResultsMerger::disableUndoNextReadyMode() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    _undoModeEnabled = false;
+    _stateForNextReadyCallUndo.reset();
+}
+
+void AsyncResultsMerger::undoNextReady() {
+    stdx::lock_guard<stdx::mutex> lk(_mutex);
+    tassert(11057500,
+            "expecting undo mode to be enabled when calling 'undoNextReady()'",
+            _undoModeEnabled);
+    tassert(11057501,
+            "expecting undo state to be present when calling 'undoNextReady()'",
+            _stateForNextReadyCallUndo.has_value());
+
+    ClusterQueryResult& result = std::get<ClusterQueryResult>(*_stateForNextReadyCallUndo);
+    RemoteCursorPtr& remote = std::get<RemoteCursorPtr>(*_stateForNextReadyCallUndo);
+
+    tassert(11057502,
+            "expecting remote cursor for undone result to be still open",
+            std::find(_remotes.begin(), _remotes.end(), remote) != _remotes.end());
+
+    // Push document back to the beginning of the remote's document queue, so it will be popped off
+    // next.
+    remote->docBuffer.push_front(*result.getResult());
+
+    if (_params.getSort()) {
+        // Rebuild merge queue from the remaining remotes. A full rebuild is necessary here because
+        // the remote may have a different document in the merge queue already.
+        _rebuildMergeQueueFromRemainingRemotes(lk);
+        if (_tailableMode == TailableModeEnum::kTailableAndAwaitData) {
+            // Restore previous high water mark.
+            _highWaterMark = std::move(std::get<BSONObj>(*_stateForNextReadyCallUndo));
+        }
+    }
+
+    _stateForNextReadyCallUndo.reset();
+    _eofNext = false;
+}
+
 bool AsyncResultsMerger::getCompareWholeSortKey() const {
     return _params.getCompareWholeSortKey();
 }
-
 
 bool AsyncResultsMerger::partialResultsReturned() const {
     stdx::lock_guard<stdx::mutex> lk(_mutex);
@@ -447,13 +500,28 @@ BSONObj AsyncResultsMerger::getHighWaterMark() {
 }
 
 void AsyncResultsMerger::setInitialHighWaterMark(const BSONObj& highWaterMark) {
+    _setHighWaterMark(
+        highWaterMark, "setInitialHighWaterMark"_sd, true /* mustBeMonotonicallyIncreasing */);
+}
+
+void AsyncResultsMerger::setHighWaterMark(const BSONObj& highWaterMark) {
+    _setHighWaterMark(
+        highWaterMark, "setHighWaterMark"_sd, false /* mustBeMonotonicallyIncreasing */);
+}
+
+void AsyncResultsMerger::_setHighWaterMark(const BSONObj& highWaterMark,
+                                           StringData context,
+                                           bool mustBeMonotonicallyIncreasing) {
     // Extra wrapping necessary here because the high water mark is stored in sort-key format: {"":
     // <high watermark>}.
     auto newHighWaterMark = BSON("" << highWaterMark);
 
     stdx::lock_guard<stdx::mutex> lk(_mutex);
-    _ensureHighWaterMarkIsMonotonicallyIncreasing(
-        _highWaterMark, newHighWaterMark, "setInitialHighWaterMark");
+    if (mustBeMonotonicallyIncreasing) {
+        _ensureHighWaterMarkIsMonotonicallyIncreasing(_highWaterMark, newHighWaterMark, context);
+    } else {
+        _ensureHighWaterMarkIsMonotonicallyDecreasing(_highWaterMark, newHighWaterMark, context);
+    }
     _highWaterMark = std::move(newHighWaterMark);
 }
 
@@ -508,6 +576,15 @@ void AsyncResultsMerger::_ensureHighWaterMarkIsMonotonicallyIncreasing(const BSO
             checkHighWaterMarkIsMonotonicallyIncreasing(current, proposed, *_params.getSort()));
 }
 
+void AsyncResultsMerger::_ensureHighWaterMarkIsMonotonicallyDecreasing(const BSONObj& current,
+                                                                       const BSONObj& proposed,
+                                                                       StringData context) const {
+    tassert(11057504,
+            str::stream() << "Cannot make high watermark go forward (in " << context
+                          << "()). Current: " << current << ", proposed: " << proposed,
+            checkHighWaterMarkIsMonotonicallyDecreasing(current, proposed, *_params.getSort()));
+}
+
 void AsyncResultsMerger::_rebuildMergeQueueFromRemainingRemotes(WithLock) {
     // Predicate that determines which remotes to keep in the merge queue.
     struct KeepRemote {
@@ -533,7 +610,7 @@ void AsyncResultsMerger::_rebuildMergeQueueFromRemainingRemotes(WithLock) {
     std::swap(_mergeQueue, newMergeQueue);
 }
 
-void AsyncResultsMerger::_setInitialHighWaterMark() {
+void AsyncResultsMerger::_determineInitialHighWaterMark() {
     // If we do not have any minimum promised sort keys, this is not a change stream. Return early.
     if (_promisedMinSortKeys.empty()) {
         return;
@@ -596,7 +673,7 @@ bool AsyncResultsMerger::_readySortedTailable(WithLock lk) const {
     const BSONObj& smallestResult = smallestRemote->docBuffer.front();
     auto keyWeWantToReturn = extractSortKey(smallestResult, _params.getCompareWholeSortKey());
 
-    // We should always have a minPromisedSortKey from every shard in the sorted tailable case.
+    // We should always have a minPromisedSortKey for every remote in the sorted tailable case.
     auto minPromisedSortKey = _getMinPromisedSortKey(lk);
     invariant(minPromisedSortKey);
     return compareSortKeys(keyWeWantToReturn, minPromisedSortKey->first, *_params.getSort()) <= 0;
@@ -638,12 +715,28 @@ StatusWith<ClusterQueryResult> AsyncResultsMerger::nextReady() {
         return _status;
     }
 
-    if (_eofNext) {
-        _eofNext = false;
-        return {ClusterQueryResult()};
-    }
+    // Determine next result to return.
+    NextReadyResult result = [&]() {
+        if (_eofNext) {
+            // Return an empty result.
+            _eofNext = false;
+            return NextReadyResult{};
+        }
 
-    return _params.getSort() ? _nextReadySorted(lk) : _nextReadyUnsorted(lk);
+        return _params.getSort() ? _nextReadySorted(lk) : _nextReadyUnsorted(lk);
+    }();
+
+    // If undo-buffering is enabled, buffer the result for later usage if it's not empty.
+    if (_undoModeEnabled) {
+        if (std::get<ClusterQueryResult>(result).isEOF()) {
+            // No result was returned. Clear undo state.
+            _stateForNextReadyCallUndo.reset();
+        } else {
+            // A result was returned. Buffer it for a later undo call.
+            _stateForNextReadyCallUndo.emplace(result);
+        }
+    }
+    return std::get<ClusterQueryResult>(std::move(result));
 }
 
 void AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationContext* opCtx) {
@@ -655,12 +748,12 @@ void AsyncResultsMerger::_processAdditionalTransactionParticipants(OperationCont
     }
 }
 
-ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
+AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadySorted(WithLock) {
     // Tailable non-awaitData cursors cannot have a sort.
     invariant(_tailableMode != TailableModeEnum::kTailable);
 
     if (_mergeQueue.empty()) {
-        return {};
+        return NextReadyResult{};
     }
 
     // Take the remote with the smallest result from the merge queue.
@@ -679,7 +772,7 @@ ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
 
     // Take the next document returned by the remote from the queue.
     BSONObj front = std::move(smallestRemote->docBuffer.front());
-    smallestRemote->docBuffer.pop();
+    smallestRemote->docBuffer.pop_front();
 
     // Re-populate the merging queue with the next result from 'smallestRemote', if it has a next
     // result.
@@ -687,29 +780,20 @@ ClusterQueryResult AsyncResultsMerger::_nextReadySorted(WithLock) {
         _mergeQueue.push(smallestRemote);
     }
 
+    NextReadyResult result{ClusterQueryResult{std::move(front), smallestRemote->shardId},
+                           smallestRemote,
+                           _undoModeEnabled ? _highWaterMark : kNoHighWaterMark};
+
     // For sorted tailable awaitData cursors, update the high water mark to the document's sort key.
     if (_tailableMode == TailableModeEnum::kTailableAndAwaitData &&
         smallestRemote->eligibleForHighWaterMark) {
-        BSONObj nextHighWaterMark = (*_nextHighWaterMarkDeterminingStrategy)(front, _highWaterMark);
-
-        LOGV2_DEBUG(10657528,
-                    5,
-                    "Checking monotonicity of high water mark tokens",
-                    "current"_attr = _highWaterMark,
-                    "next"_attr = nextHighWaterMark,
-                    "sort"_attr = *_params.getSort());
-
-        // The following check is potentially very costly on large resume tokens, so we only
-        // execute it in debug mode.
-        dassert(checkHighWaterMarkIsMonotonicallyIncreasing(
-            _highWaterMark, nextHighWaterMark, *_params.getSort()));
-        _highWaterMark = std::move(nextHighWaterMark);
+        _updateHighWaterMark(*std::get<ClusterQueryResult>(result).getResult());
     }
 
-    return {std::move(front), smallestRemote->shardId};
+    return result;
 }
 
-ClusterQueryResult AsyncResultsMerger::_nextReadyUnsorted(WithLock) {
+AsyncResultsMerger::NextReadyResult AsyncResultsMerger::_nextReadyUnsorted(WithLock) {
     size_t remotesAttempted = 0;
     while (remotesAttempted < _remotes.size()) {
         auto& remote = _remotes[_gettingFromRemote];
@@ -718,7 +802,7 @@ ClusterQueryResult AsyncResultsMerger::_nextReadyUnsorted(WithLock) {
 
         if (remote->hasNext()) {
             BSONObj front = std::move(remote->docBuffer.front());
-            remote->docBuffer.pop();
+            remote->docBuffer.pop_front();
 
             if (_tailableMode == TailableModeEnum::kTailable && !remote->hasNext()) {
                 // The cursor is tailable and we're about to return the last buffered result.
@@ -727,7 +811,10 @@ ClusterQueryResult AsyncResultsMerger::_nextReadyUnsorted(WithLock) {
                 _eofNext = true;
             }
 
-            return {std::move(front), remote->shardId};
+            // There is no high water mark for unsorted results merging, so the BSONObj high water
+            // mark part is always empty here.
+            return NextReadyResult{
+                ClusterQueryResult{std::move(front), remote->shardId}, remote, kNoHighWaterMark};
         }
 
         // Nothing from the current remote so move on to the next one.
@@ -737,7 +824,25 @@ ClusterQueryResult AsyncResultsMerger::_nextReadyUnsorted(WithLock) {
         }
     }
 
-    return {};
+    // Nothing to return.
+    return NextReadyResult{};
+}
+
+void AsyncResultsMerger::_updateHighWaterMark(const BSONObj& value) {
+    BSONObj nextHighWaterMark = (*_nextHighWaterMarkDeterminingStrategy)(value, _highWaterMark);
+
+    LOGV2_DEBUG(10657528,
+                5,
+                "Checking monotonicity of high water mark tokens",
+                "current"_attr = _highWaterMark,
+                "next"_attr = nextHighWaterMark,
+                "sort"_attr = *_params.getSort());
+
+    // The following check is potentially very costly on large resume tokens, so we only
+    // execute it in debug mode.
+    dassert(checkHighWaterMarkIsMonotonicallyIncreasing(
+        _highWaterMark, nextHighWaterMark, *_params.getSort()));
+    _highWaterMark = std::move(nextHighWaterMark);
 }
 
 BSONObj AsyncResultsMerger::_makeRequest(WithLock,
@@ -1266,7 +1371,7 @@ bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
             }
         }
 
-        remote->docBuffer.push(obj);
+        remote->docBuffer.push_back(obj);
     }
 
     // If we're doing a sorted merge, then we have to make sure to put this remote onto the merge
@@ -1468,11 +1573,7 @@ void AsyncResultsMerger::RemoteCursorData::cleanUpFailedBatch(Status status,
     if (allowPartialResults || status == ErrorCodes::ExchangePassthrough) {
         // Clear the results buffer and cursor id, and set 'partialResultsReturned' if appropriate.
         partialResultsReturned = (status != ErrorCodes::ExchangePassthrough);
-
-        // std::queue<> does not have a 'clear()' method. Instead, create an empty queue object and
-        // swap it in.
-        std::queue<BSONObj> emptyBuffer;
-        std::swap(docBuffer, emptyBuffer);
+        docBuffer.clear();
         this->status = Status::OK();
         cursorId = 0;
     } else {

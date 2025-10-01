@@ -59,7 +59,7 @@ namespace mongo::exec::agg {
  * describe topology changes to the cluster. This stage is responsible for opening and closing
  * remote cursors on these shards as needed.
  */
-class ChangeStreamHandleTopologyChangeV2Stage final : public mongo::exec::agg::Stage {
+class ChangeStreamHandleTopologyChangeV2Stage final : public Stage {
 public:
     /**
      * Possible states of the internal state machine used inside doGetNext and its callees.
@@ -130,8 +130,8 @@ public:
         virtual ~CursorManager() = default;
 
         /**
-         * Will initialize the object before the first cursors are actually opened. The resumeToken
-         * data should be used to set the high-water mark in the 'AsyncResultsMerger' here in normal
+         * Initializes the object before the first cursors are actually opened. The resumeToken data
+         * should be used to set the high-water mark in the 'AsyncResultsMerger' here in normal
          * mode, as well as the 'AsyncResultsMerger' can be told to recognize control events.
          */
         virtual void initialize(const boost::intrusive_ptr<ExpressionContext>& expCtx,
@@ -147,7 +147,7 @@ public:
                                              const stdx::unordered_set<ShardId>& shardIds) = 0;
 
         /**
-         * Opens cursor on the config server using the given cluster time for the resume token.
+         * Opens a cursor on the config server using the given cluster time for the resume token.
          */
         virtual void openCursorOnConfigServer(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               OperationContext* opCtx,
@@ -177,6 +177,23 @@ public:
          * Returns the timestamp for the current high-water mark.
          */
         virtual Timestamp getTimestampFromCurrentHighWaterMark() const = 0;
+
+        /**
+         * Enables the undo-buffering in the underlying results merger of the mergeCursors stage.
+         */
+        virtual void enableUndoNextMode() = 0;
+
+        /**
+         * Disables the undo-buffering in the underlying results merger of the mergeCursors stage.
+         */
+        virtual void disableUndoNextMode() = 0;
+
+        /**
+         * Undoes the effects of the previous 'next()' call in the underlying results merger of the
+         * mergeCursors stage and sets its high water mark to the value specified in
+         * 'highWaterMark', using a high water mark token.
+         */
+        virtual void undoGetNextAndSetHighWaterMark(Timestamp highWaterMark) = 0;
     };
 
     /**
@@ -225,7 +242,7 @@ public:
     exec::agg::MergeCursorsStage* getSourceStage() const;
 
     /**
-     * Extract the cluster timestamp from the input document, via the '_id' field.
+     * Extracts the cluster timestamp from the input document, via the '_id' field.
      * Requires the document to contain an '_id' field with the proper contents.
      */
     static Timestamp extractTimestampFromDocument(const Document& input);
@@ -234,61 +251,61 @@ public:
     // ------------------
 
     /**
-     * Return the '_lastAllocationToShardsRequestTime' value for testing.
+     * Returns the '_lastAllocationToShardsRequestTime' value for testing.
      */
     Date_t getLastAllocationToShardsRequestTime_forTest() const {
         return _lastAllocationToShardsRequestTime;
     }
 
     /**
-     * Set the value of '_lastAllocationToShardsRequestTime' value for testing.
+     * Sets the value of '_lastAllocationToShardsRequestTime' value for testing.
      */
     void setLastAllocationToShardsRequestTime_forTest(Date_t lastRequestTime) {
         _lastAllocationToShardsRequestTime = lastRequestTime;
     }
 
     /**
-     * Return the '_segmentStartTimestamp' value for testing.
+     * Returns the '_segmentStartTimestamp' value for testing.
      */
     const boost::optional<Timestamp>& getSegmentStartTimestamp_forTest() const {
         return _segmentStartTimestamp;
     }
 
     /**
-     * Set the value of '_segmentStartTimestamp' value for testing.
+     * Sets the value of '_segmentStartTimestamp' value for testing.
      */
     void setSegmentStartTimestamp_forTest(Timestamp ts) {
         _segmentStartTimestamp = ts;
     }
 
     /**
-     * Return the '_segmentEndTimestamp' value for testing.
+     * Returns the '_segmentEndTimestamp' value for testing.
      */
     const boost::optional<Timestamp>& getSegmentEndTimestamp_forTest() const {
         return _segmentEndTimestamp;
     }
 
     /**
-     * Set the value of '_segmentEndTimestamp' value for testing.
+     * Sets the value of '_segmentEndTimestamp' value for testing.
      */
     void setSegmentEndTimestamp_forTest(Timestamp ts) {
         _segmentEndTimestamp = ts;
     }
 
     /**
-     * Return the current state.
+     * Returns the current state.
      */
     State getState_forTest() const {
         return _state;
     }
 
     /**
-     * Inject the current start state for testing, and optionally validates the state transition.
+     * Injects the current start state for testing, and optionally validates the state transition.
      */
     void setState_forTest(State state, bool validateStateTransition);
 
     /**
-     * Run a single iteration of the internal state machine for testing.
+     * Runs a single iteration of the internal state machine for testing.
      */
     boost::optional<DocumentSource::GetNextResult> runGetNextStateMachine_forTest();
 
@@ -299,23 +316,23 @@ public:
 
 private:
     /**
-     * Produce the next document. Will dispatch to the internal state machine until there is
+     * Produces the next document. Will dispatch to the internal state machine until there is
      * something to return or an error occurred.
      */
     GetNextResult doGetNext() final;
 
     /**
-     * Run a single iteration of the internal state machine.
+     * Runs a single iteration of the internal state machine.
      */
     boost::optional<DocumentSource::GetNextResult> _runGetNextStateMachine();
 
     /**
-     * Set the state to 'newState'.
+     * Sets the state to 'newState'.
      */
     void _setState(State newState);
 
     /**
-     * Assert that the current state is equal to 'expectedState' and the change stream's read mode
+     * Asserts that the current state is equal to 'expectedState' and the change stream's read mode
      * is equal to 'expectedMode' (if set). Will tassert otherwise.
      */
     void _assertState(State expectedState,
@@ -323,18 +340,18 @@ private:
                       StringData context) const;
 
     /**
-     * Assert that the change stream was opened in strict mode.
+     * Asserts that the change stream was opened in strict mode.
      */
     void _assertStrictMode(StringData context) const;
 
     /**
-     * Ensure that the '_shardTargeter' instance variable is populated with a valid shard targeter
+     * Ensures that the '_shardTargeter' instance variable is populated with a valid shard targeter
      * object.
      */
     void _ensureShardTargeter();
 
     /**
-     * Log the decision result of a ShardTargeter invocation for a specific context.
+     * Logs the decision result of a ShardTargeter invocation for a specific context.
      * There are 3 variants of this function supporting slightly different additional parameters to
      * be logged.
      */
@@ -348,7 +365,7 @@ private:
                                    Timestamp segmentEnd) const;
 
     /**
-     * Query the data-to-shards allocation status for the specified cluster time. Updates
+     * Queries the data-to-shards allocation status for the specified cluster time. Updates
      * '_lastAllocationToShardsRequestTime' with the current date/time as a side-effect.
      */
     AllocationToShardsStatus _getAllocationToShardsStatus(Timestamp clusterTime);

@@ -58,8 +58,10 @@
 #include "mongo/util/net/hostandport.h"
 
 #include <cstddef>
+#include <deque>
 #include <memory>
 #include <queue>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -181,13 +183,21 @@ public:
 
     /**
      * Checks if the 'proposed' high water mark is greater or equal to 'current' high water mark,
-     * w.r.t. to the 'sortKeyPattern'. Return true if 'proposed' compares greater or equal to
+     * w.r.t. to the 'sortKeyPattern'. Returns true if 'proposed' compares greater or equal to
      * 'current', false otherwise.
      */
     static bool checkHighWaterMarkIsMonotonicallyIncreasing(const BSONObj& current,
                                                             const BSONObj& proposed,
                                                             const BSONObj& sortKeyPattern);
 
+    /**
+     * Checks if the 'proposed' high water mark is less or equal to 'current' high water mark,
+     * w.r.t. to the 'sortKeyPattern'. Returns true if 'proposed' compares less or equal to
+     * 'current', false otherwise.
+     */
+    static bool checkHighWaterMarkIsMonotonicallyDecreasing(const BSONObj& current,
+                                                            const BSONObj& proposed,
+                                                            const BSONObj& sortKeyPattern);
 
     /**
      * Returns true if there is no need to schedule remote work in order to take the next action.
@@ -311,16 +321,60 @@ public:
     BSONObj getHighWaterMark();
 
     /**
-     * Set the initial high watermark to return when no cursors are tracked.
+     * Sets the initial high watermark to return when no cursors are tracked. It is not allowed to
+     * call this method with a high water mark with a timestamp earlier than the current high water
+     * mark.
      */
     void setInitialHighWaterMark(const BSONObj& highWaterMark);
 
     /**
-     * Set the strategy to determine the next high water mark.
+     * Sets the current high water mark of the 'AsyncResultsMerger'. Notably this allows to set the
+     * high water mark to a timestamp earlier than the current high water mark.
+     */
+    void setHighWaterMark(const BSONObj& highWaterMark);
+
+    /**
+     * Sets the strategy to determine the next high water mark.
      * Assumes that the 'AsyncResultsMerger' is in tailable, awaitData mode.
      */
     void setNextHighWaterMarkDeterminingStrategy(
         NextHighWaterMarkDeterminingStrategyPtr nextHighWaterMarkDeterminingStrategy);
+
+    /**
+     * Enables an undo mode in which the effects of the last 'nextReady()' call can be partially
+     * reverted. In this mode, the 'AsyncResultsMerger' keeps track of the last result that was
+     * returned by a call to 'nextReady()'. The effects of fetching the last result via
+     * 'nextReady()' can then be "undone" by calling 'undoNextReady()'.
+     */
+    void enableUndoNextReadyMode();
+
+    /**
+     * Disables the undo mode. Also clears a buffered undo result.
+     */
+    void disableUndoNextReadyMode();
+
+    /**
+     * Partially "undoes" the effects of the last 'nextReady()' call, by putting the last returned
+     * result back into the 'AsyncResultMerger's document buffer for the shard it was originally
+     * pulled from. For sorted mergers, it will also put back the result back into the merge queue
+     * and restore the high water mark.
+     *
+     * This method can only be called if a result was previously returned via 'nextReady()' while
+     * the undo mode was enabled. Calling it otherwise will tassert. As the 'AsyncResultsMerger'
+     * only buffers the single last returned result in 'nextReady()', it is forbidden to call
+     * 'undoNextReady()' repeatedly unless another call to 'nextReady()' has been made. If this
+     * assumption is violated, this method will tassert.
+     *
+     * Calling this method will not restore the following properties of the 'AsyncResultsMerger' to
+     * their state during the last call to 'nextReady()':
+     * - the set of open remote cursors
+     * - the list of transaction participants
+     *
+     * It is forbidden to call this method if the undo is performed for a result that was produced
+     * by a remote cursor that has been closed since the last call to 'nextReady()'. If this
+     * assumption is violated, this method will tassert.
+     */
+    void undoNextReady();
 
     /**
      * Returns if this 'AsyncResultsMerger' compares the whole sort key, based on the initial setup
@@ -388,9 +442,9 @@ private:
                        AsyncResultsMergerParams params);
 
     /**
-     * We instantiate one of these per remote host. It contains the buffer of results we've
-     * retrieved from the host but not yet returned, as well as the cursor id, and any error
-     * reported from the remote.
+     * One 'RemoteCursorData' instance is instantiated per remote host. A 'RemoteCursorData'
+     * contains the buffer of results that have been retrieved from the host but not yet returned,
+     * as well as the cursor id, and any error reported by the remote.
      */
     struct RemoteCursorData : public RefCountable {
         /**
@@ -423,7 +477,7 @@ private:
         bool exhausted() const;
 
         /**
-         * Clean up the RemoteCursor internals after receiving more data failed.
+         * Cleans up the RemoteCursor internals after receiving more data failed.
          */
         void cleanUpFailedBatch(Status status, bool allowPartialResults);
 
@@ -476,7 +530,7 @@ private:
         bool closed = false;
 
         // The buffer of results that have been retrieved but not yet returned to the caller.
-        std::queue<BSONObj> docBuffer;
+        std::deque<BSONObj> docBuffer;
 
         // Is valid if there is currently a pending request to this remote.
         executor::TaskExecutor::CallbackHandle cbHandle;
@@ -487,6 +541,14 @@ private:
     };
 
     using RemoteCursorPtr = boost::intrusive_ptr<RemoteCursorData>;
+
+    /**
+     * The type that is returned by the internal helper functions for 'nextReady()'.
+     * In case the undo mode is disabled, only the 'ClusterQueryResult' part will be populated. In
+     * case undo mode is enabled, the 'RemoteCursorPtr' part contains the remote from which the
+     * result was fetched, and the BSONObj contains the high water mark.
+     */
+    using NextReadyResult = std::tuple<ClusterQueryResult, RemoteCursorPtr, BSONObj>;
 
     class MergingComparator {
     public:
@@ -535,6 +597,26 @@ private:
                                                        StringData context) const;
 
     /**
+     * Ensures that the high watermark token in 'proposed' compares equal or less to the high
+     * watermark token in 'proposed', compared to the internal sort key pattern. Tasserts if this
+     * assumption is violated.
+     */
+    void _ensureHighWaterMarkIsMonotonicallyDecreasing(const BSONObj& current,
+                                                       const BSONObj& proposed,
+                                                       StringData context) const;
+
+    /**
+     * Internal helper function to set the high water mark. If 'mustBeMonotonicallyIncreasing' is
+     * set to 'true', will validate that the timestamp contained in the high water mark is not be
+     * less than that of the current high water mark contained in '_highWaterMark'. If
+     * 'mustBeMonotonicallyIncreasing' is set to 'false', will validate that the timestamp contained
+     * in the high water mark will not be greater than that of the current high water mark.
+     */
+    void _setHighWaterMark(const BSONObj& highWaterMark,
+                           StringData context,
+                           bool mustBeMonotonicallyIncreasing);
+
+    /**
      * Parses the find or getMore command response object to a CursorResponse.
      *
      * Returns a non-OK response if the response fails to parse or if there is a cursor id mismatch.
@@ -548,6 +630,12 @@ private:
     BSONObj _makeRequest(WithLock,
                          const RemoteCursorData& remote,
                          const ServerGlobalParams::FCVSnapshot& fcvSnapshot) const;
+
+    /**
+     * Updates the internal high water mark with the passed value, using the configured next high
+     * watermark determining strategy.
+     */
+    void _updateHighWaterMark(const BSONObj& value);
 
     /**
      * Checks whether or not the remote cursors are all exhausted.
@@ -567,14 +655,14 @@ private:
     // Helpers for nextReady().
     //
 
-    ClusterQueryResult _nextReadySorted(WithLock);
-    ClusterQueryResult _nextReadyUnsorted(WithLock);
+    NextReadyResult _nextReadySorted(WithLock);
+    NextReadyResult _nextReadyUnsorted(WithLock);
 
     using CbData = executor::TaskExecutor::RemoteCommandCallbackArgs;
     using CbResponse = executor::TaskExecutor::ResponseStatus;
 
     /**
-     * Build a remote cursor object from the 'RemoteCursor' and 'ShardTag' objects.
+     * Builds a remote cursor object from the 'RemoteCursor' and 'ShardTag' objects.
      */
     RemoteCursorPtr _buildRemote(WithLock lk, const RemoteCursor& rc, const ShardTag& tag);
 
@@ -588,7 +676,7 @@ private:
                               const RemoteCursorPtr& remote);
 
     /**
-     * Schedule a killCursors request for the remote if the remote still has a cursor open.
+     * Schedules a killCursors request for the remote if the remote still has a cursor open.
      * This is a fire-and-forget attempt to close the remote cursor. We are not blocking until
      * the remote cursor is actually closed.
      */
@@ -678,8 +766,8 @@ private:
                                const CursorResponse& response);
 
     /**
-     * Returns true if the given batch is eligible to provide a high water mark resume token for
-     * the stream, false otherwise.
+     * Returns true if the given batch is eligible to provide a high water mark resume token for the
+     * stream, false otherwise.
      */
     bool _checkHighWaterMarkEligibility(WithLock,
                                         BSONObj newMinSortKey,
@@ -689,26 +777,26 @@ private:
     /**
      * Sets the initial value of the high water mark sort key, if applicable.
      */
-    void _setInitialHighWaterMark();
+    void _determineInitialHighWaterMark();
 
     /**
-     * Process additional participants received in the responses if necessary.
+     * Processes additional participants received in the responses if necessary.
      */
     void _processAdditionalTransactionParticipants(OperationContext* opCtx);
 
     /**
-     * Remove a remote from the _promisedMinSortKeys set, if already present in there.
+     * Removes a remote from the _promisedMinSortKeys set, if already present in there.
      */
     void _removeRemoteFromPromisedMinSortKeys(WithLock lk, const RemoteCursorPtr& remote);
 
     /**
-     * Rebuild the merge queue for the remaining remotes. This is supposed to be called internally
+     * Rebuilds the merge queue for the remaining remotes. This is supposed to be called internally
      * after closing cursors.
      */
     void _rebuildMergeQueueFromRemainingRemotes(WithLock lk);
 
     /**
-     * Cancel any potential in-flight callback for the remote.
+     * Cancels any potential in-flight callback for the remote.
      */
     void _cancelCallbackForRemote(WithLock lk, const RemoteCursorPtr& remote);
 
@@ -806,6 +894,18 @@ private:
     // boost::none. Can only ever be true for 'TailableModeEnum::kTailable' cursors, but not for
     // other cursor types.
     bool _eofNext = false;
+
+    /**
+     * True if the undo mode is enabled and the results merger stores the last returned result of
+     * 'nextReady()' so it can be undone later.
+     */
+    bool _undoModeEnabled = false;
+
+    /**
+     * State required to undo a previous invocation of the function 'nextReady()'. Will only be
+     * populated if '_undoModeEnabled' is true and a call to 'nextReady()' has been performed.
+     */
+    boost::optional<NextReadyResult> _stateForNextReadyCallUndo;
 
     //
     // Killing

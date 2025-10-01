@@ -43,6 +43,7 @@
 #include "mongo/db/pipeline/data_to_shards_allocation_query_service.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change_v2.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/query/compiler/parsers/matcher/expression_parser.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
@@ -56,6 +57,7 @@
 #include "mongo/s/query/exec/shard_tag.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #include <algorithm>
@@ -203,6 +205,22 @@ public:
 
     const ChangeStream& getChangeStream() const override {
         return _changeStream;
+    }
+
+    void enableUndoNextMode() override {
+        _mergeCursors->enableUndoNextMode();
+    }
+
+    void disableUndoNextMode() override {
+        _mergeCursors->disableUndoNextMode();
+    }
+
+    void undoGetNextAndSetHighWaterMark(Timestamp highWaterMark) override {
+        _mergeCursors->undoNext();
+        _mergeCursors->setHighWaterMark(ResumeToken::makeHighWaterMarkToken(
+                                            highWaterMark, ResumeTokenData::kDefaultTokenVersion)
+                                            .toDocument()
+                                            .toBson());
     }
 
     Timestamp getTimestampFromCurrentHighWaterMark() const override {
@@ -1091,6 +1109,14 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingStartingChangeStrea
             "expecting segment start timestamp to be set",
             _segmentStartTimestamp.has_value());
 
+    ON_BLOCK_EXIT([&]() {
+        // Turn on undo buffering in the results merger if we are entering the degraded fetching
+        // state.
+        if (_state == State::kFetchingDegradedGettingChangeEvent) {
+            _params->cursorManager->enableUndoNextMode();
+        }
+    });
+
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
@@ -1167,6 +1193,14 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingNormalGettingChange
     // missing when unit testing the individual states.
     _ensureShardTargeter();
 
+    ON_BLOCK_EXIT([&]() {
+        // Turn on undo buffering in the results merger if we are entering the degraded fetching
+        // state.
+        if (_state == State::kFetchingDegradedGettingChangeEvent) {
+            _params->cursorManager->enableUndoNextMode();
+        }
+    });
+
     V2StageReaderContext readerContext(getContext(),
                                        getContext()->getOperationContext(),
                                        *_params->cursorManager,
@@ -1225,6 +1259,13 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
     tassert(
         10657521, "expecting segment end timestamp to be set", _segmentEndTimestamp.has_value());
 
+    ON_BLOCK_EXIT([&]() {
+        // Turn off undo buffering in the results merger if we are exiting this state.
+        if (_state != State::kFetchingDegradedGettingChangeEvent) {
+            _params->cursorManager->disableUndoNextMode();
+        }
+    });
+
     auto input = pSource->getNext();
 
     Timestamp eventTimestamp = [&]() {
@@ -1240,9 +1281,11 @@ ChangeStreamHandleTopologyChangeV2Stage::_handleStateFetchingDegradedGettingChan
     }();
 
     if (eventTimestamp >= *_segmentEndTimestamp) {
-        // TODO SERVER-110575: Fix end-of-segment handling.
         _segmentStartTimestamp = _segmentEndTimestamp;
         _segmentEndTimestamp.reset();
+
+        // Undo the effects of fetching the last event in the underlying results merger.
+        _params->cursorManager->undoGetNextAndSetHighWaterMark(*_segmentStartTimestamp);
 
         // Reset failure counter.
         _shardNotFoundFailuresInARow = 0;

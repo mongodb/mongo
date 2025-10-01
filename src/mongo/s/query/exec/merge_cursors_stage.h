@@ -72,23 +72,50 @@ public:
     }
 
     /**
+     * Enables buffering of the last returned result in the underlying results merger. This is used
+     * by v2 change stream readers.
+     */
+    void enableUndoNextMode();
+
+    /**
+     * Disables buffering of the last returned result in the underlying results merger. This is used
+     * by v2 change stream readers.
+     */
+    void disableUndoNextMode();
+
+    /**
+     * Undoes the effect of fetching the last returned result via 'next()' from the underlying
+     * results merger. This is used by v2 change stream readers.
+     */
+    void undoNext();
+
+    /**
      * Adds the specified, already opened cursors for remote shards or the config server.
      */
     void addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
                             const ShardTag& tag = ShardTag::kDefault);
 
     /**
-     * Close the set of specified open cursors on remote shards and/or the config server.
+     * Closes the set of specified open cursors on remote shards and/or the config server.
      * This is used by v2 change stream readers.
      */
     void closeShardCursors(const stdx::unordered_set<ShardId>& shardIds, const ShardTag& tag);
 
     /**
-     * Make the underlying results merger recognize change stream control events.
+     * Makes the underlying results merger recognize change stream control events.
      * This is used by v2 change stream readers.
      */
     void recognizeControlEvents();
 
+    /**
+     * Sets the current high water mark of the underlying results merger. Notably this allows to set
+     * the high water mark to a timestamp earlier than the current high water mark.
+     */
+    void setHighWaterMark(const BSONObj& highWaterMark);
+
+    /**
+     * Sets the initial high watermark to return when no cursors are tracked.
+     */
     void setInitialHighWaterMark(const BSONObj& highWaterMark);
 
     void setNextHighWaterMarkDeterminingStrategy(

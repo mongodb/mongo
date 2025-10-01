@@ -106,20 +106,56 @@ public:
         return _arm->getNumRemotes();
     }
 
+    /**
+     * Enables buffering of the last returned result in the underlying 'AsyncResultsMerger'. This is
+     * used by v2 change stream readers.
+     */
+    void enableUndoNextMode() {
+        _arm->enableUndoNextReadyMode();
+    }
+
+    /**
+     * Disables buffering of the last returned result in the underlying 'AsyncResultsMerger'. This
+     * is used by v2 change stream readers.
+     */
+    void disableUndoNextMode() {
+        _arm->disableUndoNextReadyMode();
+    }
+
+    /**
+     * Undoes the effect of fetching the last returned result via 'next()' from the underlying
+     * 'AsyncResultsMerger'. For a more detailed description refer to the code comments for
+     * 'AsyncResultsMerger::undoNextReady()'. This is used by v2 change stream readers.
+     */
+    void undoNext() {
+        _arm->undoNextReady();
+    }
+
+    /**
+     * Makes the underlying 'AsyncResultsMerger' recognize change stream control events. This is
+     * used by v2 change stream readers.
+     */
+    void recognizeControlEvents();
+
+    /**
+     * Returns the current high water mark from the underlying 'AsyncResultsMerger'.
+     */
     BSONObj getHighWaterMark() {
         return _arm->getHighWaterMark();
     }
 
     /**
-     * Make the underlying 'AsyncResultsMerger' recognize change stream control events. This is used
-     * for v2 change stream readers.
+     * Sets the initial high watermark to return when no cursors are tracked.
      */
-    void recognizeControlEvents();
+    void setInitialHighWaterMark(const BSONObj& highWaterMark);
 
     /**
-     * Set the initial high watermark to return when no cursors are tracked.
-     * */
-    void setInitialHighWaterMark(const BSONObj& highWaterMark);
+     * Sets the current high water mark of the underlying 'AsyncResultsMerger'. Notably this allows
+     * to set the high water mark to a timestamp earlier than the current high water mark.
+     */
+    void setHighWaterMark(const BSONObj& highWaterMark) {
+        _arm->setHighWaterMark(highWaterMark);
+    }
 
     void addNewShardCursors(std::vector<RemoteCursor>&& newCursors,
                             const ShardTag& tag = ShardTag::kDefault) {
@@ -138,7 +174,7 @@ public:
     }
 
     /**
-     * Set the strategy to determine the next high water mark.
+     * Sets the strategy to determine the next high water mark.
      * Assumes that the 'AsyncResultsMerger' is in tailable, awaitData mode.
      */
     void setNextHighWaterMarkDeterminingStrategy(
@@ -177,7 +213,7 @@ private:
     StatusWith<executor::TaskExecutor::EventHandle> getNextEvent();
 
     /**
-     * Call the waitFn and return the result, yielding resources while waiting if necessary.
+     * Calls the waitFn and return the result, yielding resources while waiting if necessary.
      * 'waitFn' may not throw.
      */
     StatusWith<stdx::cv_status> doWaiting(
