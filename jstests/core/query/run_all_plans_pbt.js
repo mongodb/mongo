@@ -28,7 +28,7 @@
  */
 import {getDifferentlyShapedQueries} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {runDeoptimized, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -46,7 +46,9 @@ const experimentColl = db.run_all_plans_experiment;
 
 function runHintedAgg(query, index) {
     try {
-        return {docs: experimentColl.aggregate(query, {hint: index.name}).toArray()};
+        return {
+            docs: experimentColl.aggregate(query.pipeline, {...query.options, hint: index.name}).toArray(),
+        };
     } catch (e) {
         return {err: e.code};
     }
@@ -80,7 +82,7 @@ function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
                         "Query results from hinted experiment collection did not match plain collection using collscan.",
                     query,
                     index,
-                    explain: experimentColl.explain().aggregate(query, {hint: index.name}),
+                    explain: experimentColl.explain().aggregate(query.pipeline, {...query.options, hint: index.name}),
                     controlResults,
                     docsInCollection: controlColl.find().toArray(),
                     experimentalResults: res.docs,
@@ -91,7 +93,7 @@ function hintedQueryHasSameResultsAsControlCollScan(getQuery, testHelpers) {
     return {passed: true};
 }
 
-const aggModel = getAggPipelineModel();
+const aggModel = getQueryAndOptionsModel();
 
 // Test with a regular collection.
 testProperty(

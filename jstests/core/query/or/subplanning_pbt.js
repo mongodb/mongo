@@ -17,7 +17,7 @@
 import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getMatchPredicateSpec} from "jstests/libs/property_test_helpers/models/match_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -49,9 +49,12 @@ const matchWithTopLevelOrArb = getMatchPredicateSpec()
         return {$match: pred};
     });
 const aggModel = fc
-    .record({orMatch: matchWithTopLevelOrArb, pipeline: getAggPipelineModel()})
-    .map(({orMatch, pipeline}) => {
-        return [orMatch, ...pipeline];
+    .record({orMatch: matchWithTopLevelOrArb, query: getQueryAndOptionsModel()})
+    .map(({orMatch, query}) => {
+        return {
+            "pipeline": [orMatch, ...query.pipeline],
+            "options": query.options,
+        };
     });
 
 // Test with a regular collection.

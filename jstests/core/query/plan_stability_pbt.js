@@ -22,7 +22,7 @@
 
 import {createPlanStabilityProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {planStabilityCounterexamples} from "jstests/libs/property_test_helpers/pbt_resolved_bugs.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
@@ -39,7 +39,7 @@ const numQueriesPerRun = 50;
 const experimentColl = db.plan_stability_pbt;
 
 // TODO SERVER-106983, re-enable $match once planner is deterministic.
-const aggModel = getAggPipelineModel().filter((q) => !JSON.stringify(q).includes("$match"));
+const aggModel = getQueryAndOptionsModel().filter((q) => !JSON.stringify(q).includes("$match"));
 
 testProperty(
     createPlanStabilityProperty(experimentColl),

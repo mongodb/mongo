@@ -14,7 +14,7 @@
 import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getAggPipelineArb} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -34,9 +34,9 @@ const experimentColl = db.match_pbt_experiment;
 const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
 
 const aggModel = fc
-    .record({matchStage: getMatchArb(), restOfPipeline: getAggPipelineModel()})
+    .record({matchStage: getMatchArb(), restOfPipeline: getAggPipelineArb()})
     .map(({matchStage, restOfPipeline}) => {
-        return [matchStage, ...restOfPipeline];
+        return {"pipeline": [matchStage, ...restOfPipeline], "options": {}};
     });
 
 testProperty(

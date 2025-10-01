@@ -15,7 +15,7 @@ import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/comm
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {
     computedProjectArb,
-    getAggPipelineModel,
+    getAggPipelineArb,
     simpleProjectArb,
 } from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
@@ -38,9 +38,9 @@ const correctnessProperty = createCorrectnessProperty(controlColl, experimentCol
 
 const projectArb = fc.oneof(simpleProjectArb, computedProjectArb);
 const aggModel = fc
-    .record({projectStage: projectArb, restOfPipeline: getAggPipelineModel()})
+    .record({projectStage: projectArb, restOfPipeline: getAggPipelineArb()})
     .map(({projectStage, restOfPipeline}) => {
-        return [projectStage, ...restOfPipeline];
+        return {"pipeline": [projectStage, ...restOfPipeline], "options": {}};
     });
 
 testProperty(

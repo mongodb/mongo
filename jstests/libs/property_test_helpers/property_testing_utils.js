@@ -112,7 +112,7 @@ function runProperty(propertyFn, namespaces, workload) {
     function getQuery(queryIx, paramIx) {
         assert.lt(queryIx, queries.length);
         const query = queries[queryIx];
-        return concreteQueryFromFamily(query, paramIx);
+        return {pipeline: concreteQueryFromFamily(query.pipeline, paramIx), options: query.options};
     }
 
     return propertyFn(getQuery, testHelpers, extraParams);
@@ -223,7 +223,10 @@ export function runDeoptimized(controlColl, queries) {
         }),
     );
 
-    const resultMap = queries.map((query) => controlColl.aggregate(unoptimize(query)).toArray());
+    let resultMap = queries.map((query) => {
+        assert(Array.isArray(query.pipeline) && typeof query.options === "object");
+        return controlColl.aggregate(unoptimize(query.pipeline), query.options).toArray();
+    });
 
     assert.commandWorked(
         db.adminCommand({

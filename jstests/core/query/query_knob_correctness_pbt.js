@@ -18,7 +18,7 @@
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {queryKnobsModel} from "jstests/libs/property_test_helpers/models/query_knob_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
@@ -53,14 +53,14 @@ const knobCorrectnessProperty = createQueriesWithKnobsSetAreSameAsControlCollSca
 testProperty(
     knobCorrectnessProperty,
     {controlColl, experimentColl},
-    getWorkloadModel(false /* isTS */, getAggPipelineModel()),
+    getWorkloadModel(false /* isTS */, getQueryAndOptionsModel()),
     numRuns,
 );
 
 // TODO SERVER-103381 re-enable timeseries PBT testing.
 // Test with a TS collection.
 // TODO SERVER-83072 re-enable $group in this test, by removing the filter below.
-// const tsAggModel = getAggPipelineModel().filter(query => {
+// const tsAggModel = getQueryAndOptionsModel().filter(query => {
 //     for (const stage of query) {
 //         if (Object.keys(stage).includes('$group')) {
 //             return false;

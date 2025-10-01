@@ -24,7 +24,7 @@ import {createCacheCorrectnessProperty} from "jstests/libs/property_test_helpers
 import {getDatasetModel} from "jstests/libs/property_test_helpers/models/document_models.js";
 import {getIndexModel} from "jstests/libs/property_test_helpers/models/index_models.js";
 import {getPartialFilterPredicateArb} from "jstests/libs/property_test_helpers/models/match_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {partialIndexCounterexamples} from "jstests/libs/property_test_helpers/pbt_resolved_bugs.js";
 import {concreteQueryFromFamily, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -55,9 +55,9 @@ const workloadModel = fc
             maxLength: 15,
             size: "+2",
         }),
-        pipelines: fc.array(getAggPipelineModel(), {minLength: 1, maxLength: numQueriesPerRun, size: "+2"}),
+        queries: fc.array(getQueryAndOptionsModel(), {minLength: 1, maxLength: numQueriesPerRun, size: "+2"}),
     })
-    .map(({partialFilterPredShape, docs, indexes, pipelines}) => {
+    .map(({partialFilterPredShape, docs, indexes, queries}) => {
         // The predicate model generates a family of predicates of the same shape, with different
         // parameter options at the leaf nodes. For all indexes, we use the first predicate from the
         // family as the partial filter expression.
@@ -74,7 +74,10 @@ const workloadModel = fc
         // behave correctly. In general our queries are modeled as families of shapes, so including
         // the predicate family in the $match rather than one specific predicate makes sense.
         const match = {$match: partialFilterPredShape};
-        const queriesWithMatch = pipelines.map((p) => [match, ...p]);
+        const queriesWithMatch = queries.map((query) => ({
+            "pipeline": [match, ...query.pipeline],
+            "options": query.options,
+        }));
         return {collSpec: {isTS: false, docs, indexes: partialIndexes}, queries: queriesWithMatch};
     });
 

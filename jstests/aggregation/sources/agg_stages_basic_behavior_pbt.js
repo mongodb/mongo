@@ -23,7 +23,7 @@
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {
-    getAggPipelineModel,
+    getAggPipelineArb,
     getSingleFieldProjectArb,
     getSortArb,
     limitArb,
@@ -50,7 +50,7 @@ const numRuns = 20;
  * value).
  */
 function checkExclusionProjectionResults(query, results) {
-    const projectSpec = query.at(-1)["$project"];
+    const projectSpec = query.pipeline.at(-1)["$project"];
     const excludedField = Object.keys(projectSpec).filter((field) => field !== "_id")[0];
     const isIdFieldIncluded = projectSpec._id;
 
@@ -78,7 +78,7 @@ const exclusionProjectionTest = {
 
 // --- Inclusion projection testing ---
 function checkInclusionProjectionResults(query, results) {
-    const projectSpec = query.at(-1)["$project"];
+    const projectSpec = query.pipeline.at(-1)["$project"];
     const includedField = Object.keys(projectSpec).filter((field) => field !== "_id")[0];
     const isIdFieldExcluded = !projectSpec._id;
 
@@ -104,7 +104,7 @@ const inclusionProjectionTest = {
 
 // --- $limit testing ---
 function checkLimitResults(query, results) {
-    const limitStage = query.at(-1);
+    const limitStage = query.pipeline.at(-1);
     const limitVal = limitStage["$limit"];
 
     return results.length <= limitVal;
@@ -117,7 +117,7 @@ const limitTest = {
 
 // --- $sort testing ---
 function checkSortResults(query, results) {
-    const sortSpec = query.at(-1)["$sort"];
+    const sortSpec = query.pipeline.at(-1)["$sort"];
     const sortField = Object.keys(sortSpec)[0];
     const sortDirection = sortSpec[sortField];
 
@@ -185,7 +185,7 @@ function makePropertyFn(checkResultsFn, failMsg) {
     return function (getQuery, testHelpers) {
         for (let queryIx = 0; queryIx < testHelpers.numQueryShapes; queryIx++) {
             const query = getQuery(queryIx, 0 /* paramIx */);
-            const results = experimentColl.aggregate(query).toArray();
+            const results = experimentColl.aggregate(query.pipeline, query.options).toArray();
 
             const passed = checkResultsFn(query, results);
             if (!passed) {
@@ -194,7 +194,7 @@ function makePropertyFn(checkResultsFn, failMsg) {
                     msg: failMsg,
                     query,
                     results,
-                    explain: experimentColl.explain().aggregate(query),
+                    explain: experimentColl.explain().aggregate(query.pipeline, query.options),
                 };
             }
         }
@@ -207,12 +207,12 @@ for (const {stageArb, checkResultsFn, failMsg} of testCases) {
 
     // Create an agg model that ends with the stage we're testing. The bag does not have to be
     // deterministic because these properties should always hold.
-    const startOfPipelineArb = getAggPipelineModel({deterministicBag: false});
+    const startOfPipelineArb = getAggPipelineArb({deterministicBag: false});
     const aggModel = fc.record({startOfPipeline: startOfPipelineArb, lastStage: stageArb}).map(function ({
         startOfPipeline,
         lastStage,
     }) {
-        return [...startOfPipeline, lastStage];
+        return {"pipeline": [...startOfPipeline, lastStage], "options": {}};
     });
 
     // Run the property with a regular collection.

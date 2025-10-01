@@ -27,7 +27,7 @@
 
 import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {getAggPipelineModel, getSortArb} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel, getSortArb} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
 import {getPlanStages, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
@@ -69,12 +69,15 @@ function getWorkloadModel(isTS) {
     return fc
         .record({
             sort: getSortArb(8 /* maxNumSortComponents */),
-            pipelines: fc.array(getAggPipelineModel(), {minLength: 0, maxLength: numQueriesPerRun, size: "+2"}),
+            pipelines: fc.array(getQueryAndOptionsModel(), {minLength: 0, maxLength: numQueriesPerRun, size: "+2"}),
             collSpec: getCollectionModel({isTS}),
         })
         .map(({sort, pipelines, collSpec}) => {
             // Prefix every pipeline with the sort operation.
-            const pipelinesWithSort = pipelines.map((pipeline) => [sort, ...pipeline]);
+            const pipelinesWithSort = pipelines.map((query) => ({
+                "pipeline": [sort, ...query.pipeline],
+                "options": query.options,
+            }));
             // Create an index that will satisfy this sort.
             // TODO SERVER-105223 use other kinds of indexes to satisfy the sort (hashed, wildcard).
             // The server won't let us create an index with pattern {_id: -1}. If we see a sort

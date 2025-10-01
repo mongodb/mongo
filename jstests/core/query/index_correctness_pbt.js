@@ -16,7 +16,7 @@
  */
 import {createCorrectnessProperty} from "jstests/libs/property_test_helpers/common_properties.js";
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -32,7 +32,7 @@ const numQueriesPerRun = 20;
 const controlColl = db.index_correctness_pbt_control;
 const experimentColl = db.index_correctness_pbt_experiment;
 const correctnessProperty = createCorrectnessProperty(controlColl, experimentColl);
-const aggModel = getAggPipelineModel();
+const aggModel = getQueryAndOptionsModel();
 
 // Test with a regular collection.
 testProperty(

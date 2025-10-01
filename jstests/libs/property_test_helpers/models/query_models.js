@@ -13,6 +13,7 @@ import {
     fieldArb,
     leafParameterArb,
 } from "jstests/libs/property_test_helpers/models/basic_models.js";
+import {collationArb} from "jstests/libs/property_test_helpers/models/collation_models.js";
 import {groupArb} from "jstests/libs/property_test_helpers/models/group_models.js";
 import {getMatchArb} from "jstests/libs/property_test_helpers/models/match_models.js";
 import {oneof} from "jstests/libs/property_test_helpers/models/model_utils.js";
@@ -86,9 +87,10 @@ export const skipArb = fc.record({$skip: fc.integer({min: 1, max: 5})});
  *       when a deterministic bag is required.
  * The output is in order from simplest agg stages to most complex, for minimization.
  */
-function getAllowedStages(allowOrs, deterministicBag) {
+function getAllowedStages(allowOrs, deterministicBag, allowCollation) {
+    let allowedStages = [];
     if (deterministicBag) {
-        return [
+        allowedStages = [
             simpleProjectArb,
             getMatchArb(allowOrs),
             addFieldsConstArb,
@@ -99,7 +101,7 @@ function getAllowedStages(allowOrs, deterministicBag) {
         ];
     } else {
         // If we don't require a deterministic bag, we can allow $skip and $limit anywhere.
-        return [
+        allowedStages = [
             limitArb,
             skipArb,
             simpleProjectArb,
@@ -111,14 +113,33 @@ function getAllowedStages(allowOrs, deterministicBag) {
             groupArb,
         ];
     }
+    return allowedStages;
 }
 
 /*
- * Our full model for aggregation pipelines. See `getAllowedStages` for description of `allowOrs`
- * and `deterministicBag`. By default, ORs are allowed and the bag of results will be deterministic.
+ * The pipeline arb generates a pipeline of stages.
  */
-export function getAggPipelineModel({allowOrs = true, deterministicBag = true} = {}) {
-    const aggStageArb = oneof(...getAllowedStages(allowOrs, deterministicBag));
+export function getAggPipelineArb({allowOrs = true, deterministicBag = true, allowedStages = []} = {}) {
+    const stages = allowedStages.length == 0 ? getAllowedStages(allowOrs, deterministicBag) : allowedStages;
     // Length 6 seems long enough to cover interactions between stages.
-    return fc.array(aggStageArb, {minLength: 1, maxLength: 6});
+    return fc.array(oneof(...stages), {minLength: 1, maxLength: 6});
+}
+
+/*
+ * Our full model for aggregation pipelines. The full model is an object that contains a pipeline
+ * and options. See `getAllowedStages` for description of `allowOrs`
+ * and `deterministicBag`. By default, ORs are allowed and the bag of results will be deterministic.
+ * Allowed stages can be custom by the calling PBT if `allowedStages` is non-empty.
+ */
+export function getQueryAndOptionsModel({
+    allowOrs = true,
+    deterministicBag = true,
+    allowCollation = false,
+    allowedStages = [],
+} = {}) {
+    return fc.record({
+        "pipeline": getAggPipelineArb({allowOrs, deterministicBag, allowedStages}),
+        // TODO SERVER-111679: Make 'collation' optional if 'allowCollation' is true.
+        "options": allowCollation ? fc.record({"collation": collationArb}) : fc.constant({}),
+    });
 }

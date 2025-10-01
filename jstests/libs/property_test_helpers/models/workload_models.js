@@ -6,10 +6,15 @@ import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 function typeCheckSingleAggModel(aggregation) {
     // Should be a list of objects.
-    assert(Array.isArray(aggregation), "Each aggregation pipeline should be an array.");
-    for (const aggStage of aggregation) {
+    assert(
+        typeof aggregation === "object",
+        "Each aggregation pipeline should be an object with a pipeline and the options for execution.",
+    );
+    const pipeline = aggregation.pipeline;
+    for (const aggStage of pipeline) {
         assert.eq(typeof aggStage, "object", "Each aggregation stage should be an object.");
     }
+    assert.eq(typeof aggregation.options, "object", "the options should be an object.");
 }
 
 // Sample once from the aggsModel to do some type checking. This can prevent accidentally passing

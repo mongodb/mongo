@@ -47,10 +47,12 @@ export function createCorrectnessProperty(controlColl, experimentColl, statsColl
         for (let i = 0; i < queries.length; i++) {
             const query = queries[i];
             const controlResults = resultMap[i];
-            const experimentResults = experimentColl.aggregate(query).toArray();
 
+            let experimentResults = [];
+            assert.eq(typeof query, "object");
+            experimentResults = experimentColl.aggregate(query.pipeline, query.options).toArray();
             if (statsCollectorFn) {
-                statsCollectorFn(experimentColl.explain().aggregate(query));
+                statsCollectorFn(experimentColl.explain().aggregate(query.pipeline, query.options));
             }
 
             if (!testHelpers.comp(controlResults, experimentResults)) {
@@ -58,7 +60,7 @@ export function createCorrectnessProperty(controlColl, experimentColl, statsColl
                     passed: false,
                     message: "Query results from experiment collection did not match plain collection using collscan.",
                     query,
-                    explain: experimentColl.explain().aggregate(query),
+                    explain: experimentColl.explain().aggregate(query.pipeline, query.options),
                     controlResults,
                     experimentResults,
                 };
@@ -92,7 +94,7 @@ export function createCacheCorrectnessProperty(controlColl, experimentColl, stat
         // Run the first of each shape three times to get them cached.
         firstQueryOfEachShape.forEach((query) => {
             for (let i = 0; i < 3; i++) {
-                experimentColl.aggregate(query).toArray();
+                experimentColl.aggregate(query.pipeline, query.options).toArray();
             }
         });
 
@@ -102,10 +104,10 @@ export function createCacheCorrectnessProperty(controlColl, experimentColl, stat
         for (let i = 0; i < remainingQueries.length; i++) {
             const query = remainingQueries[i];
             const controlResults = resultMap[i];
-            const experimentResults = experimentColl.aggregate(query).toArray();
+            const experimentResults = experimentColl.aggregate(query.pipeline, query.options).toArray();
 
             if (statsCollectorFn) {
-                statsCollectorFn(experimentColl.explain().aggregate(query));
+                statsCollectorFn(experimentColl.explain().aggregate(query.pipeline, query.options));
             }
 
             if (!testHelpers.comp(controlResults, experimentResults)) {
@@ -115,7 +117,7 @@ export function createCacheCorrectnessProperty(controlColl, experimentColl, stat
                         "A query potentially using the plan cache has incorrect results. " +
                         "The query that created the cache entry likely has different parameters.",
                     query,
-                    explain: experimentColl.explain().aggregate(query),
+                    explain: experimentColl.explain().aggregate(query.pipeline, query.options),
                     controlResults,
                     experimentResults,
                 };
@@ -173,13 +175,13 @@ export function createPlanStabilityProperty(experimentColl, assertCeExists = fal
         for (const query of queries) {
             // Run explain on the query once to get the initial winning plan. Then we run explain
             // ten more times to assert that the winning plan is the same each time.
-            const initialExplain = experimentColl.explain().aggregate(query);
+            const initialExplain = experimentColl.explain().aggregate(query.pipeline, query.options);
             if (assertCeExists) {
                 assertCeIsDefined(initialExplain);
             }
 
             for (let i = 0; i < 10; i++) {
-                const newExplain = experimentColl.explain().aggregate(query);
+                const newExplain = experimentColl.explain().aggregate(query.pipeline, query.options);
                 if (!sameWinningAndRejectedPlans(initialExplain, newExplain)) {
                     return {
                         passed: false,
@@ -250,14 +252,14 @@ export function createQueriesWithKnobsSetAreSameAsControlCollScanProperty(contro
             for (let i = 0; i < queries.length; i++) {
                 const query = queries[i];
                 const controlResults = resultMap[i];
-                const experimentResults = experimentColl.aggregate(query).toArray();
+                const experimentResults = experimentColl.aggregate(query.pipeline, query.options).toArray();
                 if (!testHelpers.comp(controlResults, experimentResults)) {
                     return {
                         passed: false,
                         message:
                             "A query with different knobs set has returned incorrect results compared to a collection scan query with no knobs set.",
                         query,
-                        explain: experimentColl.explain().aggregate(query),
+                        explain: experimentColl.explain().aggregate(query.pipeline, query.options),
                         controlResults,
                         experimentResults,
                         knobToVal,

@@ -1,13 +1,13 @@
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
 import {getDatasetModel, getDocModel} from "jstests/libs/property_test_helpers/models/document_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {fc} from "jstests/third_party/fast_check/fc-3.1.0.js";
 
 export function createStabilityWorkload(numQueriesPerRun) {
     // TODO SERVER-108077 SERVER-106983 when these tickets are complete, remove filters and allow
     // ORs.
-    const aggModel = getAggPipelineModel({allowOrs: false, deterministicBag: false}).filter((q) => {
+    const aggModel = getQueryAndOptionsModel({allowOrs: false, deterministicBag: false}).filter((q) => {
         const asStr = JSON.stringify(q);
         // The query cannot contain any of these strings, as they are linked to the issues above.
         return ["$not", "$exists", "array"].every((expr) => !asStr.includes(expr));

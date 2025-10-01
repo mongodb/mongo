@@ -219,6 +219,7 @@ selector:
     - jstests/core/query/array/array1.js
     - jstests/core/query/array/arrayfind10.js
     - jstests/core/query/array/arrayfind8.js
+    - jstests/core/query/collation_correctness_pbt.js
     - jstests/core/query/covered_multikey.js
     - jstests/core/query/dotted_path_in_null.js
     - jstests/core/query/explode_for_sort_equality_to_array.js

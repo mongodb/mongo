@@ -16,7 +16,7 @@
  * ]
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {getPlanCache, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {isSlowBuild} from "jstests/libs/query/aggregation_pipeline_utils.js";
@@ -38,7 +38,7 @@ const experimentColl = db[jsTestName()];
 function repeatQueriesUseCache(getQuery, testHelpers) {
     for (let queryIx = 0; queryIx < testHelpers.numQueryShapes; queryIx++) {
         const query = getQuery(queryIx, 0 /* paramIx */);
-        const explain = experimentColl.explain().aggregate(query);
+        const explain = experimentColl.explain().aggregate(query.pipeline, query.options);
 
         // If there are no rejected plans, there is no need to cache.
         if (getRejectedPlans(explain).length === 0) {
@@ -51,7 +51,7 @@ function repeatQueriesUseCache(getQuery, testHelpers) {
         const sbeHitsBefore = serverStatusBefore.metrics.query.planCache.sbe.hits;
 
         for (let i = 0; i < 5; i++) {
-            experimentColl.aggregate(query).toArray();
+            experimentColl.aggregate(query.pipeline, query.options).toArray();
         }
 
         const serverStatusAfter = db.serverStatus();
@@ -81,7 +81,7 @@ function repeatQueriesUseCache(getQuery, testHelpers) {
     return {passed: true};
 }
 
-const aggModel = getAggPipelineModel();
+const aggModel = getQueryAndOptionsModel();
 
 testProperty(
     repeatQueriesUseCache,

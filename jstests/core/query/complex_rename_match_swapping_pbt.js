@@ -44,7 +44,7 @@ const knobCorrectnessProperty = createQueriesWithKnobsSetAreSameAsControlCollSca
 function getWorkloadModelForComplexRenameMatchSwap() {
     // Aggregations are 'renaming' stage followed by a match stage.
     const renamingArb = fc.oneof(computedProjectArb, addFieldsVarArb, groupArb);
-    const aggModel = fc.tuple(renamingArb, getMatchArb());
+    const aggModel = fc.record({"pipeline": fc.tuple(renamingArb, getMatchArb()), "options": fc.constant({})});
 
     // This document model generates very nested objects that do not contain any arrays.
     const docModel = getNestedDocModelNoArray();

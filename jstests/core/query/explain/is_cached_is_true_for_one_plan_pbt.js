@@ -13,7 +13,7 @@
  * ]
  */
 import {getCollectionModel} from "jstests/libs/property_test_helpers/models/collection_models.js";
-import {getAggPipelineModel} from "jstests/libs/property_test_helpers/models/query_models.js";
+import {getQueryAndOptionsModel} from "jstests/libs/property_test_helpers/models/query_models.js";
 import {makeWorkloadModel} from "jstests/libs/property_test_helpers/models/workload_models.js";
 import {getPlanCache, testProperty} from "jstests/libs/property_test_helpers/property_testing_utils.js";
 import {getRejectedPlans, getWinningPlanFromExplain} from "jstests/libs/query/analyze_plan.js";
@@ -28,10 +28,10 @@ function isCachedIsTrueForOnePlan(getQuery, testHelpers) {
         const query = getQuery(queryIx, 0 /* paramIx */);
         // Get the plan cached
         for (let i = 0; i < 5; i++) {
-            experimentColl.aggregate(query).toArray();
+            experimentColl.aggregate(query.pipeline, query.options).toArray();
         }
         // Inspect the explain to count how many isCached=true fields we see.
-        const explain = experimentColl.explain().aggregate(query);
+        const explain = experimentColl.explain().aggregate(query.pipeline, query.options);
         const winningPlan = getWinningPlanFromExplain(explain);
         const rejectedPlans = getRejectedPlans(explain);
         let isCachedCount = 0;
@@ -60,7 +60,7 @@ testProperty(
     makeWorkloadModel({
         collModel: getCollectionModel(),
         // A deterministic set of results isn't needed to check the `isCached` property.
-        aggModel: getAggPipelineModel({deterministicBag: false}),
+        aggModel: getQueryAndOptionsModel({deterministicBag: false}),
         numQueriesPerRun,
     }),
     numRuns,
