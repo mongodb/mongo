@@ -41,6 +41,25 @@ mongo_cc_unit_test(
     ],
 )
 
+mongo_cc_unit_test(
+    name = "join_ordering_golden_test",
+    srcs = [
+        "agg_join_model_golden_test.cpp",
+        "join_graph_golden_test.cpp",
+    ],
+    data = [
+        "//src/mongo/db/test_output/query/compiler/optimizer/join/agg_join_model_golden_test:test_data",
+        "//src/mongo/db/test_output/query/compiler/optimizer/join/join_graph_golden_test:test_data",
+    ],
+    tags = ["mongo_unittest_first_group"],
+    deps = [
+        ":join_ordering",
+        "//src/mongo/db:query_exec",
+        "//src/mongo/db/pipeline:aggregation_context_fixture",
+        "//src/mongo/db/query:query_request",
+    ],
+)
+
 mongo_cc_library(
     name = "join_predicate",
     srcs = [

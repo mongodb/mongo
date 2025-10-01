@@ -54,6 +54,16 @@ struct AggJoinModel {
     // Ramaining stages not extracted for join optiomization.
     std::unique_ptr<Pipeline> suffix;
 
+    /**Serializes the Aggregation Join Model to BSON.*/
+    BSONObj toBSON() const;
+
+    /** Converts the Aggregation Join Model to a JSON string. If 'pretty' is true the output JSON
+     * string is idented.
+     */
+    std::string toString(bool pretty) const {
+        return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
+    }
+
 private:
     void build();
 

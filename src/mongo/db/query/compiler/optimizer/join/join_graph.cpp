@@ -29,7 +29,53 @@
 
 #include "mongo/db/query/compiler/optimizer/join/join_graph.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
+
 namespace mongo::join_ordering {
+namespace {
+StringData toStringData(JoinPredicate::Operator op) {
+    switch (op) {
+        case JoinPredicate::Operator::Eq:
+            return "eq";
+    }
+    MONGO_UNREACHABLE_TASSERT(11147100);
+}
+
+BSONObj canonicalQueryToBSON(const std::unique_ptr<CanonicalQuery>& cq) {
+    BSONObjBuilder accessPathBSON{};
+    if (cq) {
+        cq->serializeToBson(&accessPathBSON);
+    }
+    return accessPathBSON.obj();
+}
+}  // namespace
+
+BSONObj JoinNode::toBSON() const {
+    BSONObjBuilder result{};
+    result.append("collectionName", redactTenant(collectionName));
+    result.append("accessPath", canonicalQueryToBSON(accessPath));
+    result.append("embedPath", embedPath ? embedPath->fullPath() : "");
+    return result.obj();
+}
+
+BSONObj JoinPredicate::toBSON() const {
+    return BSON("op" << toStringData(op) << "left" << left << "right" << right);
+}
+
+BSONObj JoinEdge::toBSON() const {
+    BSONObjBuilder result{};
+    {
+        BSONArrayBuilder ab{};
+        for (const auto& pred : predicates) {
+            ab.append(pred.toBSON());
+        }
+        result.append("predicates", ab.arr());
+    }
+    result.append("left", left.to_string());
+    result.append("right", right.to_string());
+    return result.obj();
+}
+
 std::vector<EdgeId> JoinGraph::getJoinEdges(NodeSet left, NodeSet right) const {
     std::vector<EdgeId> result;
 
@@ -82,5 +128,24 @@ EdgeId JoinGraph::addSimpleEqualityEdge(NodeId leftNode,
     NodeSet rightNodeSet{};
     rightNodeSet.set(rightNode);
     return addEdge(leftNodeSet, rightNodeSet, {{JoinPredicate::Eq, leftPathId, rightPathId}});
+}
+
+BSONObj JoinGraph::toBSON() const {
+    BSONObjBuilder result{};
+    {
+        BSONArrayBuilder ab{};
+        for (const auto& node : _nodes) {
+            ab.append(node.toBSON());
+        }
+        result.append("nodes", ab.arr());
+    }
+    {
+        BSONArrayBuilder ab{};
+        for (const auto& edge : _edges) {
+            ab.append(edge.toBSON());
+        }
+        result.append("edges", ab.arr());
+    }
+    return result.obj();
 }
 }  // namespace mongo::join_ordering

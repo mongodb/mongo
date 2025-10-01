@@ -59,6 +59,10 @@ struct JoinNode {
      * in a new document. For the main collection, this path is always empty.
      */
     boost::optional<FieldPath> embedPath;
+
+    /** Serializes the Join Node to BSON.
+     */
+    BSONObj toBSON() const;
 };
 
 /** A join predicate is a condition that specifies how two collections should be joined. It has two
@@ -75,6 +79,10 @@ struct JoinPredicate {
     Operator op;
     PathId left;
     PathId right;
+
+    /** Serializes the Join Predicate to BSON.
+     */
+    BSONObj toBSON() const;
 };
 
 /** Represents a join edge between two sets of collections.
@@ -93,6 +101,10 @@ struct JoinEdge {
     NodeSet getBitset() const {
         return left | right;
     }
+
+    /** Serializes the Join Edge to BSON.
+     */
+    BSONObj toBSON() const;
 };
 
 /** A join graph is a logical model that represents the joins in a query. It consists of join nodes
@@ -134,6 +146,17 @@ public:
 
     size_t numEdges() const {
         return _edges.size();
+    }
+
+    /** Serializes the Join Graph to BSON.
+     */
+    BSONObj toBSON() const;
+
+    /** Converts the Join Graph to a JSON string. If 'pretty' is true the output JSON string is
+     * idented.
+     */
+    std::string toString(bool pretty) const {
+        return toBSON().jsonString(/*format*/ ExtendedCanonicalV2_0_0, pretty);
     }
 
 private:

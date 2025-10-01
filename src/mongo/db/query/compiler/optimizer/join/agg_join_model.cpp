@@ -29,12 +29,14 @@
 
 #include "mongo/db/query/compiler/optimizer/join/agg_join_model.h"
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/expression_context_builder.h"
 #include "mongo/db/pipeline/pipeline_d.h"
 #include "mongo/db/query/compiler/optimizer/join/path_resolver.h"
 
 namespace mongo::join_ordering {
+namespace {
 std::unique_ptr<Pipeline> createEmptyPipeline(
     const boost::intrusive_ptr<ExpressionContext>& sourceExpCtx) {
     auto expCtx = makeCopyFromExpressionContext(sourceExpCtx, sourceExpCtx->getNamespaceString());
@@ -72,6 +74,19 @@ std::unique_ptr<CanonicalQuery> makeCQFromLookup(
     }
     return makeFullScanCQ(expCtx);
 }
+
+BSONObj resolvedPathToBSON(const ResolvedPath& rp) {
+    return BSON("nodeId" << rp.nodeId << "fieldName" << rp.fieldName.fullPath());
+}
+
+std::vector<BSONObj> pipelineToBSON(const std::unique_ptr<Pipeline>& pipeline) {
+    if (pipeline) {
+        return pipeline->serializeToBson();
+    } else {
+        return {};
+    }
+}
+}  // namespace
 
 bool AggJoinModel::canOptimizeWithJoinReordering(const std::unique_ptr<Pipeline>& pipeline) {
     size_t numLookupsWithUnwind = 0;
@@ -165,5 +180,20 @@ boost::optional<NodeId> AggJoinModel::makeBaseNode() {
         return boost::none;
     }
     return graph.addNode(expCtx->getNamespaceString(), std::move(swCQ.getValue()), boost::none);
+}
+
+BSONObj AggJoinModel::toBSON() const {
+    BSONObjBuilder result{};
+    result.append("graph", graph.toBSON());
+    {
+        BSONArrayBuilder ab{};
+        for (const auto& rp : resolvedPaths) {
+            ab.append(resolvedPathToBSON(rp));
+        }
+        result.append("resolvedPaths", ab.arr());
+    }
+    result.append("prefix", pipelineToBSON(prefix));
+    result.append("suffix", pipelineToBSON(suffix));
+    return result.obj();
 }
 }  // namespace mongo::join_ordering

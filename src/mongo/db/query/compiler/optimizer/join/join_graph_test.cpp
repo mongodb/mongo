@@ -34,14 +34,6 @@
 namespace mongo::join_ordering {
 
 namespace {
-struct PathGen {
-    PathId next() {
-        return _pathId++;
-    }
-
-    PathId _pathId{};
-};
-
 NamespaceString makeNSS(StringData collName) {
     return NamespaceString::makeLocalCollection(collName);
 }
@@ -84,16 +76,15 @@ TEST(JoinGraphTests, AddEdge) {
 
 TEST(JoinGraphTests, getJoinEdges) {
     JoinGraph graph{};
-    PathGen pg;
 
     auto a = graph.addNode(makeNSS("a"), nullptr, boost::none);
     auto b = graph.addNode(makeNSS("b"), nullptr, FieldPath("b"));
     auto c = graph.addNode(makeNSS("c"), nullptr, FieldPath("c"));
     auto d = graph.addNode(makeNSS("d"), nullptr, FieldPath("d"));
 
-    auto ab = graph.addSimpleEqualityEdge(a, b, pg.next(), pg.next());
-    auto ac = graph.addSimpleEqualityEdge(a, c, pg.next(), pg.next());
-    auto cd = graph.addSimpleEqualityEdge(c, d, pg.next(), pg.next());
+    auto ab = graph.addSimpleEqualityEdge(a, b, 0, 1);
+    auto ac = graph.addSimpleEqualityEdge(a, c, 2, 3);
+    auto cd = graph.addSimpleEqualityEdge(c, d, 4, 5);
 
     ASSERT_EQ(graph.getJoinEdges(NodeSet{"0001"}, NodeSet{"0010"}), std::vector<EdgeId>{ab});
     ASSERT_EQ(graph.getJoinEdges(NodeSet{"0001"}, NodeSet{"0100"}), std::vector<EdgeId>{ac});
