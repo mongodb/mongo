@@ -52,6 +52,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/range_deleter_service_op_observer.h"
+#include "mongo/db/s/range_deletion.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/db/versioning_protocol/chunk_version.h"
@@ -322,7 +323,7 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 
                 // Remove persistent range deletion task
                 try {
-                    RangeDeleterService::get(opCtx)->deregisterTask(collectionUuid, range);
+                    RangeDeleterService::get(opCtx)->completeTask(collectionUuid, range);
                     rangedeletionutil::removePersistentRangeDeletionTask(
                         opCtx, collectionUuid, range);
 
@@ -565,25 +566,12 @@ void RangeDeleterService::onShutdown() {
 
 BSONObj RangeDeleterService::dumpState() {
     auto lock = _acquireMutexFailIfServiceNotUp();
-
-    BSONObjBuilder builder;
-    for (const auto& [collUUID, chunkRanges] : _rangeDeletionTasks) {
-        BSONArrayBuilder subBuilder(builder.subarrayStart(collUUID.toString()));
-        for (const auto& chunkRange : chunkRanges) {
-            subBuilder.append(chunkRange->toBSON());
-        }
-    }
-    return builder.obj();
+    return _rangeDeletionTasks.getAllTasksBSON();
 }
 
 long long RangeDeleterService::totalNumOfRegisteredTasks() {
     auto lock = _acquireMutexFailIfServiceNotUp();
-
-    long long counter = 0;
-    for (const auto& [collUUID, ranges] : _rangeDeletionTasks) {
-        counter += ranges.size();
-    }
-    return counter;
+    return _rangeDeletionTasks.getTaskCount();
 }
 
 SharedSemiFuture<void> RangeDeleterService::registerTask(
@@ -644,13 +632,10 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
                 "range"_attr = redact(rdt.getRange().toString()),
                 "pending"_attr = pending);
 
-    auto [registeredTask, firstRegistration] =
-        _rangeDeletionTasks[rdt.getCollectionUuid()].insert(std::make_shared<RangeDeletion>(rdt));
+    auto [task, registrationResult] = _rangeDeletionTasks.registerTask(rdt);
 
-    auto task = static_cast<RangeDeletion*>(registeredTask->get());
-
-    // Register the task on the service only once, duplicate registrations will join
-    if (firstRegistration) {
+    // Register the task on the service only once, duplicate registrations will join.
+    if (registrationResult == RangeDeletionTaskTracker::kRegisteredNewTask) {
         scheduleRangeDeletionChain(task->getPendingFuture());
     }
 
@@ -662,26 +647,14 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
     return task->getCompletionFuture();
 }
 
-void RangeDeleterService::deregisterTask(const UUID& collUUID, const ChunkRange& range) {
+void RangeDeleterService::completeTask(const UUID& collUUID, const ChunkRange& range) {
     auto lock = _acquireMutexFailIfServiceNotUp();
-    auto& rangeDeletionTasksForCollection = _rangeDeletionTasks[collUUID];
-    auto it = rangeDeletionTasksForCollection.find(std::make_shared<ChunkRange>(range));
-    if (it != rangeDeletionTasksForCollection.end()) {
-        static_cast<RangeDeletion*>(it->get())->makeReady();
-        rangeDeletionTasksForCollection.erase(it);
-    }
-    if (rangeDeletionTasksForCollection.size() == 0) {
-        _rangeDeletionTasks.erase(collUUID);
-    }
+    _rangeDeletionTasks.completeTask(collUUID, range);
 }
 
 int RangeDeleterService::getNumRangeDeletionTasksForCollection(const UUID& collectionUUID) {
     auto lock = _acquireMutexFailIfServiceNotUp();
-    auto tasksSet = _rangeDeletionTasks.find(collectionUUID);
-    if (tasksSet == _rangeDeletionTasks.end()) {
-        return 0;
-    }
-    return tasksSet->second.size();
+    return _rangeDeletionTasks.getTaskCountForCollection(collectionUUID);
 }
 
 SharedSemiFuture<void> RangeDeleterService::getOverlappingRangeDeletionsFuture(
@@ -696,35 +669,16 @@ SharedSemiFuture<void> RangeDeleterService::getOverlappingRangeDeletionsFuture(
 
     auto lock = _acquireMutexFailIfServiceNotUp();
 
-    auto mapEntry = _rangeDeletionTasks.find(collectionUUID);
-    if (mapEntry == _rangeDeletionTasks.end() || mapEntry->second.size() == 0) {
-        // No tasks scheduled for the specified collection
+    auto tasks = _rangeDeletionTasks.getOverlappingTasks(collectionUUID, range);
+    if (tasks.empty()) {
         return SemiFuture<void>::makeReady().share();
     }
 
-    std::vector<ExecutorFuture<void>> overlappingRangeDeletionsFutures;
-    auto addOverlappingRangeDeletionFuture = [&](std::shared_ptr<ChunkRange> range) {
-        auto future = static_cast<RangeDeletion*>(range.get())->getCompletionFuture();
-        // Scheduling wait on the current executor so that it gets invalidated on step-down
-        overlappingRangeDeletionsFutures.push_back(future.thenRunOn(_executor));
-    };
-
-    auto& rangeDeletions = mapEntry->second;
-    const auto rangeSharedPtr = std::make_shared<ChunkRange>(range);
-    auto forwardIt = rangeDeletions.lower_bound(rangeSharedPtr);
-    if (forwardIt != rangeDeletions.begin() && (std::prev(forwardIt)->get()->overlapWith(range))) {
-        addOverlappingRangeDeletionFuture(*std::prev(forwardIt));
+    std::vector<ExecutorFuture<void>> futures;
+    for (const auto& [_, task] : tasks) {
+        futures.emplace_back(task->getCompletionFuture().thenRunOn(_executor));
     }
-
-    while (forwardIt != rangeDeletions.end() && forwardIt->get()->overlapWith(range)) {
-        addOverlappingRangeDeletionFuture(*forwardIt);
-        forwardIt++;
-    }
-
-    if (overlappingRangeDeletionsFutures.size() == 0) {
-        return SemiFuture<void>::makeReady().share();
-    }
-    return whenAllSucceed(std::move(overlappingRangeDeletionsFutures)).share();
+    return whenAllSucceed(std::move(futures)).share();
 }
 
 }  // namespace mongo

@@ -135,6 +135,8 @@ SharedSemiFuture<void> registerAndCreatePersistentTask(
 int insertDocsWithinRange(
     OperationContext* opCtx, const NamespaceString& nss, int min, int max, int maxCount);
 
+range_deletions::detail::CollectionToTasks dumpStateAsMap(OperationContext* opCtx);
+
 void verifyRangeDeletionTasks(OperationContext* opCtx,
                               UUID uuidColl,
                               std::vector<ChunkRange> expectedChunkRanges);

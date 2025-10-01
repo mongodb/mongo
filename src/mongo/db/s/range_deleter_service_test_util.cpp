@@ -188,6 +188,24 @@ void deleteRangeDeletionTaskDocument(OperationContext* opCtx, UUID rdtId) {
     store.remove(opCtx, BSON(RangeDeletionTask::kIdFieldName << rdtId));
 }
 
+
+range_deletions::detail::CollectionToTasks dumpStateAsMap(OperationContext* opCtx) {
+    // Rehydrate state based on the result of dumpState(). The ordering of the chunk ranges within
+    // the collection arrays is arbitrary, so we need to rebuild the map instead of
+    // comparing BSONObjs with the expected state directly.
+    auto rds = RangeDeleterService::get(opCtx);
+    BSONObj stateBSON = rds->dumpState();
+    range_deletions::detail::CollectionToTasks state;
+    for (const auto& collection : stateBSON) {
+        auto uuid = uassertStatusOK(UUID::parse(collection.fieldName()));
+        auto& tasks = state[uuid];
+        for (const auto& range : collection.Array()) {
+            tasks[ChunkRange::fromBSON(range.Obj())] = nullptr;
+        }
+    }
+    return state;
+}
+
 /**
  * Ensure that `expectedChunkRanges` range deletion tasks are scheduled for collection with UUID
  * `uuidColl`
@@ -195,34 +213,17 @@ void deleteRangeDeletionTaskDocument(OperationContext* opCtx, UUID rdtId) {
 void verifyRangeDeletionTasks(OperationContext* opCtx,
                               UUID uuidColl,
                               std::vector<ChunkRange> expectedChunkRanges) {
-    auto rds = RangeDeleterService::get(opCtx);
-
-    // Get chunk ranges inserted to be deleted by RangeDeleterService
-    BSONObj dumpState = rds->dumpState();
-    BSONElement chunkRangesElem = dumpState.getField(uuidColl.toString());
-    if (!chunkRangesElem.ok() && expectedChunkRanges.size() == 0) {
+    auto state = dumpStateAsMap(opCtx);
+    auto it = state.find(uuidColl);
+    if (it == state.end() && expectedChunkRanges.empty()) {
         return;
     }
-    ASSERT(chunkRangesElem.ok()) << "Expected to find range deletion tasks from collection "
-                                 << uuidColl.toString();
-
-    const auto chunkRanges = chunkRangesElem.Array();
-    ASSERT_EQ(chunkRanges.size(), expectedChunkRanges.size());
-
-    // Sort expectedChunkRanges vector to replicate RangeDeleterService dumpState order
-    struct {
-        bool operator()(const ChunkRange& a, const ChunkRange& b) {
-            return a.getMin().woCompare(b.getMin()) < 0;
-        }
-    } RANGES_COMPARATOR;
-
-    std::sort(expectedChunkRanges.begin(), expectedChunkRanges.end(), RANGES_COMPARATOR);
-
-    // Check expectedChunkRanges are exactly the same as the returned ones
-    for (size_t i = 0; i < expectedChunkRanges.size(); ++i) {
-        auto chunkRange = ChunkRange::fromBSON(chunkRanges[i].Obj());
-        ASSERT(chunkRange == expectedChunkRanges[i])
-            << "Expected " << chunkRange.toBSON() << " == " << expectedChunkRanges[i].toBSON();
+    ASSERT(it != state.end()) << "Expected to find range deletion tasks from collection "
+                              << uuidColl.toString();
+    const auto& tasks = it->second;
+    ASSERT_EQ(tasks.size(), expectedChunkRanges.size());
+    for (const auto& range : expectedChunkRanges) {
+        ASSERT(tasks.contains(range)) << range.toBSON();
     }
 }
 

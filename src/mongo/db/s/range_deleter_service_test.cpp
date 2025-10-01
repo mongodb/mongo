@@ -320,8 +320,8 @@ TEST_F(RangeDeleterServiceTest, NoActionPossibleIfServiceIsDown) {
         DBException,
         ErrorCodes::NotYetInitialized);
 
-    ASSERT_THROWS_CODE(rds->deregisterTask(taskWithOngoingQueries->getTask().getCollectionUuid(),
-                                           taskWithOngoingQueries->getTask().getRange()),
+    ASSERT_THROWS_CODE(rds->completeTask(taskWithOngoingQueries->getTask().getCollectionUuid(),
+                                         taskWithOngoingQueries->getTask().getRange()),
                        DBException,
                        ErrorCodes::NotYetInitialized);
 
@@ -568,23 +568,17 @@ TEST_F(RangeDeleterServiceTest, DumpState) {
     ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
     ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollB));
 
-    // Build expected state and compare it with the returned one from
-    // RangeDeleterService::dumpState()
-    BSONArrayBuilder builderArrCollA;
-    builderArrCollA.append(task0WithOngoingQueriesCollA->getTask().getRange().toBSON());
-    builderArrCollA.append(task1WithOngoingQueriesCollA->getTask().getRange().toBSON());
-
-    BSONArrayBuilder builderArrCollB;
-    builderArrCollB.append(taskWithOngoingQueriesCollB->getTask().getRange().toBSON());
-
-    BSONObj state = rds->dumpState();
-    BSONObj expectedState =
-        BSON(uuidCollA.toString() << builderArrCollA.arr() << uuidCollB.toString()
-                                  << builderArrCollB.arr());
-
-    const UnorderedFieldsBSONObjComparator kComparator;
-    ASSERT_EQ(kComparator.compare(state, expectedState), 0)
-        << "Expected " << state << " == " << expectedState;
+    auto state = dumpStateAsMap(opCtx);
+    const auto& task0A = task0WithOngoingQueriesCollA->getTask();
+    const auto& task1A = task1WithOngoingQueriesCollA->getTask();
+    const auto& taskB = taskWithOngoingQueriesCollB->getTask();
+    const auto& collAId = task0A.getCollectionUuid();
+    const auto& collBId = taskB.getCollectionUuid();
+    ASSERT_EQ(state[collAId].size(), 2);
+    ASSERT_TRUE(state[collAId].contains(task0A.getRange()));
+    ASSERT_TRUE(state[collAId].contains(task1A.getRange()));
+    ASSERT_EQ(state[collBId].size(), 1);
+    ASSERT_TRUE(state[collBId].contains(taskB.getRange()));
 }
 
 TEST_F(RangeDeleterServiceTest, TotalNumOfRegisteredTasks) {

@@ -54,6 +54,23 @@ idl_generator(
 )
 
 mongo_cc_library(
+    name = "range_deleter_service_impl",
+    srcs = [
+        "range_deletion.cpp",
+        "range_deletion_task_tracker.cpp",
+    ],
+    hdrs = [
+        "range_deletion.h",
+        "range_deletion_task_tracker.h",
+        ":range_deletion_task_gen",
+    ],
+    deps = [
+        "//src/mongo/db:server_base",
+        "//src/mongo/s:common_s",
+    ],
+)
+
+mongo_cc_library(
     name = "balancer_stats_registry",
     srcs = [
         "balancer_stats_registry.cpp",
@@ -65,6 +82,7 @@ mongo_cc_library(
         "//src/mongo/db/sharding_environment:sharding_runtime_d_params.h",
     ],
     deps = [
+        ":range_deleter_service_impl",
         "//src/mongo/db:dbdirectclient",
         "//src/mongo/db:shard_role",
         "//src/mongo/db/repl:replica_set_aware_service",
@@ -570,6 +588,7 @@ mongo_cc_library(
         ":balancer_stats_registry",
         ":forwardable_operation_metadata",
         ":query_analysis_writer",
+        ":range_deleter_service_impl",
         ":resharding_server_parameters_idl",
         ":sharding_catalog_manager",
         ":sharding_logging",
@@ -1378,6 +1397,7 @@ mongo_cc_unit_test(
         "range_deleter_service_test.cpp",
         "range_deleter_service_test.h",
         "range_deleter_service_test_util.cpp",
+        "range_deletion_task_tracker_test.cpp",
         "range_deletion_util_test.cpp",
         "session_catalog_migration_destination_test.cpp",
         "session_catalog_migration_source_test.cpp",

@@ -36,7 +36,7 @@
 #include "mongo/db/local_catalog/lock_manager/lock_manager_defs.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
-#include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/range_deletion_task_tracker.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/sharding_runtime_d_params_gen.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -46,7 +46,6 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_impl.h"
@@ -75,60 +74,6 @@ public:
     static RangeDeleterService* get(OperationContext* opCtx);
 
 private:
-    /*
-     * In memory representation of registered range deletion tasks. To each non-pending range
-     * deletion task corresponds a registered task on the service.
-     */
-    class RangeDeletion : public ChunkRange {
-    public:
-        RangeDeletion(const RangeDeletionTask& task) : ChunkRange(task.getRange()) {}
-
-        ~RangeDeletion() {
-            if (!_completionPromise.getFuture().isReady()) {
-                _completionPromise.setError(
-                    Status{ErrorCodes::Interrupted, "Range deletion interrupted"});
-            }
-        }
-
-        SharedSemiFuture<void> getPendingFuture() {
-            return _pendingPromise.getFuture();
-        }
-
-        void clearPending() {
-            if (!_pendingPromise.getFuture().isReady()) {
-                _pendingPromise.emplaceValue();
-            }
-        }
-
-        SharedSemiFuture<void> getCompletionFuture() const {
-            return _completionPromise.getFuture().semi().share();
-        }
-
-        void makeReady() {
-            _completionPromise.emplaceValue();
-        }
-
-    private:
-        // Marked ready once the range deletion has been fully processed
-        SharedPromise<void> _completionPromise;
-
-        SharedPromise<void> _pendingPromise;
-    };
-
-    /*
-     * Internal comparator to sort ranges in _rangeDeletionTasks's sets.
-     *
-     * NB: it ONLY makes sense to use this on ranges that are comparable, meaning
-     * the ones based on the same key pattern (aka the ones belonging to the same
-     * sharded collection).
-     */
-    struct RANGES_COMPARATOR {
-        bool operator()(const std::shared_ptr<ChunkRange>& a,
-                        const std::shared_ptr<ChunkRange>& b) const {
-            return a->getMin().woCompare(b->getMin()) < 0;
-        }
-    };
-
     /*
      * Class enclosing a thread continuously processing "ready" range deletions, meaning tasks
      * that are allowed to be processed (already drained ongoing queries and already waited for
@@ -198,9 +143,8 @@ private:
         std::shared_ptr<executor::TaskExecutor> _executor;
     };
 
-    // Keeping track of per-collection registered range deletion tasks
-    stdx::unordered_map<UUID, std::set<std::shared_ptr<ChunkRange>, RANGES_COMPARATOR>, UUID::Hash>
-        _rangeDeletionTasks;
+    // Keeping track of per-collection registered range deletion tasks.
+    RangeDeletionTaskTracker _rangeDeletionTasks;
 
     // Mono-threaded executor processing range deletion tasks
     std::shared_ptr<executor::TaskExecutor> _executor;
@@ -250,9 +194,9 @@ public:
         bool pending = false);
 
     /*
-     * Deregister a task from the range deleter service.
+     * Deregister a task from the range deleter service and fulfill its completion promise.
      */
-    void deregisterTask(const UUID& collUUID, const ChunkRange& range);
+    void completeTask(const UUID& collUUID, const ChunkRange& range);
 
     /*
      * Returns the number of registered range deletion tasks for a collection
