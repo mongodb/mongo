@@ -42,8 +42,6 @@
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
-#include "mongo/db/collection_crud/capped_collection_maintenance.h"
-#include "mongo/db/collection_crud/capped_utils.h"
 #include "mongo/db/collection_crud/collection_write_path.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -1180,18 +1178,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          return op->shouldPrepare() ? applyPrepareTransaction(opCtx, op, mode)
                                     : applyApplyOpsOplogEntry(opCtx, *op, mode);
      }}},
-    {"convertToCapped",
-     {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
-          -> Status {
-          const auto& entry = *op;
-          const auto& cmd = entry.getObject();
-          convertToCapped(opCtx,
-                          extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd),
-                          cmd["size"].safeNumberLong(),
-                          entry.getFromMigrate().value_or(false));
-          return Status::OK();
-      },
-      {ErrorCodes::NamespaceNotFound}}},
     {"commitTransaction",
      {[](OperationContext* opCtx, const ApplierOperation& op, OplogApplication::Mode mode)
           -> Status {
