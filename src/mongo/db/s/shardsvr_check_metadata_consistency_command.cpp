@@ -399,7 +399,12 @@ public:
             participantRequest.setCommonFields(request().getCommonFields());
             participantRequest.setPrimaryShardId(ShardingState::get(opCtx)->shardId());
             participantRequest.setCursor(request().getCursor());
-            const auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+            auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+            if (std::find(participants.begin(), participants.end(), ShardId::kConfigServerId) ==
+                participants.end()) {
+                // Include config server as shard when it is not embedded
+                participants.push_back(ShardId::kConfigServerId);
+            }
 
             BSONObjBuilder participantRequestBob;
             participantRequest.serialize(BSONObj(), &participantRequestBob);
