@@ -38,11 +38,13 @@ fi
 attempts=0
 max_attempts=4
 
-while ! aws ecr get-login-password --region us-east-1 | docker login --password-stdin --username AWS $REGISTRY; do
-    [ "$attempts" -ge "$max_attempts" ] && exit 1
-    ((attempts++))
-    sleep 10
-done
+if [ "$1" == "--push" ]; then
+    while ! aws ecr get-login-password --region us-east-1 | docker login --password-stdin --username AWS $REGISTRY; do
+        [ "$attempts" -ge "$max_attempts" ] && exit 1
+        ((attempts++))
+        sleep 10
+    done
+fi
 
 # Build Image
 MONGOD_PATH="$(find ./src -type f -name 'mongod')"

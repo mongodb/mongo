@@ -41,13 +41,20 @@ def make_task(compile_variant: str, additional_dependencies: set[str], push: str
         FunctionCall("set up venv"),
         FunctionCall("fetch binaries"),
         FunctionCall("extract binaries"),
-        FunctionCall(
-            "set up remote credentials",
-            {"aws_key_remote": "${repo_aws_key}", "aws_secret_remote": "${repo_aws_secret}"},
-        ),
-        BuiltInCommand(
-            "ec2.assume_role", {"role_arn": "arn:aws:iam::664315256653:role/mongo-tf-project"}
-        ),
+    ]
+    if push == "true":
+        commands.append(
+            FunctionCall(
+                "set up remote credentials",
+                {"aws_key_remote": "${repo_aws_key}", "aws_secret_remote": "${repo_aws_secret}"},
+            )
+        )
+        commands.append(
+            BuiltInCommand(
+                "ec2.assume_role", {"role_arn": "arn:aws:iam::664315256653:role/mongo-tf-project"}
+            )
+        )
+    commands.append(
         BuiltInCommand(
             "subprocess.exec",
             {
@@ -55,8 +62,9 @@ def make_task(compile_variant: str, additional_dependencies: set[str], push: str
                 "binary": "bash",
                 "args": scriptArgs,
             },
-        ),
-    ]
+        )
+    )
+
     return Task(f"{taskPrefix}{compile_variant}", commands, dependencies)
 
 
