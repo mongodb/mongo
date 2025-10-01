@@ -348,7 +348,7 @@ SemiFuture<void> ReshardingTxnCloner::run(
             if (chainCtx->pipeline) {
                 // Guarantee the pipeline is always cleaned up - even upon cancellation.
                 //
-                // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+                // TODO(SERVER-111752): Please revisit if this thread could be made killable.
                 auto client = cc().getServiceContext()
                                   ->getService(ClusterRole::ShardServer)
                                   ->makeClient("ReshardingTxnClonerCleanupClient",

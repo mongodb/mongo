@@ -74,7 +74,7 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
     // The listCollections command cannot be run in multi-document transactions, so run it using an
     // alternative client.
     //
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+    // TODO(SERVER-111753): Please revisit if this thread could be made killable.
     auto client = opCtx->getService()->makeClient("populateCollectionUUIDMismatch",
                                                   Client::noSession(),
                                                   ClientOperationKillableByStepdown{false});

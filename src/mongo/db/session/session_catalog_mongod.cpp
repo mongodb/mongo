@@ -148,7 +148,7 @@ void killSessionTokens(OperationContext* opCtx,
          sessionKillTokens = std::move(sessionKillTokens)](auto status) mutable {
             invariant(status);
 
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+            // TODO(SERVER-111754): Please revisit if this thread could be made killable.
             ThreadClient tc("Kill-Sessions",
                             service->getService(ClusterRole::ShardServer),
                             ClientOperationKillableByStepdown{false});

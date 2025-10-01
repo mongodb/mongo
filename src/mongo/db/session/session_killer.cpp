@@ -57,7 +57,7 @@ SessionKiller::SessionKiller(Service* service, KillFunc killer)
     _thread = stdx::thread([this, service] {
         // This is the background killing thread
 
-        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+        // TODO(SERVER-111754): Please revisit if this thread could be made killable.
         ThreadClient tc("SessionKiller", service, ClientOperationKillableByStepdown{false});
 
         stdx::unique_lock<stdx::mutex> lk(_mutex);

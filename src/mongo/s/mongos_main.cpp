@@ -308,7 +308,7 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
                             session.kill(ErrorCodes::InterruptedAtShutdown));
     });
 
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+    // TODO(SERVER-111754): Please revisit if this thread could be made killable.
     auto newClient = opCtx->getServiceContext()
                          ->getService(ClusterRole::RouterServer)
                          ->makeClient("ImplicitlyAbortTxnAtShutdown",
@@ -364,7 +364,7 @@ void cleanupTask(const ShutdownTaskArgs& shutdownArgs) {
         // This client initiation pattern is only to be used here, with plans to eliminate this
         // pattern down the line.
         if (!haveClient()) {
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+            // TODO(SERVER-111755): Please revisit if this thread could be made killable.
             Client::initThread(getThreadName(),
                                serviceContext->getService(ClusterRole::RouterServer),
                                Client::noSession(),
@@ -696,7 +696,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
                    "Summary of time elapsed"_attr = startupInfoBuilder.obj());
     });
 
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+    // TODO(SERVER-111755): Please revisit if this thread could be made killable.
     ThreadClient tc("mongosMain",
                     serviceContext->getService(ClusterRole::RouterServer),
                     ClientOperationKillableByStepdown{false});

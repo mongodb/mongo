@@ -132,7 +132,7 @@ void RouterUptimeReporter::startPeriodicThread(ServiceContext* serviceContext) {
     Date_t created = Date_t::now();
 
     _thread = stdx::thread([serviceContext, created] {
-        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+        // TODO(SERVER-111753): Please revisit if this thread could be made killable.
         Client::initThread("Uptime-reporter",
                            serviceContext->getService(ClusterRole::RouterServer),
                            Client::noSession(),

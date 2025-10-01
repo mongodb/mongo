@@ -862,7 +862,7 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
     // (This operation includes a $merge stage writing into the config database, which requires
     // internal client credentials).
     {
-        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+        // TODO(SERVER-111753): Please revisit if this thread could be made killable.
         auto altClient = opCtx->getServiceContext()
                              ->getService(ClusterRole::ShardServer)
                              ->makeClient("initializePlacementHistory",

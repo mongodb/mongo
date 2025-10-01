@@ -585,7 +585,7 @@ void ShardRegistry::scheduleReplicaSetUpdateOnConfigServerIfNeeded(
 
     auto executor = Grid::get(getGlobalServiceContext())->getExecutorPool()->getFixedExecutor();
     AsyncTry([] {
-        // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+        // TODO(SERVER-111753): Please revisit if this thread could be made killable.
         ThreadClient tc("UpdateReplicaSetOnConfigServer",
                         getGlobalServiceContext()->getService(ClusterRole::ShardServer),
                         ClientOperationKillableByStepdown{false});

@@ -352,7 +352,7 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                        return false;
                    }
 
-                   // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+                   // TODO(SERVER-111752): Please revisit if this thread could be made killable.
                    ThreadClient client(fmt::format("OplogFetcher-{}-{}",
                                                    _reshardingUUID.toString(),
                                                    _donorShard.toString()),
@@ -631,7 +631,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
             const boost::optional<BSONObj>& postBatchResumeToken) {
             _env->metrics()->onBatchRetrievedDuringOplogFetching(Milliseconds(batchTimer.millis()));
 
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+            // TODO(SERVER-111752): Please revisit if this thread could be made killable.
             ThreadClient client(fmt::format("ReshardingFetcher-{}-{}",
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),

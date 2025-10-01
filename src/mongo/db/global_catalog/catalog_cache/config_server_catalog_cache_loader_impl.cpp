@@ -122,7 +122,7 @@ SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoaderImpl::getCh
 
     return ExecutorFuture<void>(_executor)
         .then([=]() {
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+            // TODO(SERVER-111753): Please revisit if this thread could be made killable.
             ThreadClient tc("ConfigServerCatalogCacheLoader::getChunksSince",
                             getGlobalServiceContext()->getService(),
                             ClientOperationKillableByStepdown{false});
@@ -136,7 +136,7 @@ SemiFuture<DatabaseType> ConfigServerCatalogCacheLoaderImpl::getDatabase(
     const DatabaseName& dbName) {
     return ExecutorFuture<void>(_executor)
         .then([dbName] {
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+            // TODO(SERVER-111753): Please revisit if this thread could be made killable.
             ThreadClient tc("ConfigServerCatalogCacheLoader::getDatabase",
                             getGlobalServiceContext()->getService(),
                             ClientOperationKillableByStepdown{false});

@@ -272,7 +272,7 @@ private:
                   "Updating shard identity config string with confirmed replica set",
                   "connectionString"_attr = update);
 
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+            // TODO(SERVER-111753): Please revisit if this thread could be made killable.
             ThreadClient tc("updateShardIdentityConfigString",
                             _serviceContext->getService(ClusterRole::ShardServer),
                             ClientOperationKillableByStepdown{false});

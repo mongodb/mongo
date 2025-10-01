@@ -765,7 +765,7 @@ SemiFuture<void> ReshardingCollectionCloner::run(
         // been destructed.
         .onCompletion([chainCtx](Status status) {
             if (chainCtx->pipeline) {
-                // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+                // TODO(SERVER-111752): Please revisit if this thread could be made killable.
                 auto client = cc().getServiceContext()
                                   ->getService(ClusterRole::ShardServer)
                                   ->makeClient("ReshardingCollectionClonerCleanupClient",

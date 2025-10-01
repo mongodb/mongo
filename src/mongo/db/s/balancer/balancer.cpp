@@ -1035,7 +1035,7 @@ void Balancer::_mainThread() {
         _joinCond.notify_all();
     });
 
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+    // TODO(SERVER-111752): Please revisit if this thread could be made killable.
     ThreadClient threadClient("Balancer",
                               getGlobalServiceContext()->getService(ClusterRole::ShardServer),
                               ClientOperationKillableByStepdown{false});
