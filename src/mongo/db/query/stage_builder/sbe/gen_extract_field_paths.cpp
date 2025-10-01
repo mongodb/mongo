@@ -131,10 +131,8 @@ std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
             path.emplace_back(sbe::value::CellBlock::Traverse{});
         }
         // Omit the Traverse for the last path component.
-        if (fieldPath.getPathLength() != 0) {
-            path.emplace_back(sbe::value::CellBlock::Get{
-                .field = std::string(fieldPath.getFieldName(fieldPath.getPathLength() - 1))});
-        }
+        path.emplace_back(sbe::value::CellBlock::Get{
+            .field = std::string(fieldPath.getFieldName(fieldPath.getPathLength() - 1))});
         path.emplace_back(sbe::value::CellBlock::Id{});
         pathReqs.push_back(std::move(path));
 
