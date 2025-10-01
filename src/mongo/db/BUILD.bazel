@@ -936,6 +936,7 @@ mongo_cc_library(
     name = "dbdirectclient",
     srcs = [
         "//src/mongo/db:dbdirectclient.cpp",
+        "//src/mongo/db:scoped_read_concern.cpp",
     ],
     deps = [
         "//src/mongo/client:clientdriver_minimal",
