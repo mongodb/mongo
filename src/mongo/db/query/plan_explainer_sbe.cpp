@@ -32,6 +32,7 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/index/multikey_paths.h"
@@ -43,6 +44,7 @@
 #include "mongo/db/query/compiler/metadata/index_entry.h"
 #include "mongo/db/query/compiler/physical_model/index_bounds/index_bounds.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/eof_node_type.h"
+#include "mongo/db/query/compiler/physical_model/query_solution/query_solution.h"
 #include "mongo/db/query/compiler/physical_model/query_solution/stage_types.h"
 #include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
@@ -86,6 +88,175 @@ BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames)
 
     return bob.obj();
 }
+
+void statsToBSONHelper(const sbe::PlanStageStats* stats,
+                       BSONObjBuilder* bob,
+                       const BSONObjBuilder* topLevelBob,
+                       std::uint32_t currentDepth) {
+    tassert(9378607, "encountered unexpected nullptr for PlanStageStats", stats);
+    tassert(9378608, "encountered unexpected nullptr for BSONObjBuilder", bob);
+    tassert(9258809, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
+
+    // Stop as soon as the BSON object we're building exceeds the limit.
+    if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
+        bob->append("warning", "stats tree exceeded BSON size limit for explain");
+        return;
+    }
+
+    // Stop as soon as the BSON object we're building becomes too deep. Note that we go 2 less
+    // than the max depth to account for when this stage has multiple children.
+    if (currentDepth >= BSONDepth::getMaxDepthForUserStorage() - 2) {
+        bob->append("warning",
+                    "stats tree exceeded BSON depth limit; omitting the rest of the tree");
+        return;
+    }
+
+    auto stageType = stats->common.stageType;
+    bob->append("stage", stageType);
+    bob->appendNumber("planNodeId", static_cast<long long>(stats->common.nodeId));
+
+    // Some top-level exec stats get pulled out of the root stage.
+    bob->appendNumber("nReturned", static_cast<long long>(stats->common.advances));
+    // Include the execution time if it was recorded.
+    if (stats->common.executionTime.precision == QueryExecTimerPrecision::kMillis) {
+        bob->appendNumber(
+            "executionTimeMillisEstimate",
+            durationCount<Milliseconds>(stats->common.executionTime.executionTimeEstimate));
+    } else if (stats->common.executionTime.precision == QueryExecTimerPrecision::kNanos) {
+        bob->appendNumber(
+            "executionTimeMillisEstimate",
+            durationCount<Milliseconds>(stats->common.executionTime.executionTimeEstimate));
+        bob->appendNumber(
+            "executionTimeMicros",
+            durationCount<Microseconds>(stats->common.executionTime.executionTimeEstimate));
+        bob->appendNumber(
+            "executionTimeNanos",
+            durationCount<Nanoseconds>(stats->common.executionTime.executionTimeEstimate));
+    }
+    bob->appendNumber("opens", static_cast<long long>(stats->common.opens));
+    bob->appendNumber("closes", static_cast<long long>(stats->common.closes));
+    bob->appendNumber("saveState", static_cast<long long>(stats->common.yields));
+    bob->appendNumber("restoreState", static_cast<long long>(stats->common.unyields));
+    bob->appendNumber("isEOF", stats->common.isEOF);
+
+    // Include any extra debug info if present.
+    bob->appendElements(stats->debugInfo);
+
+    // We're done if there are no children.
+    if (stats->children.empty()) {
+        return;
+    }
+
+    // If there's just one child (a common scenario), avoid making an array. This makes
+    // the output more readable by saving a level of nesting. Name the field 'inputStage'
+    // rather than 'inputStages'.
+    if (stats->children.size() == 1) {
+        BSONObjBuilder childBob(bob->subobjStart("inputStage"));
+        statsToBSONHelper(stats->children[0].get(), &childBob, topLevelBob, currentDepth + 1);
+        return;
+    }
+
+    // For some stages we may want to output its children under different field names.
+    auto overridenNames = [stageType]() -> std::vector<StringData> {
+        if (stageType == "branch"_sd) {
+            return {"thenStage"_sd, "elseStage"_sd};
+        } else if (stageType == "nlj"_sd || stageType == "traverse"_sd || stageType == "mj"_sd ||
+                   stageType == "hj"_sd) {
+            return {"outerStage"_sd, "innerStage"_sd};
+        }
+        return {};
+    }();
+    if (!overridenNames.empty()) {
+        invariant(overridenNames.size() == stats->children.size());
+
+        for (size_t idx = 0; idx < stats->children.size(); ++idx) {
+            BSONObjBuilder childBob(bob->subobjStart(overridenNames[idx]));
+            statsToBSONHelper(stats->children[idx].get(), &childBob, topLevelBob, currentDepth + 1);
+        }
+        return;
+    }
+
+    // There is more than one child. Recursively call statsToBSON(...) on each
+    // of them and add them to the 'inputStages' array.
+    BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"_sd));
+    for (auto&& child : stats->children) {
+        BSONObjBuilder childBob(childrenBob.subobjStart());
+        statsToBSONHelper(child.get(), &childBob, topLevelBob, currentDepth + 2);
+    }
+    childrenBob.doneFast();
+}
+
+void statsToBSON(const sbe::PlanStageStats* stats,
+                 BSONObjBuilder* bob,
+                 const BSONObjBuilder* topLevelBob) {
+    statsToBSONHelper(stats, bob, topLevelBob, 0);
+}
+
+PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
+    const QuerySolution* solution,
+    const sbe::PlanStageStats& stats,
+    const sbe::PlanStage* sbePlanStageRoot,
+    const stage_builder::PlanStageData* sbePlanStageData,
+    const boost::optional<std::string>& planSummary,
+    const boost::optional<BSONObj>& queryParams,
+    const boost::optional<BSONArray>& remotePlanInfo,
+    ExplainOptions::Verbosity verbosity,
+    bool isCached) {
+    BSONObjBuilder bob;
+
+    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        auto summary = sbe::collectExecutionStatsSummary(stats);
+        if (solution != nullptr && verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
+            summary.score = solution->score;
+            if (internalQueryAllowForcedPlanByHash.load()) {
+                bob.append("solutionHashUnstable", (long long)solution->hash());
+            }
+        }
+        statsToBSON(&stats, &bob, &bob);
+        // At the 'kQueryPlanner' verbosity level we use the QSN-derived format for the given plan,
+        // and thus the winning plan and rejected plans at this verbosity should display the
+        // stringified SBE plan, which is added below. However, at the 'kExecStats' the execution
+        // stats use the PlanStage-derived format for the SBE tree, so there is no need to repeat
+        // the stringified SBE plan and we only included what's been generated from the
+        // PlanStageStats.
+        return {bob.obj(), std::move(summary)};
+    }
+
+    if (solution != nullptr) {
+        statsToBSON(solution->root(), &bob, &bob);
+        if (internalQueryAllowForcedPlanByHash.load()) {
+            bob.append("solutionHashUnstable", (long long)solution->hash());
+        }
+    }
+
+    BSONObjBuilder plan;
+    if (planSummary) {
+        plan.append("planSummary", *planSummary);
+    }
+
+    plan.append("isCached", isCached);
+    plan.append("queryPlan", bob.obj());
+
+    int explainThresholdBytes = internalQueryExplainSizeThresholdBytes.loadRelaxed();
+
+    if (plan.len() > explainThresholdBytes) {
+        plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
+    } else {
+        BSONObj execPlanDebugInfo = PlanExplainerSBEBase::buildExecPlanDebugInfo(
+            sbePlanStageRoot, sbePlanStageData, explainThresholdBytes - plan.len() /*lengthCap*/
+        );
+        if (plan.len() + execPlanDebugInfo.objsize() > explainThresholdBytes) {
+            plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
+        } else {
+            plan.append("slotBasedPlan", execPlanDebugInfo);
+        }
+    }
+    if (remotePlanInfo && !remotePlanInfo->isEmpty()) {
+        plan.append("remotePlans", *remotePlanInfo);
+    }
+    return {plan.obj(), boost::none};
+}
+}  // namespace
 
 void statsToBSON(const QuerySolutionNode* node,
                  BSONObjBuilder* bob,
@@ -314,6 +485,26 @@ void statsToBSON(const QuerySolutionNode* node,
             bob->append("type", eof_node::typeStr(eofn->type));
             break;
         }
+        case STAGE_HASH_JOIN_EMBEDDING_NODE:
+        case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+        case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE: {
+            // These are all BinaryJoinEmbeddingNodes.
+            auto bjen = static_cast<const BinaryJoinEmbeddingNode*>(node);
+            bob->append("leftEmbeddingField",
+                        (bjen->leftEmbeddingField ? bjen->leftEmbeddingField->fullPath() : "none"));
+            bob->append(
+                "rightEmbeddingField",
+                (bjen->rightEmbeddingField ? bjen->rightEmbeddingField->fullPath() : "none"));
+            {
+                // Append join predicates.
+                BSONArrayBuilder bab;
+                for (auto&& jp : bjen->joinPredicates) {
+                    bab.append(jp.toString());
+                }
+                bob->append("joinPredicates", bab.arr());
+            }
+            break;
+        }
         default:
             break;
     }
@@ -341,175 +532,6 @@ void statsToBSON(const QuerySolutionNode* node,
     }
     childrenBob.doneFast();
 }
-
-void statsToBSONHelper(const sbe::PlanStageStats* stats,
-                       BSONObjBuilder* bob,
-                       const BSONObjBuilder* topLevelBob,
-                       std::uint32_t currentDepth) {
-    tassert(9378607, "encountered unexpected nullptr for PlanStageStats", stats);
-    tassert(9378608, "encountered unexpected nullptr for BSONObjBuilder", bob);
-    tassert(9258809, "encountered unexpected nullptr for BSONObjBuilder", topLevelBob);
-
-    // Stop as soon as the BSON object we're building exceeds the limit.
-    if (topLevelBob->len() > internalQueryExplainSizeThresholdBytes.load()) {
-        bob->append("warning", "stats tree exceeded BSON size limit for explain");
-        return;
-    }
-
-    // Stop as soon as the BSON object we're building becomes too deep. Note that we go 2 less
-    // than the max depth to account for when this stage has multiple children.
-    if (currentDepth >= BSONDepth::getMaxDepthForUserStorage() - 2) {
-        bob->append("warning",
-                    "stats tree exceeded BSON depth limit; omitting the rest of the tree");
-        return;
-    }
-
-    auto stageType = stats->common.stageType;
-    bob->append("stage", stageType);
-    bob->appendNumber("planNodeId", static_cast<long long>(stats->common.nodeId));
-
-    // Some top-level exec stats get pulled out of the root stage.
-    bob->appendNumber("nReturned", static_cast<long long>(stats->common.advances));
-    // Include the execution time if it was recorded.
-    if (stats->common.executionTime.precision == QueryExecTimerPrecision::kMillis) {
-        bob->appendNumber(
-            "executionTimeMillisEstimate",
-            durationCount<Milliseconds>(stats->common.executionTime.executionTimeEstimate));
-    } else if (stats->common.executionTime.precision == QueryExecTimerPrecision::kNanos) {
-        bob->appendNumber(
-            "executionTimeMillisEstimate",
-            durationCount<Milliseconds>(stats->common.executionTime.executionTimeEstimate));
-        bob->appendNumber(
-            "executionTimeMicros",
-            durationCount<Microseconds>(stats->common.executionTime.executionTimeEstimate));
-        bob->appendNumber(
-            "executionTimeNanos",
-            durationCount<Nanoseconds>(stats->common.executionTime.executionTimeEstimate));
-    }
-    bob->appendNumber("opens", static_cast<long long>(stats->common.opens));
-    bob->appendNumber("closes", static_cast<long long>(stats->common.closes));
-    bob->appendNumber("saveState", static_cast<long long>(stats->common.yields));
-    bob->appendNumber("restoreState", static_cast<long long>(stats->common.unyields));
-    bob->appendNumber("isEOF", stats->common.isEOF);
-
-    // Include any extra debug info if present.
-    bob->appendElements(stats->debugInfo);
-
-    // We're done if there are no children.
-    if (stats->children.empty()) {
-        return;
-    }
-
-    // If there's just one child (a common scenario), avoid making an array. This makes
-    // the output more readable by saving a level of nesting. Name the field 'inputStage'
-    // rather than 'inputStages'.
-    if (stats->children.size() == 1) {
-        BSONObjBuilder childBob(bob->subobjStart("inputStage"));
-        statsToBSONHelper(stats->children[0].get(), &childBob, topLevelBob, currentDepth + 1);
-        return;
-    }
-
-    // For some stages we may want to output its children under different field names.
-    auto overridenNames = [stageType]() -> std::vector<StringData> {
-        if (stageType == "branch"_sd) {
-            return {"thenStage"_sd, "elseStage"_sd};
-        } else if (stageType == "nlj"_sd || stageType == "traverse"_sd || stageType == "mj"_sd ||
-                   stageType == "hj"_sd) {
-            return {"outerStage"_sd, "innerStage"_sd};
-        }
-        return {};
-    }();
-    if (!overridenNames.empty()) {
-        invariant(overridenNames.size() == stats->children.size());
-
-        for (size_t idx = 0; idx < stats->children.size(); ++idx) {
-            BSONObjBuilder childBob(bob->subobjStart(overridenNames[idx]));
-            statsToBSONHelper(stats->children[idx].get(), &childBob, topLevelBob, currentDepth + 1);
-        }
-        return;
-    }
-
-    // There is more than one child. Recursively call statsToBSON(...) on each
-    // of them and add them to the 'inputStages' array.
-    BSONArrayBuilder childrenBob(bob->subarrayStart("inputStages"_sd));
-    for (auto&& child : stats->children) {
-        BSONObjBuilder childBob(childrenBob.subobjStart());
-        statsToBSONHelper(child.get(), &childBob, topLevelBob, currentDepth + 2);
-    }
-    childrenBob.doneFast();
-}
-
-void statsToBSON(const sbe::PlanStageStats* stats,
-                 BSONObjBuilder* bob,
-                 const BSONObjBuilder* topLevelBob) {
-    statsToBSONHelper(stats, bob, topLevelBob, 0);
-}
-
-PlanExplainer::PlanStatsDetails buildPlanStatsDetails(
-    const QuerySolution* solution,
-    const sbe::PlanStageStats& stats,
-    const sbe::PlanStage* sbePlanStageRoot,
-    const stage_builder::PlanStageData* sbePlanStageData,
-    const boost::optional<std::string>& planSummary,
-    const boost::optional<BSONObj>& queryParams,
-    const boost::optional<BSONArray>& remotePlanInfo,
-    ExplainOptions::Verbosity verbosity,
-    bool isCached) {
-    BSONObjBuilder bob;
-
-    if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-        auto summary = sbe::collectExecutionStatsSummary(stats);
-        if (solution != nullptr && verbosity >= ExplainOptions::Verbosity::kExecAllPlans) {
-            summary.score = solution->score;
-            if (internalQueryAllowForcedPlanByHash.load()) {
-                bob.append("solutionHashUnstable", (long long)solution->hash());
-            }
-        }
-        statsToBSON(&stats, &bob, &bob);
-        // At the 'kQueryPlanner' verbosity level we use the QSN-derived format for the given plan,
-        // and thus the winning plan and rejected plans at this verbosity should display the
-        // stringified SBE plan, which is added below. However, at the 'kExecStats' the execution
-        // stats use the PlanStage-derived format for the SBE tree, so there is no need to repeat
-        // the stringified SBE plan and we only included what's been generated from the
-        // PlanStageStats.
-        return {bob.obj(), std::move(summary)};
-    }
-
-    if (solution != nullptr) {
-        statsToBSON(solution->root(), &bob, &bob);
-        if (internalQueryAllowForcedPlanByHash.load()) {
-            bob.append("solutionHashUnstable", (long long)solution->hash());
-        }
-    }
-
-    BSONObjBuilder plan;
-    if (planSummary) {
-        plan.append("planSummary", *planSummary);
-    }
-
-    plan.append("isCached", isCached);
-    plan.append("queryPlan", bob.obj());
-
-    int explainThresholdBytes = internalQueryExplainSizeThresholdBytes.loadRelaxed();
-
-    if (plan.len() > explainThresholdBytes) {
-        plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
-    } else {
-        BSONObj execPlanDebugInfo = PlanExplainerSBEBase::buildExecPlanDebugInfo(
-            sbePlanStageRoot, sbePlanStageData, explainThresholdBytes - plan.len() /*lengthCap*/
-        );
-        if (plan.len() + execPlanDebugInfo.objsize() > explainThresholdBytes) {
-            plan.append("warning", "slotBasedPlan exceeded BSON size limit for explain");
-        } else {
-            plan.append("slotBasedPlan", execPlanDebugInfo);
-        }
-    }
-    if (remotePlanInfo && !remotePlanInfo->isEmpty()) {
-        plan.append("remotePlans", *remotePlanInfo);
-    }
-    return {plan.obj(), boost::none};
-}
-}  // namespace
 
 PlanExplainerSBEBase::PlanExplainerSBEBase(
     const sbe::PlanStage* root,

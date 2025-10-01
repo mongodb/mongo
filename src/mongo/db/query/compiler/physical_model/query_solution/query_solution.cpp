@@ -1984,7 +1984,7 @@ void WindowNode::appendToString(str::stream* ss, int indent) const {
 
 HashJoinEmbeddingNode::HashJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
                                              std::unique_ptr<QuerySolutionNode> rightChildArg,
-                                             std::vector<JoinPredicate> joinPredicatesArg,
+                                             std::vector<QSNJoinPredicate> joinPredicatesArg,
                                              boost::optional<FieldPath> leftEmbeddingFieldArg,
                                              boost::optional<FieldPath> rightEmbeddingFieldArg)
     : BinaryJoinEmbeddingNode(std::move(leftChildArg),
@@ -1995,7 +1995,7 @@ HashJoinEmbeddingNode::HashJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> 
     for (auto&& joinPred : joinPredicates) {
         tassert(10976202,
                 "HashJoinEmbeddingNode only supports equijoin predicates",
-                joinPred.op == JoinPredicate::ComparisonOp::Eq);
+                joinPred.op == QSNJoinPredicate::ComparisonOp::Eq);
     }
 }
 
@@ -2012,7 +2012,7 @@ void BinaryJoinEmbeddingNode::appendToString(str::stream* ss, int indent) const 
         addIndent(ss, indent + 2);
         std::string op = [&joinPred] {
             switch (joinPred.op) {
-                case JoinPredicate::ComparisonOp::Eq:
+                case QSNJoinPredicate::ComparisonOp::Eq:
                     return "=";
             }
             return "(unknown op)";

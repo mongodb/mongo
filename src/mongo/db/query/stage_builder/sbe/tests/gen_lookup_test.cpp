@@ -317,9 +317,9 @@ private:
         auto nestedLoopJoinEmbeddingNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
             std::move(outerScanNode),
             std::move(innerScanNode),
-            std::vector<JoinPredicate>{JoinPredicate{.op = JoinPredicate::ComparisonOp::Eq,
-                                                     .leftField = std::move(leftField),
-                                                     .rightField = std::move(rightField)}},
+            std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                           .leftField = std::move(leftField),
+                                                           .rightField = std::move(rightField)}},
             std::move(leftEmbeddingFieldArg),
             std::move(rightEmbeddingFieldArg));
         auto solution = makeQuerySolution(std::move(nestedLoopJoinEmbeddingNode));

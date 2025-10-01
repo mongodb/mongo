@@ -27,32 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/field_path.h"
-#include "mongo/util/modules.h"
+#include "mongo/db/query/compiler/optimizer/join/join_predicate.h"
+
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-/**
- * The physical representation of a join predicate between two relations. This struct is used by
- * QuerySolutionNodes that implement binary joins to indicate which fields are being joined.
- */
-struct QSNJoinPredicate {
-    enum class ComparisonOp {
-        Eq,
-    };
+namespace {
+std::string opToString(QSNJoinPredicate::ComparisonOp op) {
+    switch (op) {
+        case QSNJoinPredicate::ComparisonOp::Eq:
+            return "=";
+    }
+    MONGO_UNREACHABLE_TASSERT(11083901);
+}
+}  // namespace
 
-    ComparisonOp op;
-    // The left and right fields of the equality predicate. The order of left and right fields is
-    // important as it corresponds to the children of a join node. The field may correspond directly
-    // to a collection, in which case the namespace of the field is implicit in the structure of the
-    // QSN, or to a stream of documetns which themselves represent the result of a join, in which
-    // case the field will have a prefix representing the "as" field of a $lookup.
-    FieldPath leftField;
-    FieldPath rightField;
-
-    std::string toString() const;
-};
-
-std::ostream& operator<<(std::ostream& out, const QSNJoinPredicate& jp);
-
+std::string QSNJoinPredicate::toString() const {
+    return str::stream() << leftField.fullPath() << " " << opToString(op) << " "
+                         << rightField.fullPath();
+}
 }  // namespace mongo

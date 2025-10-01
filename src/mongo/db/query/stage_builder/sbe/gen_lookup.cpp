@@ -1577,7 +1577,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildNestedLoopJoinEmb
 
         tassert(10984704,
                 "Unknown operation in join predicate",
-                predicate.op == JoinPredicate::ComparisonOp::Eq);
+                predicate.op == QSNJoinPredicate::ComparisonOp::Eq);
 
         // Generate an expression for one predicate, which evalutes a path on each document and
         // compares the resulting values. Any path that fails to evaluate, because of a missing or

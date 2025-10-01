@@ -141,6 +141,12 @@ StringData nodeStageTypeToString(const QuerySolutionNode* node) {
             return "UPDATE"_sd;
         case STAGE_WINDOW:
             return "WINDOW"_sd;
+        case STAGE_HASH_JOIN_EMBEDDING_NODE:
+            return "HASH_JOIN_EMBEDDING"_sd;
+        case STAGE_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+            return "NESTED_LOOP_JOIN_EMBEDDING"_sd;
+        case STAGE_INDEXED_NESTED_LOOP_JOIN_EMBEDDING_NODE:
+            return "INDEXED_NESTED_LOOP_JOIN_EMBEDDING"_sd;
         default:
             return "UNKNOWN"_sd;
     }

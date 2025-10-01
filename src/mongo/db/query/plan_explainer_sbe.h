@@ -146,4 +146,9 @@ private:
     const std::unique_ptr<PlanStage> _classicRuntimePlannerStage;
     const std::unique_ptr<PlanExplainer> _classicRuntimePlannerExplainer;
 };
+
+// Exposed only for testing purposes.
+void statsToBSON(const QuerySolutionNode* node,
+                 BSONObjBuilder* bob,
+                 const BSONObjBuilder* topLevelBob);
 }  // namespace mongo

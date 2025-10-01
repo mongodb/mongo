@@ -2235,7 +2235,7 @@ struct WindowNode : public QuerySolutionNode {
 struct BinaryJoinEmbeddingNode : public QuerySolutionNode {
     BinaryJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
                             std::unique_ptr<QuerySolutionNode> rightChildArg,
-                            std::vector<JoinPredicate> joinPredicatesArg,
+                            std::vector<QSNJoinPredicate> joinPredicatesArg,
                             boost::optional<FieldPath> leftEmbeddingFieldArg,
                             boost::optional<FieldPath> rightEmbeddingFieldArg)
         : joinPredicates(std::move(joinPredicatesArg)),
@@ -2282,7 +2282,7 @@ struct BinaryJoinEmbeddingNode : public QuerySolutionNode {
     void appendToString(str::stream* ss, int indent) const override;
 
     // Set of join predicates that this node satisfies.
-    std::vector<JoinPredicate> joinPredicates;
+    std::vector<QSNJoinPredicate> joinPredicates;
 
     // String representing the field under which the left/right results will be nested under. If one
     // is boost::none, then the results from the corresponding child will be embedded in top-level
@@ -2300,7 +2300,7 @@ struct BinaryJoinEmbeddingNode : public QuerySolutionNode {
 struct HashJoinEmbeddingNode : public BinaryJoinEmbeddingNode {
     HashJoinEmbeddingNode(std::unique_ptr<QuerySolutionNode> leftChildArg,
                           std::unique_ptr<QuerySolutionNode> rightChildArg,
-                          std::vector<JoinPredicate> joinPredicatesArg,
+                          std::vector<QSNJoinPredicate> joinPredicatesArg,
                           boost::optional<FieldPath> leftEmbeddingFieldArg,
                           boost::optional<FieldPath> rightEmbeddingFieldArg);
 

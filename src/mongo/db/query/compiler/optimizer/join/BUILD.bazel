@@ -44,6 +44,9 @@ mongo_cc_unit_test(
 mongo_cc_library(
     name = "join_predicate",
     srcs = [
+        "join_predicate.cpp",
+    ],
+    hdrs = [
         "join_predicate.h",
     ],
     deps = [

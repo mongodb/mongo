@@ -42,8 +42,10 @@
 #include "mongo/db/query/mock_yield_policies.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_explainer_sbe.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
@@ -428,5 +430,142 @@ TEST_F(PlanExplainerTest, SBEPipelinePlanExplainDiagnostics) {
     ASSERT_STRING_CONTAINS(explainDiagnostics, "saveState: ");
     ASSERT_STRING_CONTAINS(explainDiagnostics, "numTested: 1");
 }
+
+// Helper function to make a collection scan node.
+auto makeCollScanNode(const std::string& collName) {
+    auto node = std::make_unique<CollectionScanNode>();
+    node->nss = NamespaceString::createNamespaceString_forTest(collName);
+    return node;
+}
+
+TEST_F(PlanExplainerTest, HashJoinEmbeddingTest) {
+    auto outerScanNode = makeCollScanNode("testdb.explain");
+    auto innerScanNode = makeCollScanNode("testdb.foreign_explain");
+    auto hjNode = std::make_unique<HashJoinEmbeddingNode>(
+        std::move(outerScanNode),
+        std::move(innerScanNode),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                       .leftField = FieldPath("a"),
+                                                       .rightField = FieldPath("b")}},
+        FieldPath("xyz") /* leftFieldEmbedding */,
+        boost::none /* rightFieldEmbedding */);
+
+    BSONObjBuilder outerBob;
+    BSONObjBuilder innerBob(outerBob.subobjStart("inner"));
+    innerBob.done();
+    statsToBSON(hjNode.get(), &innerBob, &outerBob);
+
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "inner": {},
+            "stage": "HASH_JOIN_EMBEDDING",
+            "planNodeId": 0,
+            "leftEmbeddingField": "xyz",
+            "rightEmbeddingField": "none",
+            "joinPredicates": [
+                "a = b"
+            ],
+            "inputStages": [
+                {
+                    "stage": "COLLSCAN",
+                    "planNodeId": 0,
+                    "direction": "forward"
+                },
+                {
+                    "stage": "COLLSCAN",
+                    "planNodeId": 0,
+                    "direction": "forward"
+                }
+            ]
+        })",
+        outerBob.obj());
+}
+
+TEST_F(PlanExplainerTest, NLJEmbeddingTest) {
+    auto outerScanNode = makeCollScanNode("testdb.explain");
+    auto innerScanNode = makeCollScanNode("testdb.foreign_explain");
+    auto nljNode = std::make_unique<NestedLoopJoinEmbeddingNode>(
+        std::move(outerScanNode),
+        std::move(innerScanNode),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                       .leftField = FieldPath("x"),
+                                                       .rightField = FieldPath("y")}},
+        boost::none /* leftFieldEmbedding */,
+        FieldPath("xyz" /* rightFieldEmbedding */));
+
+    BSONObjBuilder outerBob;
+    BSONObjBuilder innerBob(outerBob.subobjStart("inner"));
+    innerBob.done();
+    statsToBSON(nljNode.get(), &innerBob, &outerBob);
+
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "inner": {},
+            "stage": "NESTED_LOOP_JOIN_EMBEDDING",
+            "planNodeId": 0,
+            "leftEmbeddingField": "none",
+            "rightEmbeddingField": "xyz",
+            "joinPredicates": [
+                "x = y"
+            ],
+            "inputStages": [
+                {
+                    "stage": "COLLSCAN",
+                    "planNodeId": 0,
+                    "direction": "forward"
+                },
+                {
+                    "stage": "COLLSCAN",
+                    "planNodeId": 0,
+                    "direction": "forward"
+                }
+            ]
+        })",
+        outerBob.obj());
+}
+
+TEST_F(PlanExplainerTest, INLJEmbeddingTest) {
+    auto outerScanNode = makeCollScanNode("testdb.explain");
+    auto innerScanNode = makeCollScanNode("testdb.foreign_explain");
+    auto inljNode = std::make_unique<IndexedNestedLoopJoinEmbeddingNode>(
+        std::move(outerScanNode),
+        std::move(innerScanNode),
+        std::vector<QSNJoinPredicate>{QSNJoinPredicate{.op = QSNJoinPredicate::ComparisonOp::Eq,
+                                                       .leftField = FieldPath("x"),
+                                                       .rightField = FieldPath("y")}},
+        boost::none /* leftFieldEmbedding */,
+        FieldPath("xyz" /* rightFieldEmbedding */));
+
+    BSONObjBuilder outerBob;
+    BSONObjBuilder innerBob(outerBob.subobjStart("inner"));
+    innerBob.done();
+    statsToBSON(inljNode.get(), &innerBob, &outerBob);
+
+    ASSERT_BSONOBJ_EQ_AUTO(
+        R"({
+            "inner": {},
+            "stage": "INDEXED_NESTED_LOOP_JOIN_EMBEDDING",
+            "planNodeId": 0,
+            "leftEmbeddingField": "none",
+            "rightEmbeddingField": "xyz",
+            "joinPredicates": [
+                "x = y"
+            ],
+            "inputStages": [
+                {
+                    "stage": "COLLSCAN",
+                    "planNodeId": 0,
+                    "direction": "forward"
+                },
+                {
+                    "stage": "COLLSCAN",
+                    "planNodeId": 0,
+                    "direction": "forward"
+                }
+            ]
+        })",
+        outerBob.obj());
+}
+
 }  // namespace
 }  // namespace mongo
