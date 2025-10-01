@@ -353,6 +353,9 @@ void TTLMonitor::shutdown() {
 }
 
 void TTLMonitor::_doTTLPass(OperationContext* opCtx, Date_t at) {
+    ScopedAdmissionPriority<ExecutionAdmissionContext> deprioritizeExecutionControl(
+        opCtx, AdmissionContext::Priority::kLow);
+
     // Don't do work if we are a secondary (TTL will be handled by primary)
     auto replCoordinator = repl::ReplicationCoordinator::get(opCtx);
     if (replCoordinator && replCoordinator->getSettings().isReplSet() &&
