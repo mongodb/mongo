@@ -49,7 +49,10 @@ server_parameters:
         redact: false
 
     disableLogicalSessionCacheRefresh:
-        description: Disable the logical session cache refresh (for testing only).
+        description:
+            Disable the logical session cache refresh. This parameter should not be set to true
+            unless the node is undergoing maintenance and being booted in standalone mode or in a
+            testing environment.
         set_at: startup
         cpp_vartype: bool
         cpp_varname: disableLogicalSessionCacheRefresh

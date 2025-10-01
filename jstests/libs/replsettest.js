@@ -1598,17 +1598,17 @@ export class ReplSetTest {
                         continue;
                     }
 
-                    assert.commandWorked(
-                        node.adminCommand({
-                            setParameter: 1,
-                            enableDefaultWriteConcernUpdatesForInitiate: false,
-                        }),
-                    );
-
-                    // Re-enable the reconfig check to ensure that committed writes cannot be rolled
-                    // back. We disabled this check during initialization to ensure that replica
-                    // sets will not fail to start up.
                     if (jsTestOptions().enableTestCommands) {
+                        assert.commandWorked(
+                            node.adminCommand({
+                                setParameter: 1,
+                                enableDefaultWriteConcernUpdatesForInitiate: false,
+                            }),
+                        );
+
+                        // Re-enable the reconfig check to ensure that committed writes cannot be rolled
+                        // back. We disabled this check during initialization to ensure that replica
+                        // sets will not fail to start up.
                         assert.commandWorked(
                             node.adminCommand({setParameter: 1, enableReconfigRollbackCommittedWritesCheck: true}),
                         );
@@ -2877,11 +2877,13 @@ export class ReplSetTest {
         options.setParameter.shutdownTimeoutMillisForSignaledShutdown =
             options.setParameter.shutdownTimeoutMillisForSignaledShutdown || 100;
 
-        // This parameter is enabled to allow the default write concern to change while
-        // initiating a ReplSetTest. This is due to our testing optimization to initiate
-        // with a single node, and reconfig the full membership set in.
-        // We need to recalculate the DWC after each reconfig until the full set is included.
-        options.setParameter.enableDefaultWriteConcernUpdatesForInitiate = true;
+        if (jsTestOptions().enableTestCommands) {
+            // This parameter is enabled to allow the default write concern to change while
+            // initiating a ReplSetTest. This is due to our testing optimization to initiate
+            // with a single node, and reconfig the full membership set in.
+            // We need to recalculate the DWC after each reconfig until the full set is included.
+            options.setParameter.enableDefaultWriteConcernUpdatesForInitiate = true;
+        }
 
         if (
             baseOptions.hasOwnProperty("setParameter") &&

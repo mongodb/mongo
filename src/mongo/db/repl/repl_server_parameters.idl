@@ -480,6 +480,7 @@ server_parameters:
         cpp_varname: enableDefaultWriteConcernUpdatesForInitiate
         default: false
         redact: false
+        test_only: true
 
     startupRecoveryForRestore:
         description: >-
