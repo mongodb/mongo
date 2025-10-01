@@ -1638,7 +1638,7 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
         if (keysInsertedOut) {
             *keysInsertedOut += inserted;
         }
-    } else {
+    } else if (entry->isReady()) {
         int64_t numInserted = 0;
         status = insertKeysAndUpdateMultikeyPaths(
             opCtx,
@@ -1690,8 +1690,11 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
 
         return;
     }
+    if (!entry->isReady()) {
+        return;
+    }
 
-    // On WiredTiger, we do blind unindexing of records for efficiency.  However, when duplicates
+    // On WiredTiger, we do blind unindexing of records for efficiency. However, when duplicates
     // are allowed in unique indexes, WiredTiger does not do blind unindexing, and instead confirms
     // that the recordid matches the element we are removing.
     //
