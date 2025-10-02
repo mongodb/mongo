@@ -150,5 +150,7 @@ selector:
     - jstests/noPassthrough/timeseries/write/timeseries_write_compresses_uncompressed_bucket.js
     - jstests/noPassthrough/timeseries/write/timeseries_write_concern.js
     - jstests/noPassthrough/versioning_protocol/stale_shard_version_with_timeseries.js
+    - src/mongo/db/modules/enterprise/jstests/hot_backups/selective_backup_restore/selective_backup_restore_e2e.js
+    - src/mongo/db/modules/enterprise/jstests/hot_backups/**/*timeseries*.js
     - src/mongo/db/modules/enterprise/jstests/live_import/import_collection_timeseries.js
 test_kind: js_test

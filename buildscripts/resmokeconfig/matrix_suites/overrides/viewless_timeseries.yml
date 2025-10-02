@@ -151,6 +151,8 @@
         - jstests/noPassthrough/query/server_status/serverstatus_index_stats.js
         - jstests/noPassthrough/**/timeseries/**/*.js
         - jstests/noPassthrough/**/*timeseries*.js
+        - src/mongo/db/modules/enterprise/jstests/hot_backups/selective_backup_restore/selective_backup_restore_e2e.js
+        - src/mongo/db/modules/enterprise/jstests/hot_backups/**/*timeseries*.js
         - src/mongo/db/modules/enterprise/jstests/live_import/import_collection_timeseries.js
 - name: only_validated_no_passthrough_timeseries_tests_selector
   value:
@@ -265,6 +267,8 @@
         - jstests/noPassthrough/timeseries/write/timeseries_write_compresses_uncompressed_bucket.js
         - jstests/noPassthrough/timeseries/write/timeseries_write_concern.js
         - jstests/noPassthrough/versioning_protocol/stale_shard_version_with_timeseries.js
+        - src/mongo/db/modules/enterprise/jstests/hot_backups/selective_backup_restore/selective_backup_restore_e2e.js
+        - src/mongo/db/modules/enterprise/jstests/hot_backups/**/*timeseries*.js
         - src/mongo/db/modules/enterprise/jstests/live_import/import_collection_timeseries.js
 - name: all_replica_sets_timeseries_tests_selector
   value:
