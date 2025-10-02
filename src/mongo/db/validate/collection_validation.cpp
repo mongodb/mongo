@@ -632,6 +632,10 @@ Status validate(OperationContext* opCtx,
         // cluster key).
         indexValidator.traverseRecordStore(opCtx, results, validateState.validationVersion());
 
+        if (validateState.isCollHashValidation()) {
+            indexValidator.computeMetadataHash(opCtx, validateState.getCollection(), results);
+        }
+
         // Pause collection validation while a lock is held and between collection and index data
         // validation.
         //

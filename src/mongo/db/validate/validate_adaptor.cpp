@@ -60,6 +60,7 @@
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/key_string/key_string.h"
+#include "mongo/db/storage/mdb_catalog.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
@@ -78,6 +79,7 @@
 #include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 
 #include <climits>
@@ -772,6 +774,17 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
     return Status::OK();
 }
 
+void ValidateAdaptor::computeMetadataHash(OperationContext* opCtx,
+                                          const CollectionPtr& coll,
+                                          ValidateResults* results) {
+    const auto& catalogEntry =
+        MDBCatalog::get(opCtx)->getRawCatalogEntry(opCtx, coll->getCatalogId());
+    auto catalogEntryNoIdents = catalogEntry.removeFields(StringDataSet{"ident", "idxIdent"});
+    SHA256Block metadataHash = SHA256Block::computeHash(
+        {ConstDataRange(catalogEntryNoIdents.objdata(), catalogEntryNoIdents.objsize())});
+    results->setMetadataHash(metadataHash.toHexString());
+}
+
 void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* results) {
     if (_validateState->getFirstRecordId().isNull()) {
         // The record store is empty if the first RecordId isn't initialized.
@@ -857,7 +870,7 @@ void ValidateAdaptor::hashDrillDown(OperationContext* opCtx, ValidateResults* re
                         std::make_pair(hashAndCount.first.toHexString(), hashAndCount.second));
     }
 
-    results->addPartialHashes(std::move(partial));
+    results->setPartialHashes(std::move(partial));
 }
 
 void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
@@ -1096,9 +1109,9 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
     }
 
     if (_validateState->isCollHashValidation()) {
-        results->addCollectionHash(accumulatedBlock.toHexString());
+        results->setCollectionHash(accumulatedBlock.toHexString());
         if (revealHashedIds) {
-            results->addRevealedIds(std::move(revealedIds));
+            results->setRevealedIds(std::move(revealedIds));
         }
     }
 

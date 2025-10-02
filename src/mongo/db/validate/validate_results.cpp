@@ -187,6 +187,10 @@ void ValidateResults::appendToResultObj(BSONObjBuilder* resultObj,
         resultObj->append("all", _collectionHash.value());
     }
 
+    if (_metadataHash.has_value()) {
+        resultObj->append("metadata", _metadataHash.value());
+    }
+
     if (_partialHashes.has_value()) {
         BSONObjBuilder bob(resultObj->subobjStart("partial"));
         for (const auto& [prefix, hashAndCount] : *_partialHashes) {

@@ -79,6 +79,12 @@ public:
     void traverseRecordStore(OperationContext* opCtx,
                              ValidateResults* results,
                              ValidationVersion validationVersion);
+    /**
+     * Computes the hash of the collection's local catalog entry and sets it in 'results'.
+     **/
+    void computeMetadataHash(OperationContext* opCtx,
+                             const CollectionPtr& coll,
+                             ValidateResults* results);
 
     /**
      * For a given set of hash prefixes, outputs an order independent hash of all the documents
