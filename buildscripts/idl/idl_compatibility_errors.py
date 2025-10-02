@@ -247,9 +247,12 @@ class IDLCompatibilityErrorCollection(object):
     def dump_errors(self) -> None:
         """Print the list of errors."""
         error_list = self.to_list()
-        print("Errors found while checking IDL compatibility: %s errors:" % (len(error_list)))
-        for error_msg in error_list:
-            print("%s\n\n" % error_msg)
+        if len(error_list) == 0:
+            print("IDL compatibility check passed.")
+        else:
+            print("IDL compatibility check failed with %s errors:" % (len(error_list)))
+            for error_msg in error_list:
+                print("%s\n\n" % error_msg)
         print("------------------------------------------------")
 
     def count(self) -> int:
