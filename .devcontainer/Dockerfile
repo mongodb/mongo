@@ -24,9 +24,24 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 
 # Toolchain installation with SHA256 verification
 # Run "python3 toolchain.py generate" to update toolchain_config.env
+ARG TARGETPLATFORM
 COPY .devcontainer/toolchain_config.env /tmp/toolchain_config.env
 RUN set -e; \
   . /tmp/toolchain_config.env; \
+  if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
+    TOOLCHAIN_URL="$TOOLCHAIN_ARM64_URL"; \
+    TOOLCHAIN_SHA256="$TOOLCHAIN_ARM64_SHA256"; \
+    ARCH="arm64"; \
+  elif [ "$TARGETPLATFORM" = "linux/amd64" ]; then \
+    TOOLCHAIN_URL="$TOOLCHAIN_AMD64_URL"; \
+    TOOLCHAIN_SHA256="$TOOLCHAIN_AMD64_SHA256"; \
+    ARCH="amd64"; \
+  else \
+    echo "Unsupported platform: $TARGETPLATFORM"; \
+    exit 1; \
+  fi; \
+  echo "Target platform: $TARGETPLATFORM"; \
+  echo "Architecture: $ARCH"; \
   echo "Installing toolchain from: $TOOLCHAIN_URL"; \
   echo "Expected SHA256: $TOOLCHAIN_SHA256"; \
   curl -fSL "$TOOLCHAIN_URL" -o /tmp/toolchain.tar.gz; \
