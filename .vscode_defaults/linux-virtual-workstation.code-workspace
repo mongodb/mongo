@@ -309,7 +309,7 @@
 				"id": "runTargets",
 				"command": "shellCommand.execute",
 				"args": {
-					"command": "bazel query 'attr(tags, \"mongo_binary\", //...)' union 'attr(tags, \"mongo_unittest_target\", //...)' | grep mongo | grep -v \"_with_debug\" | grep -v third_party | sed 's;//;bazel-bin/;g' | sed 's;:;/;g'",
+					"command": "bazel query 'attr(tags, \"mongo_binary\", //...)' union 'attr(tags, \"mongo_unittest\", //...)' | grep mongo | grep -v \"_with_debug\" | grep -v third_party | sed 's;//;bazel-bin/;g' | sed 's;:;/;g'",
 					"cwd": "${workspaceFolder}",
 					"taskId": "runTargets",
 					"rememberPrevious": true,

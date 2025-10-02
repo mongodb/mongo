@@ -800,7 +800,7 @@ tasks:
           target: >-
             //src/mongo/...
           args: >-
-            --test_tag_filters=mongo_unittest_target_debug,-final_binary,-code_coverage_quarantine_debug
+            --test_tag_filters=mongo_unittest_debug,-final_target,-code_coverage_quarantine_debug
             --test_timeout=600
             --verbose_failures
             --instrumentation_filter="^//src/mongo[/:],-^//src/mongo/util:boost_assert_shim,-^//src/mongo/util:icu,-^//src/mongo/db/modules/enterprise/src/streams[/:]"
@@ -1043,8 +1043,8 @@ tasks:
           bazel_args: >-
             --config=evg
             --linkstatic=False
-            --test_tag_filters=mongo_unittest_target,-final_binary,-intermediate_debug,-incompatible_with_bazel_remote_test
-            --build_tag_filters=mongo_unittest_target,-incompatible_with_bazel_remote_test
+            --test_tag_filters=mongo_unittest,-final_target,-intermediate_debug,-incompatible_with_bazel_remote_test
+            --build_tag_filters=mongo_unittest,-incompatible_with_bazel_remote_test
 
   - name: unit_tests_remote_exec_incompatible
     tags: ["assigned_to_jira_team_devprod_correctness", "auxiliary"]

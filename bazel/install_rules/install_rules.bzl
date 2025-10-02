@@ -37,7 +37,7 @@ TEST_TAGS = {
     "mongo_benchmark": 1,
     "mongo_fuzzer_test": 1,
     "mongo_integration_test": 1,
-    "mongo_unittest_target": 1,
+    "mongo_unittest": 1,
     "mongo_unittest_first_group": 1,
     "mongo_unittest_second_group": 1,
     "mongo_unittest_third_group": 1,
