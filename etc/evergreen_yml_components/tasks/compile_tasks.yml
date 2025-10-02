@@ -434,7 +434,7 @@ tasks:
           # compiled. We therefore link them without debug symbols to compile them faster.
           bazel_args: >-
             --config=evg
-            --build_tag_filters=-mongo_unittest,mongo_binary,mongo_benchmark,mongo_integration_test
+            --build_tag_filters=-mongo_unittest_target,mongo_binary,mongo_benchmark,mongo_integration_test
             --linkopt=-s
           task_compile_flags: ${compile_all_but_not_unittests_flags|--linkopt=-s}
 

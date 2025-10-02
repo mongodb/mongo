@@ -7,7 +7,7 @@ bazel_tags_to_autogenerate = [
     "mongo_benchmark",
     "mongo_fuzzer_test",
     "mongo_integration_test",
-    "mongo_unittest",
+    "mongo_unittest_target",
     "mongo_unittest_first_group",
     "mongo_unittest_second_group",
     "mongo_unittest_third_group",

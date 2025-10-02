@@ -239,7 +239,7 @@ def validate_bazel_groups(generate_report, fix):
             [
                 bazel_bin,
                 "query",
-                'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest[,\]]", //src/...))',
+                'kind(extract_debug, attr(tags, "[\[ ]mongo_unittest_target[,\]]", //src/...))',
             ]
             + query_opts,
             capture_output=True,

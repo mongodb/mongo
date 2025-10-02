@@ -831,7 +831,7 @@ def _mongo_cc_binary_and_test(
             name = name,
             binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
             type = "program",
-            tags = original_tags + ["final_target"],
+            tags = original_tags + ["final_binary"],
             enabled = SEPARATE_DEBUG_ENABLED,
             enable_pdb = PDB_GENERATION_ENABLED,
             deps = all_deps,
@@ -839,12 +839,15 @@ def _mongo_cc_binary_and_test(
             exec_properties = exec_properties,
         )
     else:
+        final_binary_tags = original_tags + ["final_binary"]
+        if "mongo_unittest_target" in final_binary_tags:
+            final_binary_tags += ["mongo_unittest"]
         native.cc_test(**args)
         extract_debuginfo_test(
             name = name,
             binary_with_debug = ":" + name + WITH_DEBUG_SUFFIX,
             type = "program",
-            tags = original_tags + ["final_target"],
+            tags = final_binary_tags,
             enabled = SEPARATE_DEBUG_ENABLED,
             enable_pdb = PDB_GENERATION_ENABLED,
             deps = all_deps,
@@ -853,7 +856,7 @@ def _mongo_cc_binary_and_test(
         )
 
         native.sh_test(
-            name = name + "_remote_exec",
+            name = name + "_remote_exec_wrapper",
             srcs = [
                 "//bazel:test_wrapper",
             ],
@@ -1072,7 +1075,7 @@ def mongo_cc_unit_test(
         header_deps = header_deps,
         visibility = visibility,
         data = data,
-        tags = tags + ["mongo_unittest"],
+        tags = tags + ["mongo_unittest_target"],
         copts = copts,
         linkopts = linkopts,
         includes = includes,
