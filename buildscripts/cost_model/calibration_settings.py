@@ -135,75 +135,6 @@ database = config.DatabaseConfig(
 
 
 # Collection template settings
-def create_index_scan_collection_template(name: str, cardinality: int) -> config.CollectionTemplate:
-    values = [
-        "iqtbr5b5is",
-        "vt5s3tf8o6",
-        "b0rgm58qsn",
-        "9m59if353m",
-        "biw2l9ok17",
-        "b9ct0ue14d",
-        "oxj0vxjsti",
-        "f3k8w9vb49",
-        "ec7v82k6nk",
-        "f49ufwaqx7",
-    ]
-
-    start_weight = 10
-    step_weight = 25
-    finish_weight = start_weight + len(values) * step_weight
-    weights = list(range(start_weight, finish_weight, step_weight))
-    fill_up_weight = cardinality - sum(weights)
-    if fill_up_weight > 0:
-        values.append(HIDDEN_STRING_VALUE)
-        weights.append(fill_up_weight)
-
-    distr = RandomDistribution.choice(values, weights)
-
-    return config.CollectionTemplate(
-        name=name,
-        fields=[
-            config.FieldTemplate(
-                name="int_uniform",
-                data_type=config.DataType.INTEGER,
-                distribution=RandomDistribution.uniform(
-                    RangeGenerator(DataType.INTEGER, 0, cardinality)
-                ),
-                indexed=True,
-            ),
-            config.FieldTemplate(
-                name="choice", data_type=config.DataType.STRING, distribution=distr, indexed=True
-            ),
-            config.FieldTemplate(
-                name="mixed1",
-                data_type=config.DataType.STRING,
-                distribution=distributions["string_mixed"],
-                indexed=False,
-            ),
-            config.FieldTemplate(
-                name="uniform1",
-                data_type=config.DataType.STRING,
-                distribution=distributions["string_uniform"],
-                indexed=False,
-            ),
-            config.FieldTemplate(
-                name="choice2",
-                data_type=config.DataType.STRING,
-                distribution=distributions["string_choice"],
-                indexed=False,
-            ),
-            config.FieldTemplate(
-                name="mixed2",
-                data_type=config.DataType.STRING,
-                distribution=distributions["string_mixed"],
-                indexed=False,
-            ),
-        ],
-        compound_indexes=[],
-        cardinalities=[cardinality],
-    )
-
-
 def create_coll_scan_collection_template(
     name: str, cardinalities: list[int], payload_size: int = 0
 ) -> config.CollectionTemplate:
@@ -272,40 +203,6 @@ def create_coll_scan_collection_template(
     return template
 
 
-def create_merge_sort_collection_template(
-    name: str, cardinalities: list[int], num_merge_fields: int = 10
-) -> config.CollectionTemplate:
-    # Generate fields "a", "b", ... "j" (if num_merge_fields is 10)
-    field_names = [chr(ord("a") + i) for i in range(num_merge_fields)]
-    fields = [
-        config.FieldTemplate(
-            name=field_name,
-            data_type=config.DataType.INTEGER,
-            distribution=RandomDistribution.uniform(
-                RangeGenerator(DataType.INTEGER, 1, num_merge_fields + 1)
-            ),
-            indexed=True,
-        )
-        for field_name in field_names
-    ]
-    fields.append(
-        config.FieldTemplate(
-            name="sort_field",
-            data_type=config.DataType.STRING,
-            distribution=random_strings_distr(10, 1000),
-            indexed=False,
-        )
-    )
-    compound_indexes = [{field_name: 1, "sort_field": 1} for field_name in field_names]
-
-    return config.CollectionTemplate(
-        name=name,
-        fields=fields,
-        compound_indexes=compound_indexes,
-        cardinalities=cardinalities,
-    )
-
-
 def create_intersection_collection_template(
     name: str, cardinalities: list[int], distribution: str, value_range: int = 10
 ) -> config.CollectionTemplate:
@@ -336,45 +233,77 @@ def create_intersection_collection_template(
     )
 
 
-def create_ixscan_diff_num_fields_template():
-    card = 10000
-    # Generate fields "a", "b", ... "j"
-    field_names = [chr(ord("a") + i) for i in range(10)]
+# Creates a collection with fields "a", "b", ... "j" (if 'num_fields' is 10) and an
+# additional field "sort_field" if 'include_sort_field' is true.
+# If 'every_field_indexed' is false then only "a" will be indexed.
+# 'end_of_range_is_card' requires that there is only one cardinality in
+# 'cardinalities' and sets the end of the range for the field values to be the cardinality.
+def create_indexed_fields_template(
+    name: str,
+    cardinalities: list[int],
+    end_of_range_is_card,
+    every_field_indexed,
+    include_sort_field,
+    num_base_fields: int = 10,
+) -> config.CollectionTemplate:
+    # Generate fields "a", "b", ... "j" (if num_merge_fields is 10)
+    field_names = [chr(ord("a") + i) for i in range(num_base_fields)]
+
+    dist_end_range = num_base_fields + 1
+    if end_of_range_is_card:
+        assert len(cardinalities) == 1
+        dist_end_range = cardinalities[0]
+
     fields = [
         config.FieldTemplate(
             name=field_name,
             data_type=config.DataType.INTEGER,
-            distribution=RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, card)),
-            # We only want a single field index on 'a'.
-            indexed=(field_name == "a"),
+            distribution=RandomDistribution.uniform(
+                RangeGenerator(DataType.INTEGER, 1, dist_end_range)
+            ),
+            indexed=True if every_field_indexed else (field_name == "a"),
         )
         for field_name in field_names
     ]
-    compound_indexes = [
-        # Note the single field index is created in the FieldTemplate for 'a' above.
-        ["a", "b"],
-        ["a", "b", "c"],
-        ["a", "b", "c", "d"],
-        ["a", "b", "c", "d", "e"],
-        ["a", "b", "c", "d", "e", "f"],
-        ["a", "b", "c", "d", "e", "f", "g"],
-        ["a", "b", "c", "d", "e", "f", "g", "h"],
-        ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
-        ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
-    ]
+
+    compound_indexes = []
+
+    if include_sort_field:
+        fields.append(
+            config.FieldTemplate(
+                name="sort_field",
+                data_type=config.DataType.STRING,
+                distribution=random_strings_distr(10, 1000),
+                indexed=False,
+            )
+        )
+        compound_indexes = [{field_name: 1, "sort_field": 1} for field_name in field_names]
+
+    elif not every_field_indexed:
+        assert num_base_fields == 10
+        compound_indexes = [
+            # Note the single field index is created in the FieldTemplate for 'a' above.
+            ["a", "b"],
+            ["a", "b", "c"],
+            ["a", "b", "c", "d"],
+            ["a", "b", "c", "d", "e"],
+            ["a", "b", "c", "d", "e", "f"],
+            ["a", "b", "c", "d", "e", "f", "g"],
+            ["a", "b", "c", "d", "e", "f", "g", "h"],
+            ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+            ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
+        ]
 
     return config.CollectionTemplate(
-        name="index_scan_diff_num_fields",
+        name=name,
         fields=fields,
         compound_indexes=compound_indexes,
-        cardinalities=[card],
+        cardinalities=cardinalities,
     )
 
 
-collection_cardinalities = list(range(10000, 50001, 10000))
-
-c_int_05 = config.CollectionTemplate(
-    name="c_int_05",
+projection_collection = config.CollectionTemplate(
+    name="projection",
     fields=[
         config.FieldTemplate(
             name="in1",
@@ -408,41 +337,32 @@ c_int_05 = config.CollectionTemplate(
         ),
     ],
     compound_indexes=[],
-    cardinalities=collection_cardinalities,
+    cardinalities=[30000],
 )
 
-c_arr_01 = config.CollectionTemplate(
-    name="c_arr_01",
-    fields=[
-        config.FieldTemplate(
-            name="as",
-            data_type=config.DataType.INTEGER,
-            distribution=distributions["array_small"],
-            indexed=True,
-        )
-    ],
-    compound_indexes=[],
-    cardinalities=collection_cardinalities,
-)
-
-index_scan = create_index_scan_collection_template("index_scan", 1_000_000)
-coll_scan = create_coll_scan_collection_template(
-    "coll_scan", cardinalities=[100_000], payload_size=2000
+doc_scan_collection = create_coll_scan_collection_template(
+    "doc_scan", cardinalities=[100_000], payload_size=2000
 )
 sort_collections = create_coll_scan_collection_template(
     "sort",
     cardinalities=[5, 10, 50, 75, 100, 150, 300, 400, 500, 750, 1000],
     payload_size=10,
 )
-merge_sort_collections = create_merge_sort_collection_template(
+merge_sort_collections = create_indexed_fields_template(
     "merge_sort",
     cardinalities=[5, 10, 50, 75, 100, 150, 300, 400, 500, 750, 1000],
-    num_merge_fields=10,
+    end_of_range_is_card=False,
+    every_field_indexed=False,
+    include_sort_field=True,
+    num_base_fields=10,
 )
-or_collections = create_merge_sort_collection_template(
+or_collections = create_indexed_fields_template(
     "or",
     cardinalities=[5, 10, 50, 75, 100, 150, 300, 400, 500, 750] + list(range(1000, 10001, 1000)),
-    num_merge_fields=2,
+    end_of_range_is_card=False,
+    every_field_indexed=True,
+    include_sort_field=False,
+    num_base_fields=2,
 )
 intersection_sorted_collections = create_intersection_collection_template(
     "intersection_sorted",
@@ -450,14 +370,21 @@ intersection_sorted_collections = create_intersection_collection_template(
     cardinalities=[5, 100, 1000, 5000],
     value_range=10,
 )
-intersection_hash_collections = create_intersection_collection_template(
+intersection_hash_collection = create_intersection_collection_template(
     "intersection_hash",
     distribution="normal",
     cardinalities=[1000],
     value_range=10,
 )
 
-index_scan_diff_num_fields_collections = create_ixscan_diff_num_fields_template()
+index_scan_collection = create_indexed_fields_template(
+    "index_scan",
+    cardinalities=[10000],
+    end_of_range_is_card=True,
+    every_field_indexed=False,
+    include_sort_field=False,
+    num_base_fields=10,
+)
 
 # Data Generator settings
 data_generator = config.DataGeneratorConfig(
@@ -465,16 +392,14 @@ data_generator = config.DataGeneratorConfig(
     create_indexes=True,
     batch_size=10000,
     collection_templates=[
-        index_scan,
-        coll_scan,
+        index_scan_collection,
+        doc_scan_collection,
         sort_collections,
         merge_sort_collections,
         or_collections,
         intersection_sorted_collections,
-        intersection_hash_collections,
-        index_scan_diff_num_fields_collections,
-        c_int_05,
-        c_arr_01,
+        intersection_hash_collection,
+        projection_collection,
     ],
     write_mode=config.WriteMode.REPLACE,
     collection_name_with_card=True,
@@ -498,7 +423,6 @@ def make_filter_by_note(note_value: Any):
 
 
 qsn_nodes = [
-    config.QsNodeCalibrationConfig(type="SUBPLAN"),
     config.QsNodeCalibrationConfig(name="COLLSCAN_FORWARD", type="COLLSCAN"),
     config.QsNodeCalibrationConfig(name="COLLSCAN_BACKWARD", type="COLLSCAN"),
     config.QsNodeCalibrationConfig(name="COLLSCAN_W_FILTER", type="COLLSCAN"),

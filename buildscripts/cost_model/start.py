@@ -68,8 +68,9 @@ def save_to_csv(parameters: Mapping[str, Sequence[CostModelParameters]], filepat
 
 
 async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collection = [c for c in collections if c.name.startswith("index_scan")][0]
-    field = [f for f in collection.fields if f.name == "int_uniform"][0]
+    collections = [c for c in collections if c.name == "index_scan_10000"]
+    assert len(collections) == 1
+
     requests = []
     cards = [25, 50, 100, 200, 300, 400, 500]
     # For every query, we run it as both a forward and backward scan.
@@ -77,7 +78,7 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
         for card in cards:
             requests.append(
                 Query(
-                    {"filter": {field.name: {"$lt": card}}, "sort": {field.name: direction}},
+                    {"filter": {"a": {"$lt": card}}, "sort": {"a": direction}, "hint": {"a": 1}},
                     note=f"IXSCAN_{note}",
                 )
             )
@@ -91,7 +92,7 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
                 int(key)
                 for key in np.linspace(
                     0,
-                    collection.documents_count,
+                    collections[0].documents_count,
                     endpoint=False,
                     dtype=np.dtype(int),
                     # We need this max as otherwise we will generate an empty $in query (which turns into an EOF plan) for
@@ -101,7 +102,7 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
             ]
             requests.append(
                 Query(
-                    {"filter": {field.name: {"$in": seeks}}, "sort": {field.name: direction}},
+                    {"filter": {"a": {"$in": seeks}}, "sort": {"a": direction}, "hint": {"a": 1}},
                     note=f"IXSCAN_{note}",
                 )
             )
@@ -115,9 +116,10 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
                     Query(
                         {
                             "filter": {
-                                field.name: {"$lt": card, "$mod": [1, 0]},
+                                "a": {"$lt": card, "$mod": [1, 0]},
                             },
-                            "sort": {field.name: direction},
+                            "sort": {"a": direction},
+                            "hint": {"a": 1},
                         },
                         note="IXSCAN_W_FILTER",
                     )
@@ -125,22 +127,25 @@ async def execute_index_seeks(database: DatabaseInstance, collections: Sequence[
                 requests.append(
                     Query(
                         {
-                            "filter": {field.name: {"$in": seeks, "$mod": [1, 0]}},
-                            "sort": {field.name: direction},
+                            "filter": {"a": {"$in": seeks, "$mod": [1, 0]}},
+                            "sort": {"a": direction},
+                            "hint": {"a": 1},
                         },
                         note="IXSCAN_W_FILTER",
                     )
                 )
 
     await workload_execution.execute(
-        database, main_config.workload_execution, [collection], requests
+        database, main_config.workload_execution, collections, requests
     )
 
 
 async def execute_collection_scans(
     database: DatabaseInstance, collections: Sequence[CollectionInfo]
 ):
-    collections = [c for c in collections if c.name.startswith("coll_scan")]
+    collections = [c for c in collections if c.name == "doc_scan_100000"]
+    assert len(collections) == 1
+
     # Even though these numbers are not representative of the way COLLSCANs are usually used,
     # we can use them for calibration based on the assumption that the cost scales linearly.
     limits = [1, 5, 25, 50, 100, 1000, 2000, 3000, 4000, 5000]
@@ -169,17 +174,21 @@ async def execute_collection_scans(
 
 
 async def execute_limits(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collection = [c for c in collections if c.name.startswith("index_scan")][0]
+    collections = [c for c in collections if c.name == "index_scan_10000"]
+    assert len(collections) == 1
+
     limits = [1, 2, 5, 10, 15, 20, 25, 50, 100, 250, 500] + list(range(1000, 10001, 1000))
 
     requests = [Query({"limit": limit}, note="LIMIT") for limit in limits]
     await workload_execution.execute(
-        database, main_config.workload_execution, [collection], requests
+        database, main_config.workload_execution, collections, requests
     )
 
 
 async def execute_skips(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collection = [c for c in collections if c.name.startswith("index_scan")][0]
+    collections = [c for c in collections if c.name == "index_scan_10000"]
+    assert len(collections) == 1
+
     skips = [5, 10, 15, 20, 25, 50, 75, 100, 500, 1000, 2500, 5000]
     limits = [5, 10, 15, 20, 50, 75, 100, 250, 500, 1000]
     requests = []
@@ -188,17 +197,19 @@ async def execute_skips(database: DatabaseInstance, collections: Sequence[Collec
         for skip in skips:
             requests.append(Query(find_cmd={"skip": skip, "limit": limit}, note="SKIP"))
     await workload_execution.execute(
-        database, main_config.workload_execution, [collection], requests
+        database, main_config.workload_execution, collections, requests
     )
 
 
 async def execute_projections(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collection = [c for c in collections if c.name == "c_int_05_30000"][0]
+    collections = [c for c in collections if c.name == "projection_30000"]
+    assert len(collections) == 1
+
     limits = [5, 10, 50, 75, 100, 150, 300, 500] + list(range(1000, 10001, 1000))
 
     # We calibrate using projections on the last field since this means the node does a nontrivial amount of work.
     # This is because non-covered projections iterate over the fields in a given document as part of its work.
-    field = collection.fields[-1]
+    field = collections[0].fields[-1]
     requests = []
     # Simple projections, these do not contain any computed fields and are not fully covered by an index.
     for limit in limits:
@@ -207,7 +218,7 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
         )
 
     # Covered projections, these are inclusions that are fully covered by an index.
-    field = [f for f in collection.fields if f.indexed][-1]
+    field = [f for f in collections[0].fields if f.indexed][-1]
     for limit in limits:
         requests.append(
             Query(
@@ -219,7 +230,7 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
     # Default projections, these are the only ones that can handle computed projections,
     # so that is how we calibrate them. We assume that the computation will be constant across
     # the enumerated plans and thus keep it very simple.
-    fields = [f for f in collection.fields if f.type == DataType.INTEGER]
+    fields = [f for f in collections[0].fields if f.type == DataType.INTEGER]
     for limit in limits:
         requests.append(
             Query(
@@ -228,7 +239,7 @@ async def execute_projections(database: DatabaseInstance, collections: Sequence[
             )
         )
     await workload_execution.execute(
-        database, main_config.workload_execution, [collection], requests
+        database, main_config.workload_execution, collections, requests
     )
 
 
@@ -236,6 +247,7 @@ async def execute_sorts(database: DatabaseInstance, collections: Sequence[Collec
     # Using collections of varying sizes instead of limits, as the limit + sort combination
     # would trigger the optimized top-K sorting algorithm, which is calibrated separately below.
     collections = [c for c in collections if c.name.startswith("sort")]
+    assert len(collections) == 11
 
     requests = [
         # A standard sort applies the simple sort algorithm.
@@ -270,6 +282,8 @@ async def execute_sorts(database: DatabaseInstance, collections: Sequence[Collec
 
 async def execute_merge_sorts(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
     collections = [c for c in collections if c.name.startswith("merge_sort")]
+    assert len(collections) == 11
+
     fields = collections[0].fields
 
     requests = []
@@ -293,6 +307,7 @@ async def execute_ors(database: DatabaseInstance, collections: Sequence[Collecti
     # Using collections of varying sizes instead of limits, as a limit would prevent subsequent
     # OR branches from being executed if earlier branches already satisfy the limit requirement.
     collections = [c for c in collections if c.name.startswith("or")]
+    assert len(collections) == 20
 
     requests = [
         Query(
@@ -310,6 +325,8 @@ async def execute_sort_intersections(
     database: DatabaseInstance, collections: Sequence[CollectionInfo]
 ):
     collections = [ci for ci in collections if ci.name.startswith("intersection_sorted")]
+    assert len(collections) == 4
+
     # Values ranging from 1 to 10
     values = collections[0].fields[0].distribution.get_values()
 
@@ -341,7 +358,9 @@ async def execute_sort_intersections(
 async def execute_hash_intersections(
     database: DatabaseInstance, collections: Sequence[CollectionInfo]
 ):
-    collections = [ci for ci in collections if ci.name.startswith("intersection_hash")]
+    collections = [ci for ci in collections if ci.name == "intersection_hash_1000"]
+    assert len(collections) == 1
+
     # Values ranging from 1 to 10
     values = collections[0].fields[0].distribution.get_values()
 
@@ -371,7 +390,8 @@ async def execute_hash_intersections(
 
 
 async def execute_fetches(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collection = [c for c in collections if c.name.startswith("coll_scan")][0]
+    collections = [c for c in collections if c.name == "doc_scan_100000"]
+    assert len(collections) == 1
 
     requests = []
 
@@ -393,18 +413,20 @@ async def execute_fetches(database: DatabaseInstance, collections: Sequence[Coll
         )
 
     await workload_execution.execute(
-        database, main_config.workload_execution, [collection], requests
+        database, main_config.workload_execution, collections, requests
     )
 
 
 async def execute_index_scans_w_diff_num_fields(
     database: DatabaseInstance, collections: Sequence[CollectionInfo]
 ):
-    collection = [c for c in collections if c.name.startswith("index_scan_diff_num_fields")][0]
+    collections = [c for c in collections if c.name == "index_scan_10000"]
+    assert len(collections) == 1
+
     requests = []
 
     # The compound_indexes list does not contain the single-field index {a: 1}.
-    for index in ["a"] + collection.compound_indexes:
+    for index in ["a"] + collections[0].compound_indexes:
         hint_obj = {key: 1 for key in index}
 
         requests.append(
@@ -415,7 +437,7 @@ async def execute_index_scans_w_diff_num_fields(
         )
 
     await workload_execution.execute(
-        database, main_config.workload_execution, [collection], requests
+        database, main_config.workload_execution, collections, requests
     )
 
 

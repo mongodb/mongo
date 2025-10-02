@@ -29,6 +29,8 @@
 
 from __future__ import annotations
 
+import os
+
 import experiment as exp
 import matplotlib.pyplot as plt
 import numpy as np
@@ -145,5 +147,6 @@ def calibrate_node(
             plt.tight_layout()
 
         if fig:
-            fig.savefig(f"{node_name}.png")
+            os.makedirs("figures", exist_ok=True)
+            fig.savefig("figures/" + f"{node_name}.png")
     return model
