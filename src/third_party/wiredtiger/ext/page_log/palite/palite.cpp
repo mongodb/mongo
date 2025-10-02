@@ -1502,7 +1502,7 @@ public:
             memset(checkpoint_metadata, 0, sizeof(WT_ITEM));
 
         Storage::Transaction txn = storage.begin_transaction();
-        storage.get_last_checkpoint(
+        int ret = storage.get_last_checkpoint(
           txn.conn, checkpoint_lsn, checkpoint_timestamp, checkpoint_metadata);
         storage.commit_transaction(txn);
 
@@ -1512,7 +1512,7 @@ public:
           checkpoint_metadata ? checkpoint_metadata->size : 0,
           palite_verbose_item(checkpoint_metadata));
 
-        return 0;
+        return ret;
     }
 
     int

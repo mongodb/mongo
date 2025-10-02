@@ -2325,12 +2325,6 @@ __rec_pack_delta_leaf(WT_SESSION_IMPL *session, WTI_RECONCILE *r, WT_SAVE_UPD *s
         memcpy(p, key->data, key->size);
         p += key->size;
     } else {
-        /*
-         * FIXME-WT-14886: how should we handle the case that in the previous reconciliation, we
-         * write the full value and in this reconciliation, it is deleted by a tombstone. Should we
-         * still include the full value in the delta? We can omit it but it will make the rest of
-         * the system more complicated. Include it for now to simplify the prototype.
-         */
         if (!__wt_txn_upd_visible_all(session, supd->onpage_upd)) {
             if (supd->onpage_upd->txnid != WT_TXN_NONE) {
                 LF_SET(WT_DELTA_LEAF_HAS_START_TXN_ID);

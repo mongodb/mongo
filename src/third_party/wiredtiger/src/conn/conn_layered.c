@@ -48,11 +48,12 @@ __layered_get_disagg_checkpoint(WT_SESSION_IMPL *session, const char **cfg,
     if (page_log->pl_get_complete_checkpoint_ext == NULL)
         WT_ERR(ENOTSUP);
 
-    WT_ERR(page_log->pl_get_complete_checkpoint_ext(page_log, &session->iface,
-      complete_checkpoint_lsn, NULL, complete_checkpoint_timestamp, complete_checkpoint_metadata));
+    ret = page_log->pl_get_complete_checkpoint_ext(page_log, &session->iface,
+      complete_checkpoint_lsn, NULL, complete_checkpoint_timestamp, complete_checkpoint_metadata);
+    WT_ERR_NOTFOUND_OK(ret, true);
 
 err:
-    if (page_log != NULL)
+    if (ret != 0 && ret != WT_NOTFOUND && page_log != NULL)
         WT_TRET(page_log->terminate(page_log, &session->iface)); /* dereference */
     __wt_free(session, page_log_name);
     return (ret);
@@ -363,7 +364,16 @@ __disagg_pick_up_checkpoint(WT_SESSION_IMPL *session, uint64_t meta_lsn)
           ", new metadata LSN = %" PRIu64,
           current_meta_lsn, meta_lsn);
 
-    /* FIXME-WT-15448 We might also want to add a check for picking up the same checkpoint again. */
+    /*
+     * Warn if we are picking up the same checkpoint again. There's nothing else to do here, goto
+     * err for cleanup.
+     */
+    if (meta_lsn == current_meta_lsn) {
+        __wt_verbose_level(session, WT_VERB_LAYERED, WT_VERBOSE_WARNING,
+          "Picking up the same checkpoint again: metadata LSN = %" PRIu64, meta_lsn);
+        /* Keep previous ret value to avoid overlapping error message */
+        goto err;
+    }
 
     /*
      * Part 1: Get the metadata of the shared metadata table and insert it into our metadata table.

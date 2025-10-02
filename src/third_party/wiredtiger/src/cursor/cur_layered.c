@@ -842,7 +842,7 @@ retry:
         goto retry;
 
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_next);
-    /* FIXME-WT-15543: Handle the case of current_cursor being NULL */
+    /* FIXME-WT-15545: Handle the case of current_cursor being NULL */
     if (clayered->current_cursor == clayered->ingest_cursor)
         WT_STAT_CONN_DSRC_INCR(session, layered_curs_next_ingest);
     else
@@ -910,7 +910,7 @@ retry:
         goto retry;
 
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_prev);
-    /* FIXME-WT-15543: Handle the case of current_cursor being NULL */
+    /* FIXME-WT-15545: Handle the case of current_cursor being NULL */
     if (clayered->current_cursor == clayered->ingest_cursor)
         WT_STAT_CONN_DSRC_INCR(session, layered_curs_prev_ingest);
     else
@@ -1322,7 +1322,7 @@ __clayered_search(WT_CURSOR *cursor)
     ret = __clayered_lookup(session, clayered, &cursor->value);
 
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_search);
-    /* FIXME-WT-15543: Handle the case of current_cursor being NULL */
+    /* FIXME-WT-15545: Handle the case of current_cursor being NULL */
     if (clayered->current_cursor == clayered->ingest_cursor)
         WT_STAT_CONN_DSRC_INCR(session, layered_curs_search_ingest);
     else
@@ -1466,7 +1466,7 @@ __clayered_search_near(WT_CURSOR *cursor, int *exactp)
         *exactp = cmp;
 
     WT_STAT_CONN_DSRC_INCR(session, layered_curs_search_near);
-    /* FIXME-WT-15543: Handle the case of current_cursor being NULL */
+    /* FIXME-WT-15545: Handle the case of current_cursor being NULL */
     if (clayered->current_cursor == clayered->ingest_cursor)
         WT_STAT_CONN_DSRC_INCR(session, layered_curs_search_near_ingest);
     else

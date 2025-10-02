@@ -165,8 +165,7 @@ __wti_prepared_discover_add_artifact_ondisk_row(
 
     /*
      * Create an update structure with the time information and state populated - that allows this
-     * code to reuse existing machinery for installing transaction operations. FIXME-WT-15346 Handle
-     * claiming prepared delete.
+     * code to reuse existing machinery for installing transaction operations.
      */
     WT_RET(__wt_upd_alloc(session, NULL, WT_UPDATE_STANDARD, &upd, NULL));
     upd->txnid = session->txn->id;

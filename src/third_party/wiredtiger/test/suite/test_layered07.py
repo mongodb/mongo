@@ -88,12 +88,13 @@ class test_layered07(wttest.WiredTigerTestCase, DisaggConfigMixin):
         time.sleep(1)
         self.session.checkpoint()
         time.sleep(1)
-        self.disagg_advance_checkpoint(conn_follow)
 
         #
         # Part 2: The big switcheroo
         #
         self.pr('switch the leader and the follower')
+
+        # This function call implies the follower will pick up a new checkpoint.
         self.disagg_switch_follower_and_leader(conn_follow, self.conn)
         time.sleep(2)
 

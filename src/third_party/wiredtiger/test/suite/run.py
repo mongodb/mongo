@@ -84,6 +84,7 @@ Options:\n\
             --timeout N          have any test that exceeds N seconds throw an error.\n\
   -v N    | --verbose N          set verboseness to N (0<=N<=3, default=1)\n\
   -i      | --ignore-stdout      dont fail on unexpected stdout or stderr\n\
+  -P      | --print-output       duplicate all intercepted output to a standard stream\n\
   -R      | --randomseed         run with random seeds for generates random numbers\n\
   -S      | --seed               run with two seeds that generates random numbers, \n\
                                  format "seed1.seed2", seed1 or seed2 can\'t be zero\n\
@@ -298,7 +299,7 @@ def error(exitval, prefix, msg):
 
 if __name__ == '__main__':
     # Turn numbers and ranges into test module names
-    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = zstdtest = ignoreStdout = extralongtest = False
+    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = zstdtest = ignoreStdout = printOutput = extralongtest = False
     removeAtStart = True
     asan = False
     parallel = 0
@@ -432,6 +433,9 @@ if __name__ == '__main__':
             if option == '-ignore-stdout' or option == 'i':
                 ignoreStdout = True
                 continue
+            if option == '-print-output' or option == 'P':
+                printOutput = True
+                continue
             if option == '-config' or option == 'c':
                 if configfile != None or len(args) == 0:
                     usage()
@@ -547,8 +551,8 @@ if __name__ == '__main__':
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, removeAtStart, timestamp, gdbSub, lldbSub,
                                           verbose, wt_builddir, dirarg, longtest, extralongtest,
-                                          zstdtest, ignoreStdout, seedw, seedz, hookmgr,
-                                          ss_random_prefix, timeout)
+                                          zstdtest, ignoreStdout, printOutput, seedw, seedz,
+                                          hookmgr, ss_random_prefix, timeout)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:

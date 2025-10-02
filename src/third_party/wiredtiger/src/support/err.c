@@ -936,7 +936,7 @@ wiredtiger_dump_error_log(int (*callback)(const char *))
 
     if (error_log.count > WT_MAX_ERROR_LOG_MAX) {
         WT_ERR_NOLOG(__wt_snprintf(buf, buflen, "%d errors occurred, only the last %d are shown\n",
-                       error_log.count, WT_MAX_ERROR_LOG_MAX) != 0);
+          error_log.count, WT_MAX_ERROR_LOG_MAX));
         WT_ERR_NOLOG(callback(buf));
     }
 

@@ -222,6 +222,9 @@ class test_layered38(wttest.WiredTigerTestCase, DisaggConfigMixin):
         # Close the cursor held open.
         hold_cursor.close()
 
+        # Push forward the checkpoint again to avoid picking up the same checkpoint twice.
+        self.session.checkpoint()
+
         # Trigger advance checkpoint code again to set the prune timestamp to the last
         # checkpoint timestamp. We couldn't do that because there was a cursor holding the old content.
         self.disagg_advance_checkpoint(conn_follow)

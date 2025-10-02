@@ -98,3 +98,15 @@ class test_layered53(wttest.WiredTigerTestCase, DisaggConfigMixin):
         self.session_follow.checkpoint()
         _, _, checkpoint_timestamp, _ = self.disagg_get_complete_checkpoint_ext()
         self.assertEqual(checkpoint_timestamp, 20)
+
+        # Idempotence check: advancing the follower again should *not* change state.
+        # It should simply log that the same checkpoint is being picked up again.
+        # And two conditions implied here:
+        # 1) The metadata LSN should not change.
+        # 2) Error log should be raised.
+        meta_lsn = self.disagg_get_complete_checkpoint_meta()
+        with self.expectedStdoutPattern(".*Picking up the same checkpoint again.*"):
+            self.disagg_advance_checkpoint(self.conn_follow)
+        # Check that the metadata LSN did not change.
+        current_meta_lsn = self.disagg_get_complete_checkpoint_meta()
+        self.assertEqual(meta_lsn, current_meta_lsn)

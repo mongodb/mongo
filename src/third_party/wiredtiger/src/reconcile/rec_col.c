@@ -1442,9 +1442,17 @@ record_loop:
                     ovfl_state = OVFL_IGNORE;
                     break;
                 case OVFL_IGNORE:
-                    /* The original wasn't an overflow item. */
-                    data = vpack->data;
-                    size = vpack->size;
+                    /*
+                     * Use the copied original value if the on-page value is an overflow value.
+                     * Otherwise, use the on-page value.
+                     */
+                    if (F_ISSET(vpack, WT_CELL_UNPACK_OVERFLOW)) {
+                        data = orig->data;
+                        size = (uint32_t)orig->size;
+                    } else {
+                        data = vpack->data;
+                        size = vpack->size;
+                    }
                     break;
                 }
             } else {
