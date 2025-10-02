@@ -453,8 +453,6 @@ TEST_F(StorageInterfaceImplTest,
         storage.insertDocuments(opCtx, {nss.dbName(), *options.uuid}, transformInserts({op})));
 }
 
-MONGO_COMPILER_DIAGNOSTIC_PUSH
-MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
 TEST_F(StorageInterfaceImplTest,
        InsertDocumentsInsertsDocumentsOneAtATimeWhenAllAtOnceInsertingFails) {
     // Create a collection that does not support all-at-once inserting.
@@ -482,7 +480,6 @@ TEST_F(StorageInterfaceImplTest,
     // Check collection contents.
     _assertDocumentsInCollectionEquals(opCtx, nss, {doc1.doc, doc2.doc});
 }
-MONGO_COMPILER_DIAGNOSTIC_POP
 
 TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsReturnsOpTimeOfLastOperation) {
     // Create fake oplog collection to hold operations.

@@ -182,13 +182,10 @@ void BM_OnInserts(benchmark::State& state, const char* nss) {
     CollectionMock coll(NamespaceString::createNamespaceString_forTest(nss));
     // TODO(SERVER-103400): Investigate usage validity of CollectionPtr::CollectionPtr_UNSAFE
     const auto collptr = CollectionPtr::CollectionPtr_UNSAFE(&coll);
-    MONGO_COMPILER_DIAGNOSTIC_PUSH
-    MONGO_COMPILER_DIAGNOSTIC_IGNORED_TRANSITIONAL("-Wuninitialized")
     std::vector<InsertStatement> statements(1,
                                             InsertStatement(BSON("_id" << "whatever"
                                                                        << "key"
                                                                        << "value")));
-    MONGO_COMPILER_DIAGNOSTIC_POP
     OpObserverRegistry registry;
     auto* serviceContext = setupServiceContext();
     repl::ReplSettings replSettings;
