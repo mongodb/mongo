@@ -32,8 +32,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * This encapsulates the callbacks to implement the methods to return the cursors for the opened
@@ -48,4 +49,4 @@ int killCursorsWithMatchingSessions(OperationContext* opCtx, const SessionKiller
 
 }  // namespace service_liaison_router_callbacks
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

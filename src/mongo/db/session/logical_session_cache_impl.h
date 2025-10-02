@@ -43,6 +43,7 @@
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -68,7 +69,7 @@ namespace mongo {
  *    suggested that they consider also setting the refresh interval accordingly.
  *      --setParameter logicalSessionRefreshMillis=X.
  */
-class LogicalSessionCacheImpl final : public LogicalSessionCache {
+class MONGO_MOD_NEEDS_REPLACEMENT LogicalSessionCacheImpl final : public LogicalSessionCache {
 public:
     using ReapSessionsOlderThanFn =
         unique_function<int(OperationContext*, SessionsCollection&, Date_t)>;

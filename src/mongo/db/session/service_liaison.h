@@ -34,6 +34,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 

@@ -39,6 +39,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/util/modules.h"
 
 #include <cstddef>
 #include <memory>
@@ -48,7 +49,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * The interface for the logical session cache
@@ -159,4 +160,4 @@ private:
     LogicalSessionId _lsid;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

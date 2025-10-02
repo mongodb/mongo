@@ -30,6 +30,7 @@
 
 global:
     cpp_namespace: "mongo"
+    mod_visibility: pub
     cpp_includes:
         - "mongo/db/session/logical_session_id.h"
         - "mongo/db/repl/optime.h"

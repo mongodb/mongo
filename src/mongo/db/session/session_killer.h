@@ -43,6 +43,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/net/hostandport.h"
 
 #include <functional>
@@ -55,7 +56,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * The SessionKiller enforces a single thread for session killing for any given Service.
@@ -129,8 +130,8 @@ public:
      * This is the api for killSessions commands to invoke the killer.  It blocks until the kill is
      * finished, or until it fails (times out on all nodes in mongos).
      */
-    std::shared_ptr<Result> kill(OperationContext* opCtx,
-                                 const KillAllSessionsByPatternSet& toKill);
+    MONGO_MOD_PRIVATE std::shared_ptr<Result> kill(OperationContext* opCtx,
+                                                   const KillAllSessionsByPatternSet& toKill);
 
 private:
     /**
@@ -161,4 +162,4 @@ private:
     bool _inShutdown = false;
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

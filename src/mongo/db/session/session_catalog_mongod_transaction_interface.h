@@ -34,6 +34,7 @@
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

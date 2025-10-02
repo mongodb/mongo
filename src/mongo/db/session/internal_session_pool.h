@@ -41,6 +41,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -58,7 +59,7 @@ namespace mongo {
  * to execute an internal transaction. Sessions are reaped from the pool if they have not been used
  * for over 15 minutes. The session pool is partitioned by uid.
  */
-class InternalSessionPool {
+class MONGO_MOD_PUB InternalSessionPool {
 
 public:
     class Session {

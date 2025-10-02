@@ -31,8 +31,9 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 namespace kill_sessions {
 
@@ -48,4 +49,4 @@ inline Status validateLsid(const LogicalSessionId& lsid) {
 
 }  // namespace kill_sessions
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

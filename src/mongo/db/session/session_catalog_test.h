@@ -31,6 +31,7 @@
 
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 

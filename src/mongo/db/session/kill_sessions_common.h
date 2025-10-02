@@ -44,6 +44,7 @@
 #include "mongo/rpc/metadata/audit_user_attrs.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/str.h"
 
 #include <memory>
@@ -119,7 +120,7 @@ private:
  * two types share no code, but do share enough shape to re-use some boilerplate.
  */
 template <typename Eraser>
-class KillCursorsBySessionAdaptor {
+class MONGO_MOD_PUB KillCursorsBySessionAdaptor {
 public:
     KillCursorsBySessionAdaptor(OperationContext* opCtx,
                                 const SessionKiller::Matcher& matcher,
@@ -193,9 +194,9 @@ private:
 };
 
 template <typename Eraser>
-auto makeKillCursorsBySessionAdaptor(OperationContext* opCtx,
-                                     const SessionKiller::Matcher& matcher,
-                                     Eraser&& eraser) {
+MONGO_MOD_PUB auto makeKillCursorsBySessionAdaptor(OperationContext* opCtx,
+                                                   const SessionKiller::Matcher& matcher,
+                                                   Eraser&& eraser) {
     return KillCursorsBySessionAdaptor<std::decay_t<Eraser>>{
         opCtx, matcher, std::forward<Eraser>(eraser)};
 }

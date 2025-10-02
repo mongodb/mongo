@@ -37,6 +37,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <memory>

@@ -32,11 +32,12 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/util/modules.h"
 
 /**
  * Mongod local kill session / transaction functionality library.
  */
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * Kills all cursors, ops, and transactions on mongod for sessions matching 'matcher'.
@@ -93,4 +94,4 @@ void yieldLocksForPreparedTransactions(OperationContext* opCtx);
  */
 void invalidateSessionsForStepdown(OperationContext* opCtx);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

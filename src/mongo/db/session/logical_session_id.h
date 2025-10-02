@@ -40,6 +40,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/uuid.h"
 
 #include <cstddef>
@@ -54,7 +55,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 using TxnNumber = std::int64_t;
 using StmtId = std::int32_t;
@@ -227,4 +228,4 @@ public:
         : OperationSessionInfoFromClientBase(std::move(other)) {}
 };
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

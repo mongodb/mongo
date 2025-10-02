@@ -37,6 +37,7 @@
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <string>

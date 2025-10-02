@@ -35,6 +35,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/util/modules.h"
 #include "mongo/util/time_support.h"
 
 #include <cstddef>
@@ -43,7 +44,7 @@
 
 #include <boost/optional/optional.hpp>
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 constexpr size_t kMaximumUserNameLengthForLogicalSessions = 10000;
 
@@ -101,9 +102,10 @@ bool isInternalSessionForNonRetryableWrite(const LogicalSessionId& sessionId);
 /**
  * Helpers to make internal sessions.
  */
-LogicalSessionId makeLogicalSessionIdWithTxnNumberAndUUID(const LogicalSessionId& parentLsid,
-                                                          TxnNumber txnNumber);
-LogicalSessionId makeLogicalSessionIdWithTxnUUID(const LogicalSessionId& parentLsid);
+MONGO_MOD_PRIVATE LogicalSessionId
+makeLogicalSessionIdWithTxnNumberAndUUID(const LogicalSessionId& parentLsid, TxnNumber txnNumber);
+MONGO_MOD_PRIVATE LogicalSessionId
+makeLogicalSessionIdWithTxnUUID(const LogicalSessionId& parentLsid);
 
 /**
  * Factory functions to generate logical session records.
@@ -117,6 +119,7 @@ LogicalSessionId makeLogicalSessionId(OperationContext* opCtx);
  * We recommend acquiring a system session through the session pool. It can be acquired through this
  * method InternalSessionPool::acquireSystemSession().
  */
+MONGO_MOD_USE_REPLACEMENT(InternalSessionPool::acquireSystemSession())
 LogicalSessionId makeSystemLogicalSessionId();
 
 /**
@@ -135,11 +138,11 @@ LogicalSessionIdSet makeLogicalSessionIds(const std::vector<LogicalSessionFromCl
                                           OperationContext* opCtx,
                                           std::initializer_list<Privilege> allowSpoof = {});
 
-namespace logical_session_id_helpers {
+namespace MONGO_MOD_PUB logical_session_id_helpers {
 
 void serializeLsidAndTxnNumber(OperationContext* opCtx, BSONObjBuilder* builder);
 
 void serializeLsid(OperationContext* opCtx, BSONObjBuilder* builder);
 
-}  // namespace logical_session_id_helpers
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB logical_session_id_helpers
+}  // namespace MONGO_MOD_PUB mongo

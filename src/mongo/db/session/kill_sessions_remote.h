@@ -31,8 +31,9 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/util/modules.h"
 
-namespace mongo {
+namespace MONGO_MOD_PUB mongo {
 
 /**
  * The killSessions killer for running on mongos. It kills matching local ops first, then fans out
@@ -42,4 +43,4 @@ SessionKiller::Result killSessionsRemote(OperationContext* opCtx,
                                          const SessionKiller::Matcher& patterns,
                                          SessionKiller::UniformRandomBitGenerator* urbg);
 
-}  // namespace mongo
+}  // namespace MONGO_MOD_PUB mongo

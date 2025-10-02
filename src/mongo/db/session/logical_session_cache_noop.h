@@ -30,13 +30,14 @@
 #pragma once
 
 #include "mongo/db/session/logical_session_cache.h"
+#include "mongo/util/modules.h"
 
 namespace mongo {
 
 /**
  * A noop logical session cache for use in tests
  */
-class LogicalSessionCacheNoop : public LogicalSessionCache {
+class MONGO_MOD_PUB LogicalSessionCacheNoop : public LogicalSessionCache {
 public:
     void joinOnShutDown() override {}
 
