@@ -35,6 +35,9 @@
 #include "mongo/db/extension/sdk/byte_buf_utils.h"
 #include "mongo/db/query/query_shape/query_shape.h"
 #include "mongo/util/modules.h"
+#include "mongo/util/scopeguard.h"
+
+#include <vector>
 
 #include <absl/base/nullability.h>
 
@@ -111,37 +114,6 @@ protected:
 };
 
 /**
- * ExtensionAggregationStageParseNodeHandle is a wrapper around a
- * MongoExtensionAggregationStageParseNode.
- */
-class ExtensionAggregationStageParseNodeHandle
-    : public OwnedHandle<::MongoExtensionAggregationStageParseNode> {
-public:
-    ExtensionAggregationStageParseNodeHandle(
-        absl::Nonnull<::MongoExtensionAggregationStageParseNode*> parseNode)
-        : OwnedHandle<::MongoExtensionAggregationStageParseNode>(parseNode) {
-        _assertValidVTable();
-    }
-
-    // TODO(SERVER-111368): Add getQueryShape().
-
-    /**
-     * Gets the expanded pipeline BSON vector for this stage.
-     */
-    std::vector<BSONObj> getExpandedPipelineVec() const;
-
-protected:
-    void _assertVTableConstraints(const VTable_t& vtable) const override {
-        tassert(10977601,
-                "ExtensionAggregationStageParseNode 'get_query_shape' is null",
-                vtable.get_query_shape != nullptr);
-        tassert(10977602,
-                "ExtensionAggregationStageParseNode 'expand' is null",
-                vtable.expand != nullptr);
-    }
-};
-
-/**
  * ExtensionAggregationStageAstNodeHandle is an owned handle wrapper around a
  * MongoExtensionAggregationStageAstNode.
  */
@@ -167,6 +139,61 @@ protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
         tassert(
             11113700, "ExtensionAggregationStageAstNode 'bind' is null", vtable.bind != nullptr);
+    }
+};
+
+class ExtensionAggregationStageParseNodeHandle;
+using VariantNodeHandle =
+    std::variant<ExtensionAggregationStageParseNodeHandle, ExtensionAggregationStageAstNodeHandle>;
+
+/**
+ * ExtensionAggregationStageParseNodeHandle is a wrapper around a
+ * MongoExtensionAggregationStageParseNode.
+ */
+class ExtensionAggregationStageParseNodeHandle
+    : public OwnedHandle<::MongoExtensionAggregationStageParseNode> {
+public:
+    ExtensionAggregationStageParseNodeHandle(
+        absl::Nonnull<::MongoExtensionAggregationStageParseNode*> parseNode)
+        : OwnedHandle<::MongoExtensionAggregationStageParseNode>(parseNode) {
+        _assertValidVTable();
+    }
+
+    // TODO(SERVER-111368): Add getQueryShape().
+
+    /**
+     * Expands this parse node into its child nodes and returns them as a vector of host-side
+     * handles.
+     *
+     * On success, the returned vector contains one or more handles (ParseNodeHandle or
+     * AstNodeHandle) and ownership of the underlying nodes is transferred to the caller.
+     *
+     * On failure, the call triggers an assertion and no ownership is transferred.
+     *
+     * The caller is responsible for managing the lifetime of the returned handles.
+     */
+    std::vector<VariantNodeHandle> expand() const;
+
+protected:
+    void _assertVTableConstraints(const VTable_t& vtable) const override {
+        tassert(10977601,
+                "ExtensionAggregationStageParseNode 'get_query_shape' is null",
+                vtable.get_query_shape != nullptr);
+        tassert(11113800,
+                "ExtensionAggregationStageParseNode 'get_expanded_size' is null",
+                vtable.get_expanded_size != nullptr);
+        tassert(10977602,
+                "ExtensionAggregationStageParseNode 'expand' is null",
+                vtable.expand != nullptr);
+    }
+
+private:
+    /**
+     * Returns the number of elements the parse node will produce when expanded. This value is used
+     * by the host to size the ExpandedArray.
+     */
+    size_t getExpandedSize() const {
+        return vtable().get_expanded_size(get());
     }
 };
 

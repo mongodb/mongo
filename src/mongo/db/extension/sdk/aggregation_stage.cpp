@@ -41,6 +41,7 @@ const ::MongoExtensionLogicalAggregationStageVTable ExtensionLogicalAggregationS
 const ::MongoExtensionAggregationStageParseNodeVTable ExtensionAggregationStageParseNode::VTABLE = {
     .destroy = &ExtensionAggregationStageParseNode::_extDestroy,
     .get_query_shape = &ExtensionAggregationStageParseNode::_extGetQueryShape,
+    .get_expanded_size = &ExtensionAggregationStageParseNode::_extGetExpandedSize,
     .expand = &ExtensionAggregationStageParseNode::_extExpand};
 
 const ::MongoExtensionAggregationStageAstNodeVTable ExtensionAggregationStageAstNode::VTABLE = {

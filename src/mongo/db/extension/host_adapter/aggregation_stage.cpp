@@ -31,8 +31,10 @@
 #include "mongo/db/extension/sdk/byte_buf.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo::extension::host_adapter {
+MONGO_FAIL_POINT_DEFINE(failExtensionExpand);
 
 ExtensionLogicalAggregationStageHandle ExtensionAggregationStageDescriptorHandle::parse(
     BSONObj stageBson) const {
@@ -43,22 +45,76 @@ ExtensionLogicalAggregationStageHandle ExtensionAggregationStageDescriptorHandle
     return ExtensionLogicalAggregationStageHandle(logicalStagePtr);
 }
 
-std::vector<BSONObj> ExtensionAggregationStageParseNodeHandle::getExpandedPipelineVec() const {
-    ::MongoExtensionByteBuf* buf;
-    const auto& vtbl = vtable();
-    auto* ptr = get();
-    sdk::enterC([&]() { return vtbl.expand(ptr, &buf); });
+std::vector<VariantNodeHandle> ExtensionAggregationStageParseNodeHandle::expand() const {
+    // Host allocates buffer with the expected size.
+    const auto expandedSize = getExpandedSize();
+    tassert(
+        11113803, "AggregationStageParseNode getExpandedSize() must be >= 1", expandedSize >= 1);
+    std::vector<::MongoExtensionExpandedArrayElement> buf{expandedSize};
+    ::MongoExtensionExpandedArray expandedArray{expandedSize, buf.data()};
 
-    if (!buf) {
-        return std::vector<BSONObj>{};
+    sdk::enterC([&] { return vtable().expand(get(), &expandedArray); });
+
+    // This guard provides a best-effort cleanup in the case of an exception.
+    //
+    // - `transferredCount` tracks how many elements from the front of `buf` have been
+    //   successfully wrapped into RAII handles and had their raw pointers nulled.
+    // - If an exception occurs while constructing handles (e.g., OOM in `emplace_back` or a bad
+    //   vtable), we destroy only the elements that have not yet been transferred
+    //   ([transferredCount, expandedSize)).
+    size_t transferredCount{0};
+    ScopeGuard guard([&]() {
+        for (size_t idx = transferredCount; idx < expandedSize; ++idx) {
+            auto& elt = expandedArray.elements[idx];
+            switch (elt.type) {
+                case kParseNode: {
+                    if (elt.parse && elt.parse->vtable && elt.parse->vtable->destroy) {
+                        elt.parse->vtable->destroy(elt.parse);
+                    }
+                    break;
+                }
+                case kAstNode: {
+                    if (elt.ast && elt.ast->vtable && elt.ast->vtable->destroy) {
+                        elt.ast->vtable->destroy(elt.ast);
+                    }
+                    break;
+                }
+                default:
+                    // Memory is leaked if the type tag is invalid, but this only happens if the
+                    // extension violates the API contract.
+                    break;
+            }
+        }
+    });
+
+    // Transfer ownership of each element into RAII handles and build the result vector.
+    std::vector<VariantNodeHandle> expandedVec;
+    expandedVec.reserve(expandedSize);
+    for (auto& elt : buf) {
+        if (MONGO_unlikely(failExtensionExpand.shouldFail())) {
+            uasserted(11113805, "Injected failure in expand() during handle transfer");
+        }
+
+        switch (elt.type) {
+            case kParseNode: {
+                expandedVec.emplace_back(elt.parse);
+                elt.parse = nullptr;
+                break;
+            }
+            case kAstNode: {
+                expandedVec.emplace_back(elt.ast);
+                elt.ast = nullptr;
+                break;
+            }
+            default:
+                tasserted(11113804, "ExpandedArray element has invalid type tag");
+                break;
+        }
+        ++transferredCount;
     }
 
-    sdk::VecByteBufHandle ownedBuf{static_cast<sdk::VecByteBuf*>(buf)};
-    auto ownedBob = sdk::bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
-
-    BSONArray arr(ownedBob);
-    auto wrappedPipeline = BSON("pipeline" << arr);
-    return parsePipelineFromBSON(wrappedPipeline.firstElement());
+    guard.dismiss();
+    return expandedVec;
 }
 
 ExtensionLogicalAggregationStageHandle ExtensionAggregationStageAstNodeHandle::bind() const {

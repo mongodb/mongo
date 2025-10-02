@@ -215,14 +215,49 @@ typedef struct MongoExtensionLogicalAggregationStageVTable {
 } MongoExtensionLogicalAggregationStageVTable;
 
 /**
- * A MongoExtensionAggregationStageParseNode is representative of an aggregation
- * stage that has undergone a preliminary parse focusing on syntax validation (i.e., no expression
- * context). A parse node is responsible for validating syntax, generating a query shape, and
- * expanding into one or more nodes which can participate in the next phase of validation.
+ * Types of nodes that can be in an ExpandedArray.
+ */
+typedef enum MongoExtensionAggregationStageNodeType : uint32_t {
+    kParseNode = 0,
+    kAstNode = 1
+} MongoExtensionAggregationStageNodeType;
+
+/**
+ * MongoExtensionAggregationStageParseNode is responsible for validating the user provided syntax,
+ * generating a query shape, and expanding into a resolved list of nodes that can be either AST
+ * nodes or other parse nodes (which will eventually resolve to AST nodes through recursive
+ * expansion). It can participate in preliminary pipeline validation.
  */
 typedef struct MongoExtensionAggregationStageParseNode {
     const struct MongoExtensionAggregationStageParseNodeVTable* const vtable;
 } MongoExtensionAggregationStageParseNode;
+
+/**
+ * An AggregationStageAstNode describes an aggregation stage that has been parsed and expanded into
+ * a form that can participate in lite-parsed validation.
+ */
+typedef struct MongoExtensionAggregationStageAstNode {
+    const struct MongoExtensionAggregationStageAstNodeVTable* const vtable;
+} MongoExtensionAggregationStageAstNode;
+
+typedef struct MongoExtensionExpandedArrayElement {
+    MongoExtensionAggregationStageNodeType type;
+    union {
+        MongoExtensionAggregationStageParseNode* parse;
+        MongoExtensionAggregationStageAstNode* ast;
+    };
+} MongoExtensionExpandedArrayElement;
+
+/**
+ * MongoExtensionExpandedArray is an abstraction to represent the expansion of a ParseNode. A
+ * ParseNode can expand into a MongoExtensionExpandedArrayElement array of one or more elements.
+ * Each element is either a ParseNode or an AstNode. The array is allocated and owned by the caller
+ * and populated by the extension.
+ */
+typedef struct MongoExtensionExpandedArray {
+    size_t size;
+    struct MongoExtensionExpandedArrayElement* const elements;
+} MongoExtensionExpandedArray;
 
 /**
  * Virtual function table for MongoExtensionAggregationStageParseNode.
@@ -242,27 +277,39 @@ typedef struct MongoExtensionAggregationStageParseNodeVTable {
         MongoExtensionByteBuf** queryShape);
 
     /**
-     * Populates ByteBuf with the stage's expansion. Ownership is transferred to the
-     * caller.
+     * Returns the size (number of nodes) of the ParseNode's expansion. Callers must first get the
+     * expansion size before calling expand() so that they can pre-allocate the ExpandedArrayElement
+     * array which is then populated by the extension.
+     */
+    size_t (*get_expanded_size)(const MongoExtensionAggregationStageParseNode* parseNode);
+
+    /**
+     * Populates the MongoExtensionExpandedArray with the stage's expansion.
+     *
+     * If a stage does not desugar, the ExpandedArray will contain a single AstNode representation
+     * for this ParseNode. If a stage desugars into multiple stages, the ExpandedArray will contain
+     * the component stages' representation.
+     *
+     * The expanded array must contain at least one element.
+     *
+     * The caller must first get the expansion size and allocate the ExpandedArray
+     * elements buffer with the correct size before calling expand() with the allocated buffer which
+     * will be populated with the elements.
+     *
+     * The caller is responsible for fully expanding the returned expanded array recursively.
+     *
+     * Ownership of the pointers within the array elements is transferred to the caller.
      */
     MongoExtensionStatus* (*expand)(const MongoExtensionAggregationStageParseNode* parseNode,
-                                    MongoExtensionByteBuf** expansionArray);
+                                    MongoExtensionExpandedArray* expanded);
 } MongoExtensionAggregationStageParseNodeVTable;
-
-/**
- * An AggregationStageAstNode describes an aggregation stage that has been parsed and expanded into
- * a form that can participate in lite-parsed validation.
- */
-typedef struct MongoExtensionAggregationStageAstNode {
-    const struct MongoExtensionAggregationStageAstNodeVTable* const vtable;
-} MongoExtensionAggregationStageAstNode;
 
 /**
  * Virtual function table for MongoExtensionAggregationStageAstNode.
  */
 typedef struct MongoExtensionAggregationStageAstNodeVTable {
     /**
-     * Destroy `astNode` and free any related resources.
+     * Destroys `astNode` and free any related resources.
      */
     void (*destroy)(MongoExtensionAggregationStageAstNode* astNode);
 

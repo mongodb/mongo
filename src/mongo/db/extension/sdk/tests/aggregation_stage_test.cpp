@@ -55,18 +55,7 @@ public:
     NoOpLogicalAggregationStage() {}
 };
 
-class NoOpParseNode : public extension::sdk::AggregationStageParseNode {
-public:
-    BSONArray expand() const override {
-        return {};
-    }
-
-    static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
-        return std::make_unique<NoOpParseNode>();
-    }
-};
-
-class NoOpAggregationStageAstNode : public extension::sdk::AggregationStageAstNode {
+class NoOpAstNode : public extension::sdk::AggregationStageAstNode {
 public:
     std::unique_ptr<extension::sdk::LogicalAggregationStage> bind() const override {
         return std::make_unique<NoOpLogicalAggregationStage>();
@@ -74,37 +63,27 @@ public:
 
 
     static inline std::unique_ptr<extension::sdk::AggregationStageAstNode> make() {
-        return std::make_unique<NoOpAggregationStageAstNode>();
+        return std::make_unique<NoOpAstNode>();
     }
 };
 
-class DesugarAsMatchAndLimitDescriptor : public extension::sdk::AggregationStageDescriptor {
+class NoOpParseNode : public extension::sdk::AggregationStageParseNode {
 public:
-    static inline const std::string kStageName = "$matchLimitDesugarExtension";
+    static constexpr size_t kExpansionSize = 1;
 
-    DesugarAsMatchAndLimitDescriptor()
-        : extension::sdk::AggregationStageDescriptor(kStageName,
-                                                     MongoExtensionAggregationStageType::kDesugar) {
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
     }
 
-    std::unique_ptr<extension::sdk::LogicalAggregationStage> parse(
-        BSONObj stageBson) const override {
-        return std::make_unique<NoOpLogicalAggregationStage>();
-    }
-
-    static inline std::unique_ptr<extension::sdk::AggregationStageDescriptor> make() {
-        return std::make_unique<DesugarAsMatchAndLimitDescriptor>();
-    }
-};
-
-class DesugarAsMatchAndLimitParseNode : public extension::sdk::AggregationStageParseNode {
-public:
-    BSONArray expand() const override {
-        return BSON_ARRAY(BSON("$match" << BSONObj()) << BSON("$limit" << 1));
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        std::vector<extension::sdk::VariantNode> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(std::make_unique<NoOpAstNode>());
+        return expanded;
     }
 
     static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
-        return std::make_unique<DesugarAsMatchAndLimitParseNode>();
+        return std::make_unique<NoOpParseNode>();
     }
 };
 
@@ -129,7 +108,11 @@ public:
 
 class DesugarToEmptyParseNode : public extension::sdk::AggregationStageParseNode {
 public:
-    BSONArray expand() const override {
+    size_t getExpandedSize() const override {
+        return 0;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
         return {};
     }
 
@@ -138,33 +121,121 @@ public:
     }
 };
 
-class BadDesugarArrayElementsDescriptor : public extension::sdk::AggregationStageDescriptor {
+class CountingAST final : public extension::sdk::AggregationStageAstNode {
 public:
-    static inline const std::string kStageName = "$badArrayEltsDesugarExtension";
+    static int alive;
 
-    BadDesugarArrayElementsDescriptor()
-        : extension::sdk::AggregationStageDescriptor(kStageName,
-                                                     MongoExtensionAggregationStageType::kDesugar) {
+    CountingAST() {
+        ++alive;
     }
 
-    std::unique_ptr<extension::sdk::LogicalAggregationStage> parse(
-        BSONObj stageBson) const override {
+    ~CountingAST() override {
+        --alive;
+    }
+
+    std::unique_ptr<extension::sdk::LogicalAggregationStage> bind() const override {
         return std::make_unique<NoOpLogicalAggregationStage>();
     }
 
-    static inline std::unique_ptr<extension::sdk::AggregationStageDescriptor> make() {
-        return std::make_unique<BadDesugarArrayElementsDescriptor>();
+    static inline std::unique_ptr<extension::sdk::AggregationStageAstNode> make() {
+        return std::make_unique<CountingAST>();
     }
 };
 
-class BadDesugarArrayElementsParseNode : public extension::sdk::AggregationStageParseNode {
+class CountingParse final : public extension::sdk::AggregationStageParseNode {
 public:
-    BSONArray expand() const override {
-        return BSON_ARRAY(1);
+    static constexpr size_t kExpansionSize = 1;
+    static int alive;
+
+    CountingParse() {
+        ++alive;
+    }
+
+    ~CountingParse() override {
+        --alive;
+    }
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        std::vector<extension::sdk::VariantNode> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(std::make_unique<CountingAST>());
+        return expanded;
     }
 
     static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
-        return std::make_unique<BadDesugarArrayElementsParseNode>();
+        return std::make_unique<CountingParse>();
+    }
+};
+
+int CountingParse::alive = 0;
+int CountingAST::alive = 0;
+
+class NestedDesugaringParseNode final : public extension::sdk::AggregationStageParseNode {
+public:
+    static constexpr size_t kExpansionSize = 2;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        std::vector<extension::sdk::VariantNode> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(std::make_unique<CountingAST>());
+        expanded.emplace_back(std::make_unique<CountingParse>());
+        return expanded;
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
+        return std::make_unique<NestedDesugaringParseNode>();
+    }
+};
+
+class GetExpandedSizeLessThanActualExpansionSizeParseNode final
+    : public extension::sdk::AggregationStageParseNode {
+public:
+    static constexpr size_t kExpansionSize = 2;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize - 1;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        std::vector<extension::sdk::VariantNode> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(std::make_unique<CountingAST>());
+        expanded.emplace_back(std::make_unique<CountingParse>());
+        return expanded;
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
+        return std::make_unique<GetExpandedSizeLessThanActualExpansionSizeParseNode>();
+    }
+};
+
+class GetExpandedSizeGreaterThanActualExpansionSizeParseNode final
+    : public extension::sdk::AggregationStageParseNode {
+public:
+    static constexpr size_t kExpansionSize = 2;
+
+    size_t getExpandedSize() const override {
+        return kExpansionSize + 1;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        std::vector<extension::sdk::VariantNode> expanded;
+        expanded.reserve(kExpansionSize);
+        expanded.emplace_back(std::make_unique<CountingAST>());
+        expanded.emplace_back(std::make_unique<CountingParse>());
+        return expanded;
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
+        return std::make_unique<GetExpandedSizeGreaterThanActualExpansionSizeParseNode>();
     }
 };
 
@@ -199,49 +270,132 @@ public:
     };
 };
 
-TEST(AggregationStageTest, DesugarStaticDescriptorTest) {
-    auto matchLimitDesugarStaticDescriptor = extension::sdk::ExtensionAggregationStageDescriptor{
-        DesugarAsMatchAndLimitDescriptor::make()};
-    auto handle = extension::host_adapter::ExtensionAggregationStageDescriptorHandle{
-        &matchLimitDesugarStaticDescriptor};
-
-    ASSERT_EQUALS(handle.getName(), DesugarAsMatchAndLimitDescriptor::kStageName);
-    ASSERT_EQUALS(handle.getType(), ::MongoExtensionAggregationStageType::kDesugar);
-}
-
-TEST(AggregationStageTest, MatchLimitDesugarExpansionSucceedsTest) {
-    auto matchLimitDesugarParseNode =
-        std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
-            DesugarAsMatchAndLimitParseNode::make());
+TEST(AggregationStageTest, CountingParseExpansionSucceedsTest) {
+    auto countingParseNode =
+        std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(CountingParse::make());
     auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
-        matchLimitDesugarParseNode.release()};
+        countingParseNode.release()};
 
-    auto vec = handle.getExpandedPipelineVec();
-    ASSERT_EQ(vec.size(), 2U);
-    ASSERT_TRUE(vec[0].hasField("$match"));
-    ASSERT_TRUE(vec[1].hasField("$limit"));
-    ASSERT_EQ(vec[1].getIntField("$limit"), 1) << vec[1].toString();
+    auto expanded = handle.expand();
+    ASSERT_EQUALS(expanded.size(), 1);
+
+    // TODO SERVER-111605 Check expansion results by name once get_name is added.
+    ASSERT_TRUE(
+        std::holds_alternative<extension::host_adapter::ExtensionAggregationStageAstNodeHandle>(
+            expanded[0]));
 }
 
-TEST(AggregationStageTest, EmptyDesugarExpansionSucceedsTest) {
+TEST(AggregationStageTest, NestedExpansionSucceedsTest) {
+    auto nestedDesugarParseNode =
+        std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
+            NestedDesugaringParseNode::make());
+    auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
+        nestedDesugarParseNode.release()};
+
+    auto expanded = handle.expand();
+    ASSERT_EQUALS(expanded.size(), 2);
+
+    // TODO SERVER-111605 Check expansion results by name once get_name is added.
+    // First element is the AST node.
+    ASSERT_TRUE(
+        std::holds_alternative<extension::host_adapter::ExtensionAggregationStageAstNodeHandle>(
+            expanded[0]));
+
+    // Second element is the nested ParseNode.
+    ASSERT_TRUE(
+        std::holds_alternative<extension::host_adapter::ExtensionAggregationStageParseNodeHandle>(
+            expanded[1]));
+    auto& nestedHandle =
+        std::get<extension::host_adapter::ExtensionAggregationStageParseNodeHandle>(expanded[1]);
+
+    // Expand the nested node.
+    auto nestedExpanded = nestedHandle.expand();
+    ASSERT_EQUALS(nestedExpanded.size(), 1);
+    ASSERT_TRUE(
+        std::holds_alternative<extension::host_adapter::ExtensionAggregationStageAstNodeHandle>(
+            nestedExpanded[0]));
+}
+
+TEST(AggregationStageTest, HandlesPreventMemoryLeaksOnSuccess) {
+    CountingAST::alive = 0;
+    CountingParse::alive = 0;
+
+    auto nestedDesugarParseNode =
+        std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
+            NestedDesugaringParseNode::make());
+
+    {
+        auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
+            nestedDesugarParseNode.release()};
+
+        [[maybe_unused]] auto expanded = handle.expand();
+        ASSERT_EQUALS(CountingAST::alive, 1);
+        ASSERT_EQUALS(CountingParse::alive, 1);
+    }
+
+    // Assert that the result of expand(), a vector of VariantNodeHandles, is properly cleaned up
+    // once it goes out of scope.
+    ASSERT_EQUALS(CountingAST::alive, 0);
+    ASSERT_EQUALS(CountingParse::alive, 0);
+}
+
+TEST(AggregationStageTest, HandlesPreventMemoryLeaksOnFailure) {
+    CountingAST::alive = 0;
+    CountingParse::alive = 0;
+
+    auto nestedDesugarParseNode =
+        std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
+            NestedDesugaringParseNode::make());
+
+    auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
+        nestedDesugarParseNode.release()};
+
+    auto failExpand = globalFailPointRegistry().find("failExtensionExpand");
+    failExpand->setMode(FailPoint::skip, 1);
+
+    ASSERT_THROWS_CODE(
+        [&] {
+            [[maybe_unused]] auto expanded = handle.expand();
+        }(),
+        DBException,
+        11113805);
+
+    // Assert that the result of expand(), a vector of VariantNodeHandles, is properly cleaned up
+    // after an exception is thrown.
+    ASSERT_EQUALS(CountingAST::alive, 0);
+    ASSERT_EQUALS(CountingParse::alive, 0);
+
+    failExpand->setMode(FailPoint::off, 0);
+}
+
+DEATH_TEST(AggregationStageTest, EmptyDesugarExpansionFails, "11113803") {
     auto emptyDesugarParseNode =
         std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
             DesugarToEmptyParseNode::make());
     auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
         emptyDesugarParseNode.release()};
 
-    auto vec = handle.getExpandedPipelineVec();
-    ASSERT_EQ(vec.size(), 0U);
+    [[maybe_unused]] auto expanded = handle.expand();
 }
 
-TEST(AggregationStageTest, BadArrayElementsDesugarExpansionFails) {
-    auto badArrayElementsDesugarParseNode =
+DEATH_TEST(AggregationStageTest, GetExpandedSizeLessThanActualExpansionSizeFails, "11113802") {
+    auto getExpandedSizeLessThanActualExpansionSizeParseNode =
         std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
-            BadDesugarArrayElementsParseNode::make());
+            GetExpandedSizeLessThanActualExpansionSizeParseNode::make());
     auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
-        badArrayElementsDesugarParseNode.release()};
+        getExpandedSizeLessThanActualExpansionSizeParseNode.release()};
 
-    ASSERT_THROWS_CODE(handle.getExpandedPipelineVec(), DBException, ErrorCodes::TypeMismatch);
+    [[maybe_unused]] auto expanded = handle.expand();
+}
+
+DEATH_TEST(AggregationStageTest, GetExpandedSizeGreaterThanActualExpansionSizeFails, "11113802") {
+    auto getExpandedSizeGreaterThanActualExpansionSizeParseNode =
+        std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
+            GetExpandedSizeGreaterThanActualExpansionSizeParseNode::make());
+    auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
+        getExpandedSizeGreaterThanActualExpansionSizeParseNode.release()};
+
+    [[maybe_unused]] auto expanded = handle.expand();
 }
 
 DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "10977601") {
@@ -251,6 +405,16 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetQueryShape, "109
 
     auto vtable = handle.vtable();
     vtable.get_query_shape = nullptr;
+    handle.assertVTableConstraints(vtable);
+};
+
+DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsGetExpandedSize, "11113800") {
+    auto noOpParseNode =
+        std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(NoOpParseNode::make());
+    auto handle = TestParseNodeVTableHandle{noOpParseNode.release()};
+
+    auto vtable = handle.vtable();
+    vtable.get_expanded_size = nullptr;
     handle.assertVTableConstraints(vtable);
 };
 
@@ -264,10 +428,9 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602")
     handle.assertVTableConstraints(vtable);
 };
 
-TEST(AggregationStageTest, NoOpAggregationStageAstNodeTest) {
+TEST(AggregationStageTest, NoOpAstNodeTest) {
     auto noOpAggregationStageAstNode =
-        std::make_unique<extension::sdk::ExtensionAggregationStageAstNode>(
-            NoOpAggregationStageAstNode::make());
+        std::make_unique<extension::sdk::ExtensionAggregationStageAstNode>(NoOpAstNode::make());
     auto handle = extension::host_adapter::ExtensionAggregationStageAstNodeHandle{
         noOpAggregationStageAstNode.release()};
 
@@ -275,8 +438,8 @@ TEST(AggregationStageTest, NoOpAggregationStageAstNodeTest) {
 }
 
 DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTable, "11113700") {
-    auto noOpAstNode = std::make_unique<extension::sdk::ExtensionAggregationStageAstNode>(
-        NoOpAggregationStageAstNode::make());
+    auto noOpAstNode =
+        std::make_unique<extension::sdk::ExtensionAggregationStageAstNode>(NoOpAstNode::make());
     auto handle = TestAstNodeVTableHandle{noOpAstNode.release()};
 
     auto vtable = handle.vtable();
