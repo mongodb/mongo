@@ -49,7 +49,7 @@ var $config = (function() {
 
             jsTestLog('Executing drop state: ' + coll.getFullName());
 
-            assert.commandWorkedIgnoringWriteConcernErrors(db.runCommand({drop: coll.getName()}));
+            assert.commandWorked(db.runCommand({drop: coll.getName()}));
         },
         rename: function(db, collName, connCache) {
             db = this.getRandomDb(db);
