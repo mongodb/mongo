@@ -45,7 +45,7 @@ TextNoOpMatchExpression::TextNoOpMatchExpression(TextParams params)
     _ftsQuery.setLanguage(std::move(params.language));
     _ftsQuery.setCaseSensitive(params.caseSensitive);
     _ftsQuery.setDiacriticSensitive(params.diacriticSensitive);
-    invariant(_ftsQuery.parse(fts::TEXT_INDEX_VERSION_INVALID));
+    tassert(_ftsQuery.parse(fts::TEXT_INDEX_VERSION_INVALID));
 }
 
 std::unique_ptr<MatchExpression> TextNoOpMatchExpression::clone() const {

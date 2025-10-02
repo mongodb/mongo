@@ -93,7 +93,9 @@ void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator) {
     // has a single CollatorInterface, and since that collator is kept on the ExpressionContext,
     // the collator pointer that we're propagating throughout the MatchExpression tree must match
     // the one inside the ExpressionContext.
-    invariant(collator == _expCtx->getCollator());
+    tassert(11052404,
+            "The MatchExpression collator must match the ExpressionContext one",
+            collator == _expCtx->getCollator());
     if (_rewriteResult && _rewriteResult->matchExpression()) {
         _rewriteResult->matchExpression()->setCollator(collator);
     }

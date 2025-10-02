@@ -78,8 +78,8 @@ public:
                                         Value(value),
                                         ElementPath::LeafArrayBehavior::kNoTraversal,
                                         ElementPath::NonLeafArrayBehavior::kMatchSubpath) {
-        invariant(_rhs.type() != BSONType::undefined);
-        invariant(_rhs.type() != BSONType::array);
+        tassert(11052405, "_rhs cannot be undefined", _rhs.type() != BSONType::undefined);
+        tassert(11052406, "_rhs cannot be an array", _rhs.type() != BSONType::array);
     }
 
     ~InternalExprComparisonMatchExpression() override = default;

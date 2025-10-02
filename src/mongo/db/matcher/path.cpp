@@ -126,7 +126,9 @@ void BSONElementIterator::reset(const ElementPath* path, const BSONObj& objectTo
 }
 
 void BSONElementIterator::_setTraversalStart(size_t suffixIndex, BSONElement elementToIterate) {
-    invariant(_path->fieldRef().numParts() >= suffixIndex);
+    tassert(11052423,
+            "suffixIndex cannot be greater than the number of parts in the path",
+            _path->fieldRef().numParts() >= suffixIndex);
 
     if (suffixIndex == _path->fieldRef().numParts()) {
         _traversalStart = elementToIterate;
@@ -305,7 +307,6 @@ bool BSONElementIterator::more() {
                     return true;
                 }
 
-                invariant(eltInArray.type() != BSONType::object);  // Handled above.
                 if (eltInArray.type() == BSONType::array) {
                     // The current array element is itself an array.  See if the nested array
                     // has any elements matching the remaining.

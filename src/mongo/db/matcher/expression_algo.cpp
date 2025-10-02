@@ -751,8 +751,8 @@ bool hasPredicateOnPaths(const MatchExpression& expr,
 
 bool isSubsetOf(const MatchExpression* lhs, const MatchExpression* rhs) {
     // lhs is the query and rhs is the index.
-    invariant(lhs);
-    invariant(rhs);
+    tassert(11052402, "lhs must not be null", lhs);
+    tassert(11052403, "rhs must not be null", rhs);
 
     if (lhs->equivalent(rhs)) {
         return true;

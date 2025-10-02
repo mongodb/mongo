@@ -275,7 +275,9 @@ public:
          */
         ErrorAnnotation(Mode mode)
             : tag(""), annotation(BSONObj()), mode(mode), schemaAnnotations(SchemaAnnotations()) {
-            invariant(mode != Mode::kGenerateError);
+            tassert(11052400,
+                    "Expected the mode to not be kGenerateError",
+                    mode != Mode::kGenerateError);
         }
 
         /**

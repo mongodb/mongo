@@ -47,7 +47,7 @@ namespace mongo {
 Status addAliasToTypeSet(StringData typeAlias,
                          const findBSONTypeAliasFun& aliasMapFind,
                          MatcherTypeSet* typeSet) {
-    invariant(typeSet);
+    tassert(11052422, "typeSet must not be null", typeSet);
 
     if (typeAlias == MatcherTypeSet::kMatchesAllNumbersAlias) {
         typeSet->allNumbers = true;

@@ -68,7 +68,7 @@ ComparisonMatchExpressionBase::ComparisonMatchExpressionBase(
       _backingBSONIsSet(false),
       _collator(collator) {
     setData(path, std::move(rhs));
-    invariant(!_rhs.eoo());
+    tassert(11052407, "rhs cannot be eoo", !_rhs.eoo());
 }
 
 // Instantiate above constructor for 'Value&&' and 'const BSONElement&' types.

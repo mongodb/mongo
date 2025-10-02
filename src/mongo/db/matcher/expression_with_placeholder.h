@@ -67,7 +67,7 @@ public:
     ExpressionWithPlaceholder(boost::optional<std::string> placeholder,
                               std::unique_ptr<MatchExpression> filter)
         : _placeholder(std::move(placeholder)), _filter(std::move(filter)) {
-        invariant(static_cast<bool>(_filter));
+        tassert(11052418, "filter must not be null", _filter);
     }
 
     /**

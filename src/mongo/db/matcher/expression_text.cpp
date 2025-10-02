@@ -92,7 +92,6 @@ const FTSAccessMethod* validateFTSIndex(OperationContext* opCtx, const Namespace
     uassert(ErrorCodes::IndexNotFound,
             "more than one text index found for $text query",
             idxMatches.size() < 2);
-    invariant(idxMatches.size() == 1);
 
     const IndexDescriptor* index = idxMatches[0];
     const FTSAccessMethod* fam = static_cast<const FTSAccessMethod*>(

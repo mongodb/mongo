@@ -173,7 +173,7 @@ TEST(InternalExprEqMatchExpression, EquivalentToClone) {
 
 DEATH_TEST_REGEX(InternalExprEqMatchExpression,
                  CannotCompareToArray,
-                 R"#(Invariant failure.*_rhs.type\(\) != BSONType::array)#") {
+                 "Tripwire assertion.*11052406") {
     auto operand = BSON("a" << BSON_ARRAY(1 << 2));
     InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
                                      operand.firstElement());
@@ -181,13 +181,15 @@ DEATH_TEST_REGEX(InternalExprEqMatchExpression,
 
 DEATH_TEST_REGEX(InternalExprEqMatchExpression,
                  CannotCompareToUndefined,
-                 R"#(Invariant failure.*_rhs.type\(\) != BSONType::undefined)#") {
+                 "Tripwire assertion.*11052405") {
     auto operand = BSON("a" << BSONUndefined);
     InternalExprEqMatchExpression eq(operand.firstElement().fieldNameStringData(),
                                      operand.firstElement());
 }
 
-DEATH_TEST_REGEX(InternalExprEqMatchExpression, CannotCompareToMissing, "Invariant failure.*_rhs") {
+DEATH_TEST_REGEX(InternalExprEqMatchExpression,
+                 CannotCompareToMissing,
+                 "Tripwire assertion.*11052407") {
     InternalExprEqMatchExpression eq("a"_sd, BSONElement());
 }
 }  // namespace

@@ -211,7 +211,7 @@ public:
      * in the hotpath.
      */
     void setBackingBSON(const BSONObj& obj) {
-        invariant(obj.isOwned());
+        tassert(11052408, "The backing obj must be owned", obj.isOwned());
         _backingBSON = obj;
         _backingBSONIsSet = true;
     }
@@ -319,7 +319,7 @@ public:
                             clonable_ptr<ErrorAnnotation> annotation = nullptr,
                             const CollatorInterface* collator = nullptr)
         : ComparisonMatchExpression(EQ, path, rhs, std::move(annotation), collator) {
-        invariant(!rhs.eoo());
+        tassert(11052409, "rhs cannot be eoo", !rhs.eoo());
     }
 
     StringData name() const final {
@@ -363,7 +363,7 @@ public:
                        const BSONElement& rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(LTE, path, rhs, std::move(annotation)) {
-        invariant(!rhs.eoo());
+        tassert(11052410, "rhs cannot be eoo", !rhs.eoo());
     }
 
     StringData name() const final {
@@ -407,7 +407,7 @@ public:
                       const BSONElement& rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(LT, path, rhs, std::move(annotation)) {
-        invariant(!rhs.eoo());
+        tassert(11052411, "rhs cannot be eoo", !rhs.eoo());
     }
 
     StringData name() const final {
@@ -456,7 +456,7 @@ public:
                       const BSONElement& rhs,
                       clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(GT, path, rhs, std::move(annotation)) {
-        invariant(!rhs.eoo());
+        tassert(11052412, "rhs cannot be eoo", !rhs.eoo());
     }
 
     StringData name() const final {
@@ -504,7 +504,7 @@ public:
                        const BSONElement& rhs,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : ComparisonMatchExpression(GTE, path, rhs, std::move(annotation)) {
-        invariant(!rhs.eoo());
+        tassert(11052413, "rhs cannot be eoo", !rhs.eoo());
     }
 
     StringData name() const final {
