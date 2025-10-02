@@ -135,7 +135,7 @@ void TimeseriesTestFixture::setUp() {
     _bucketCatalog = &bucket_catalog::GlobalBucketCatalog::get(_opCtx->getServiceContext());
 
     // Enables us to do data integrity checks on reopening and insert.
-    gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.store(100);
+    gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.store(true);
     gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening.store(true);
 
     // Create all collections with meta fields.

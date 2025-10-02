@@ -2901,17 +2901,8 @@ export class ReplSetTest {
                 options.setParameter.disableTransitionFromLatestToLastContinuous || false;
         }
 
-        const olderThan82 =
-            MongoRunner.compareBinVersions(
-                MongoRunner.getBinVersionFor(options.binVersion),
-                MongoRunner.getBinVersionFor("8.2"),
-            ) === -1;
         if (jsTestOptions().performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert) {
-            if (olderThan82) {
-                options.setParameter.performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert = true;
-            } else {
-                options.setParameter.performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert = 100;
-            }
+            options.setParameter.performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert = true;
         }
 
         if (this.useAutoBootstrapProcedure) {

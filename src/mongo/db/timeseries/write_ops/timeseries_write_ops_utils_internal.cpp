@@ -42,7 +42,6 @@
 #include "mongo/db/timeseries/write_ops/measurement.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/tracking/context.h"
@@ -446,16 +445,14 @@ void makeWriteRequestFromBatch(OperationContext* opCtx,
                                std::vector<mongo::write_ops::InsertCommandRequest>* insertOps,
                                std::vector<mongo::write_ops::UpdateCommandRequest>* updateOps) {
     if (batch->numPreviouslyCommittedMeasurements == 0) {
-        insertOps->push_back(makeTimeseriesInsertOpFromBatch(opCtx, batch, bucketsNs));
+        insertOps->push_back(makeTimeseriesInsertOpFromBatch(batch, bucketsNs));
         return;
     }
     updateOps->push_back(makeTimeseriesCompressedDiffUpdateOpFromBatch(opCtx, batch, bucketsNs));
 }
 
 mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
-    OperationContext* opCtx,
-    std::shared_ptr<bucket_catalog::WriteBatch> batch,
-    const NamespaceString& bucketsNs) {
+    std::shared_ptr<bucket_catalog::WriteBatch> batch, const NamespaceString& bucketsNs) {
     invariant(!batch->isReopened);
     BSONObj bucketToInsert;
     BucketDocument bucketDoc;
@@ -474,10 +471,7 @@ mongo::write_ops::InsertCommandRequest makeTimeseriesInsertOpFromBatch(
     bucketToInsert = makeTimeseriesInsertCompressedBucketDocument(batch, intermediates);
 
     // Extra verification that the insert op decompresses to the same values put in.
-    // We use a PseudoRandom to test frequency of checks, this is not cryptographically
-    // secure, but good enough for simple rate limiting on verifications.
-    if ((opCtx->getClient()->getPrng().nextInt32() % 100) <
-        gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load()) {
+    if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load()) {
         auto verifierFunction = makeVerifierFunction(batch, OperationSource::kTimeseriesInsert);
         verifierFunction(bucketToInsert, BSONObj());
     }
@@ -568,11 +562,8 @@ mongo::write_ops::UpdateOpEntry makeTimeseriesCompressedDiffEntry(
     bool changedToUnsorted) {
     // Verifier function that will be called when we apply the diff to our bucket and verify that
     // the measurements we inserted appear correctly in the resulting bucket's BSONColumns.
-    // We use a PseudoRandom to test frequency of checks, this is not cryptographically
-    // secure, but good enough for simple rate limiting on verifications.
     doc_diff::VerifierFunc verifierFunction = nullptr;
-    if ((opCtx->getClient()->getPrng().nextInt32() % 100) <
-            gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load() ||
+    if (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert.load() ||
         (gPerformTimeseriesCompressionIntermediateDataIntegrityCheckOnReopening.load() &&
          batch->isReopened)) {
         verifierFunction = makeVerifierFunction(batch, OperationSource::kTimeseriesUpdate);

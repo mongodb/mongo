@@ -145,7 +145,7 @@ config_fuzzer_params = {
         "oplogFetcherUsesExhaust": {"choices": [True, False], "fuzz_at": ["startup"]},
         # Default value False; we are enabling more data integrity checks during timeseries compression.
         "performTimeseriesCompressionIntermediateDataIntegrityCheckOnInsert": {
-            "choices": [0, 100],
+            "choices": [True, False],
             "period": 5,
             "fuzz_at": ["startup", "runtime"],
         },
