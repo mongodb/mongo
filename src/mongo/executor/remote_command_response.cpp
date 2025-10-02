@@ -87,11 +87,7 @@ bool RemoteCommandResponse::isOK() const {
     return status.isOK();
 }
 
-std::vector<std::string> RemoteCommandResponse::getErrorLabels() const {
-    if (!status.isOK()) {
-        return {};
-    }
-
+std::vector<std::string> extractErrorLabels(BSONObj data) {
     if (BSONElement errorLabelsElement = data["errorLabels"]; !errorLabelsElement.eoo()) {
         auto errorLabelsArray = errorLabelsElement.Array();
 
@@ -106,6 +102,14 @@ std::vector<std::string> RemoteCommandResponse::getErrorLabels() const {
     }
 
     return {};
+}
+
+std::vector<std::string> RemoteCommandResponse::getErrorLabels() const {
+    if (!status.isOK()) {
+        return {};
+    }
+
+    return extractErrorLabels(data);
 }
 
 bool RemoteCommandResponse::operator==(const RemoteCommandResponse& rhs) const {

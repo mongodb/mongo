@@ -38,7 +38,6 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/rpc/metadata/audit_metadata.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/async_rpc_shard_retry_policy.h"
 
 #include <cstddef>
 #include <utility>
@@ -79,6 +78,12 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
 
     std::vector<ExecutorFuture<async_rpc::AsyncRPCResponse<typename CommandType::Reply>>> futures;
     auto indexToShardId = std::make_shared<stdx::unordered_map<int, ShardId>>();
+    // We keep shared pointers to Shards to ensure they remain valid while
+    // accessing shard retry budgets during the lifetime of this call.
+    // TODO SERVER-111875: Remove this vector once the shard retry budget is tracked per shard ID
+    // instead of Shard instance.
+    std::vector<std::shared_ptr<Shard>> indexToShard;
+    indexToShard.reserve(shardIds.size());
 
     CancellationSource cancelSource(originalOpts->token);
 
@@ -86,18 +91,18 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
         std::unique_ptr<async_rpc::Targeter> targeter =
             std::make_unique<async_rpc::ShardIdTargeter>(
                 originalOpts->exec, opCtx, shardIds[i], readPref);
-        bool startTransaction = originalOpts->cmd.getStartTransaction()
-            ? *originalOpts->cmd.getStartTransaction()
-            : false;
-        auto retryPolicy = std::make_shared<async_rpc::ShardRetryPolicyWithIsStartingTransaction>(
-            Shard::RetryPolicy::kIdempotentOrCursorInvalidated, startTransaction);
+        auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardIds[i]));
+        auto retryStrategy = std::make_shared<Shard::RetryStrategy>(
+            *shard, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
         auto opts = std::make_shared<async_rpc::AsyncRPCOptions<CommandType>>(
-            originalOpts->exec, cancelSource.token(), originalOpts->cmd, retryPolicy);
+            originalOpts->exec, cancelSource.token(), originalOpts->cmd, retryStrategy);
         if (shardVersions) {
             opts->cmd.setShardVersion((*shardVersions)[i]);
         }
         futures.push_back(async_rpc::sendCommand<CommandType>(opts, opCtx, std::move(targeter)));
         (*indexToShardId)[i] = shardIds[i];
+        indexToShard.push_back(shard);
     }
 
     auto formatResponse = [](async_rpc::AsyncRPCResponse<typename CommandType::Reply> reply) {

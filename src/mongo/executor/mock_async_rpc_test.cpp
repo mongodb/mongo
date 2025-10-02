@@ -31,12 +31,12 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
+#include "mongo/client/retry_strategy.h"
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/async_rpc.h"
-#include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/async_rpc_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
@@ -76,11 +76,11 @@ public:
 
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> sendHelloCommandToHostAndPort(
         HostAndPort target,
-        std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
+        std::shared_ptr<mongo::RetryStrategy> retryStrategy = std::make_shared<NoRetryStrategy>()) {
         HelloCommand hello;
         initializeCommand(hello);
         auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
-            getExecutorPtr(), _cancellationToken, hello, retryPolicy);
+            getExecutorPtr(), _cancellationToken, hello, retryStrategy);
         return sendCommand(options, _opCtx.get(), std::make_unique<FixedTargeter>(target));
     }
 
@@ -236,19 +236,23 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, OnCommand) {
     ASSERT_BSONOBJ_EQ(responseFut.get().response.toBSON(), helloReply.toBSON());
 }
 
-TEST_F(SyncMockAsyncRPCRunnerTestFixture, SyncMockAsyncRPCRunnerWithRetryPolicy) {
-    const auto retryPolicy = std::make_shared<TestRetryPolicy>();
+TEST_F(SyncMockAsyncRPCRunnerTestFixture, SyncMockAsyncRPCRunnerWithRetryStrategy) {
+    const auto retryStrategy = std::make_shared<TestRetryStrategy>();
     const auto maxNumRetries = 1;
     const auto retryDelay = Milliseconds(100);
-    retryPolicy->setMaxNumRetries(maxNumRetries);
-    retryPolicy->pushRetryDelay(retryDelay);
+    retryStrategy->setMaxNumRetries(maxNumRetries);
+    retryStrategy->pushRetryDelay(retryDelay);
     auto responseFut =
-        sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port}, retryPolicy);
+        sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port}, retryStrategy);
 
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
-    BSONObjBuilder result(helloReply.toBSON());
-    CommandHelpers::appendCommandStatusNoThrow(result, Status::OK());
-    auto expectedResultObj = result.obj();
+    BSONObjBuilder resultError(helloReply.toBSON());
+    BSONObjBuilder resultOK(helloReply.toBSON());
+    CommandHelpers::appendCommandStatusNoThrow(
+        resultError, Status(ErrorCodes::Overflow, "test error code for retry"));
+    CommandHelpers::appendCommandStatusNoThrow(resultOK, Status::OK());
+    auto expectedResultErrorObj = resultError.obj();
+    auto expectedResultOKObj = resultOK.obj();
 
     HelloCommand hello;
     initializeCommand(hello);
@@ -257,7 +261,7 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, SyncMockAsyncRPCRunnerWithRetryPolicy)
         auto expected = hello;
         hello.setClientOperationKey(getOpKeyFromCommand(ri._cmd));
         ASSERT_BSONOBJ_EQ(hello.toBSON(), ri._cmd);
-        return expectedResultObj;
+        return expectedResultErrorObj;
     });
     auto net = getNetworkInterfaceMock();
     {
@@ -269,10 +273,10 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, SyncMockAsyncRPCRunnerWithRetryPolicy)
         auto expected = hello;
         hello.setClientOperationKey(getOpKeyFromCommand(ri._cmd));
         ASSERT_BSONOBJ_EQ(hello.toBSON(), ri._cmd);
-        return expectedResultObj;
+        return expectedResultOKObj;
     });
     ASSERT_BSONOBJ_EQ(responseFut.get().response.toBSON(), helloReply.toBSON());
-    ASSERT_EQ(maxNumRetries, retryPolicy->getNumRetriesPerformed());
+    ASSERT_EQ(maxNumRetries, retryStrategy->getNumRetriesPerformed());
 }
 
 // A simple test showing that we can asynchronously register an expectation
@@ -371,7 +375,7 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectRemoteError) {
     ASSERT_EQ(remoteErr.getTargetUsed(), getLocalHost());
 }
 
-TEST_F(AsyncMockAsyncRPCRunnerTestFixture, AsyncMockAsyncRPCRunnerWithRetryPolicy) {
+TEST_F(AsyncMockAsyncRPCRunnerTestFixture, AsyncMockAsyncRPCRunnerWithRetryStrategy) {
     // We expect that some code will use the runner to send a hello
     // to localhost on "testdb".
     auto matcher = [](const AsyncMockAsyncRPCRunner::Request& req) {
@@ -383,7 +387,8 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, AsyncMockAsyncRPCRunnerWithRetryPolic
     // Register our expectation and ensure it isn't yet met.
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
     BSONObjBuilder firstResult(helloReply.toBSON());
-    CommandHelpers::appendCommandStatusNoThrow(firstResult, Status::OK());
+    CommandHelpers::appendCommandStatusNoThrow(
+        firstResult, Status(ErrorCodes::Overflow, "test error code for retry"));
     BSONObjBuilder secondResult(helloReply.toBSON());
     CommandHelpers::appendCommandStatusNoThrow(secondResult, Status::OK());
 
@@ -394,14 +399,14 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, AsyncMockAsyncRPCRunnerWithRetryPolic
     ASSERT_FALSE(firstExpectation.isReady());
     ASSERT_FALSE(secondExpectation.isReady());
 
-    const auto retryPolicy = std::make_shared<TestRetryPolicy>();
+    const auto retryStrategy = std::make_shared<TestRetryStrategy>();
     const auto maxNumRetries = 1;
     const auto retryDelay = Milliseconds(100);
-    retryPolicy->setMaxNumRetries(maxNumRetries);
-    retryPolicy->pushRetryDelay(retryDelay);
+    retryStrategy->setMaxNumRetries(maxNumRetries);
+    retryStrategy->pushRetryDelay(retryDelay);
     // Allow a request to be scheduled on the mock.
     auto response =
-        sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port}, retryPolicy);
+        sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port}, retryStrategy);
 
     // Now, our first expectation should be met.
     firstExpectation.get();
@@ -418,7 +423,7 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, AsyncMockAsyncRPCRunnerWithRetryPolic
     secondExpectation.get();
     ASSERT_BSONOBJ_EQ(reply.response.toBSON(), helloReply.toBSON());
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), reply.targetUsed);
-    ASSERT_EQ(maxNumRetries, retryPolicy->getNumRetriesPerformed());
+    ASSERT_EQ(maxNumRetries, retryStrategy->getNumRetriesPerformed());
 }
 
 // A more complicated test that registers several expectations, and then

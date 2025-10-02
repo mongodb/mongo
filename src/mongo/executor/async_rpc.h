@@ -48,7 +48,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/executor/async_rpc_error_info.h"
-#include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
@@ -111,17 +110,22 @@ struct AsyncRPCResponse<void> {
 
 template <typename CommandType>
 struct AsyncRPCOptions {
-    AsyncRPCOptions(const std::shared_ptr<executor::TaskExecutor>& exec,
-                    CancellationToken token,
-                    const CommandType& cmd,
-                    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
-                    BatonHandle baton = nullptr)
-        : exec{exec}, token{token}, cmd{cmd}, retryPolicy{retryPolicy}, baton{std::move(baton)} {}
+    AsyncRPCOptions(
+        const std::shared_ptr<executor::TaskExecutor>& exec,
+        CancellationToken token,
+        const CommandType& cmd,
+        std::shared_ptr<mongo::RetryStrategy> retryStrategy = std::make_shared<NoRetryStrategy>(),
+        BatonHandle baton = nullptr)
+        : exec{exec},
+          token{token},
+          cmd{cmd},
+          retryStrategy{retryStrategy},
+          baton{std::move(baton)} {}
 
     std::shared_ptr<executor::TaskExecutor> exec;
     CancellationToken token;
     CommandType cmd;
-    std::shared_ptr<RetryPolicy> retryPolicy;
+    std::shared_ptr<mongo::RetryStrategy> retryStrategy;
     BatonHandle baton;
 };
 
@@ -197,11 +201,11 @@ inline Status makeErrorIfNeeded(TaskExecutor::ResponseStatus r) {
  * Adaptor that allows a RetryPolicy to be used with AsyncTry::withBackoffBetweenIterations.
  */
 struct RetryDelayAsBackoff {
-    RetryDelayAsBackoff(RetryPolicy* policy) : _policy{policy} {}
-    Milliseconds nextSleep() {
-        return _policy->getNextRetryDelay();
+    RetryDelayAsBackoff(mongo::RetryStrategy* strategy) : _strategy{strategy} {}
+    Milliseconds nextSleep() const {
+        return _strategy->getNextRetryDelay();
     }
-    RetryPolicy* _policy;
+    mongo::RetryStrategy* _strategy;
 };
 
 class ProxyingExecutor : public OutOfLineExecutor,
@@ -253,11 +257,36 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
     auto resFuture =
         AsyncTry<decltype(tryBody)>(std::move(tryBody))
             .until([options](StatusWith<detail::AsyncRPCInternalResponse> swResponse) {
-                bool shouldStopRetry = options->token.isCanceled() ||
-                    !options->retryPolicy->recordAndEvaluateRetry(swResponse.getStatus());
-                return shouldStopRetry;
+                if (options->token.isCanceled()) {
+                    return true;
+                }
+                auto s = swResponse.getStatus();
+                if (s.isOK()) {
+                    auto successResponse = swResponse.getValue();
+                    options->retryStrategy->recordSuccess(successResponse.targetUsed);
+                    return true;
+                }
+                if (s.code() != ErrorCodes::RemoteCommandExecutionError) {
+                    return true;
+                }
+
+                auto extraInfo = s.extraInfo<AsyncRPCErrorInfo>();
+                auto target = extraInfo->getTargetAttempted();
+                bool shouldRetry = false;
+
+                if (extraInfo->isLocal()) {
+                    shouldRetry = options->retryStrategy->recordFailureAndEvaluateShouldRetry(
+                        extraInfo->asLocal(), target, {});
+                } else if (extraInfo->isRemote()) {
+                    auto errorLabels =
+                        executor::extractErrorLabels(extraInfo->asRemote().getResponseObj());
+                    shouldRetry = options->retryStrategy->recordFailureAndEvaluateShouldRetry(
+                        extraInfo->asRemote().getRemoteCommandResult(), target, errorLabels);
+                }
+
+                return !shouldRetry;
             })
-            .withBackoffBetweenIterations(RetryDelayAsBackoff(options->retryPolicy.get()))
+            .withBackoffBetweenIterations(RetryDelayAsBackoff(options->retryStrategy.get()))
             .on(proxyExec, CancellationToken::uncancelable());
 
     return std::move(resFuture)

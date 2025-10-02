@@ -54,6 +54,7 @@ class ReplyInterface;
 
 namespace executor {
 
+std::vector<std::string> extractErrorLabels(BSONObj data);
 
 /**
  * Type of object describing the response of previously sent RemoteCommandRequest.

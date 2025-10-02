@@ -731,7 +731,6 @@ networking.execution:
     - src/mongo/executor/pinned_connection_task_executor*
     - src/mongo/s/append_raw_responses_test.cpp
     - src/mongo/s/async_requests_sender*
-    - src/mongo/s/async_rpc_shard_retry_policy.h
     - src/mongo/s/async_rpc_shard_targeter*
     - src/mongo/s/sharding_task_executor*
 

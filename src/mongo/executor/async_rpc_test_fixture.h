@@ -33,7 +33,6 @@
 #include "mongo/db/repl/hello/hello_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/async_rpc.h"
-#include "mongo/executor/async_rpc_retry_policy.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/task_executor.h"
@@ -56,28 +55,40 @@ using executor::NetworkTestEnv;
 using executor::ThreadPoolMock;
 using executor::ThreadPoolTaskExecutor;
 
-class TestRetryPolicy : public RetryPolicy {
+class TestRetryStrategy : public mongo::RetryStrategy {
 public:
-    bool recordAndEvaluateRetry(Status s) final {
+    bool recordFailureAndEvaluateShouldRetry(Status s,
+                                             const boost::optional<HostAndPort>& target,
+                                             std::span<const std::string> errorLabels) final {
         if (_numRetriesPerformed == _maxRetries) {
             return false;
         }
         ++_numRetriesPerformed;
+
+        // Pop and save the next retry delay when we decide to retry
+        if (!_retryDelays.empty()) {
+            _nextRetryDelay = _retryDelays.front();
+            _retryDelays.pop_front();
+        }
+
         return true;
     }
 
-    Milliseconds getNextRetryDelay() final {
-        auto&& out = _retryDelays.front();
-        _retryDelays.pop_front();
-        return out;
+    Milliseconds getNextRetryDelay() const final {
+        return _nextRetryDelay;
+    }
+
+    void recordSuccess(const boost::optional<HostAndPort>& target) final {
+        // Noop, as there's nothing to cleanup on success.
+    }
+
+    const TargetingMetadata& getTargetingMetadata() const final {
+        static const TargetingMetadata emptyMetadata{};
+        return emptyMetadata;
     }
 
     void pushRetryDelay(Milliseconds retryDelay) {
         _retryDelays.push_back(retryDelay);
-    }
-
-    BSONObj toBSON() const final {
-        return BSON("retryPolicyType" << "TestRetryPolicy");
     }
 
     void setMaxNumRetries(int maxRetries) {
@@ -90,6 +101,7 @@ public:
 
 private:
     int _numRetriesPerformed, _maxRetries = 0;
+    Milliseconds _nextRetryDelay{0};  // Current retry delay
     std::deque<Milliseconds> _retryDelays;
 };
 
@@ -157,7 +169,7 @@ public:
         return _net.get();
     }
 
-    void scheduleRequestAndAdvanceClockForRetry(std::shared_ptr<RetryPolicy> retryPolicy,
+    void scheduleRequestAndAdvanceClockForRetry(std::shared_ptr<mongo::RetryStrategy> retryStrategy,
                                                 NetworkTestEnv::OnCommandFunction onCommandFunc,
                                                 Milliseconds advanceBy) {
         auto net = getNetworkInterfaceMock();
