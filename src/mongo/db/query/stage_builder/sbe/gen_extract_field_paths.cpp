@@ -144,11 +144,12 @@ std::pair<SbStage, PlanStageSlots> buildExtractFieldPaths(SbStage stage,
     tassert(10757507, "expected nonempty outSlots", !outSlots.empty());
     auto childResultSlot = childStageOutputs.getResultObj();
 
+    const PlanNodeId nodeId = stage->getCommonStats()->nodeId;
     return {sbe::makeS<sbe::ExtractFieldPathsStage>(std::move(stage),
                                                     childResultSlot.getId(),
                                                     pathReqs,  // TODO this is by value
                                                     std::move(outSlots),
-                                                    stage->getCommonStats()->nodeId),
+                                                    nodeId),
             extractionOutputs};
 }
 }  // namespace mongo::stage_builder
