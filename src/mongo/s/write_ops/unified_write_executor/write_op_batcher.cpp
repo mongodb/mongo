@@ -209,7 +209,7 @@ void WriteOpBatcher::markBatchReprocess(WriteBatch batch) {
 
 WriteOpBatcher::Result OrderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
                                                            RoutingContext& routingCtx) {
-    const bool inTransaction = opCtx && TransactionRouter::get(opCtx);
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     std::vector<std::pair<WriteOp, Status>> opsWithErrors;
     OrderedSimpleBatchBuilder builder(*this);
@@ -327,7 +327,7 @@ WriteOpBatcher::Result OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
 
 WriteOpBatcher::Result UnorderedWriteOpBatcher::getNextBatch(OperationContext* opCtx,
                                                              RoutingContext& routingCtx) {
-    const bool inTransaction = opCtx && TransactionRouter::get(opCtx);
+    const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
 
     // When this method returns (or when an exception is thrown), mark the ops in 'opsToReprocess'
     // for re-processing.

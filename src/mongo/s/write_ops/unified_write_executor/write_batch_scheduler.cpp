@@ -38,7 +38,7 @@ namespace mongo {
 namespace unified_write_executor {
 
 void WriteBatchScheduler::run(OperationContext* opCtx) {
-    // The loop below uses an expontential backoff scheme that kicks in when there are one or more
+    // The loop below uses an exponential backoff scheme that kicks in when there are one or more
     // consecutive rounds that don't make progress. If there are too many consecutive rounds without
     // progress, this function will eventually give up and fail with an error. These variables are
     // used to implement this mechanism.
@@ -62,7 +62,7 @@ void WriteBatchScheduler::run(OperationContext* opCtx) {
             break;
         }
 
-        // If no progress was made during the previous round, do expontential backoff before
+        // If no progress was made during the previous round, do exponential backoff before
         // starting this round.
         if (numRoundsWithoutProgress > 0) {
             sleepFor(backoff.nextSleep());

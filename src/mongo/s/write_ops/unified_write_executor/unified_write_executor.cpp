@@ -45,10 +45,6 @@ namespace unified_write_executor {
 
 namespace {
 bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
-    if (!opCtx) {
-        return false;
-    }
-
     // When determining if a write command is non-verbose, we follow slightly different rules
     // for batch write commands vs. bulk write commands. For batch write commands, we match the
     // existing behavior of BatchWriteOp::buildClientResponse(). For bulk write commands, we
@@ -67,6 +63,9 @@ bool isNonVerboseWriteCommand(OperationContext* opCtx, WriteCommandRef cmdRef) {
 WriteCommandResponse executeWriteCommand(OperationContext* opCtx,
                                          WriteCommandRef cmdRef,
                                          BSONObj originalCommand) {
+
+    tassert(11123700, "OperationContext must not be null", opCtx);
+
     const bool isNonVerbose = isNonVerboseWriteCommand(opCtx, cmdRef);
 
     Stats stats;
