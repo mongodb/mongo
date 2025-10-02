@@ -2225,7 +2225,7 @@ inline FastTuple<bool, value::TypeTags, value::Value> numericConvLossless(
             return {false, value::TypeTags::Nothing, 0};
         }
         default:
-            MONGO_UNREACHABLE
+            MONGO_UNREACHABLE_TASSERT(11122923);
     }
 }
 
@@ -2263,7 +2263,7 @@ public:
             _objectCurrent = bson + 4;
             _objectEnd = bson + ConstDataView(bson).read<LittleEndian<uint32_t>>();
         } else {
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122924);
         }
     }
     std::pair<TypeTags, Value> getViewOfValue() const;
@@ -2331,7 +2331,7 @@ public:
                     _fieldNameSize = strlen(_arrayCurrent + 1);
                 }
             } else {
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122925);
             }
 
             for (size_t i = 0; !atEnd() && i < index; i++) {

@@ -109,7 +109,7 @@ inline std::pair<TypeTags, Value> genericCompare(TypeTags lhsTag,
                 return {TypeTags::Boolean, bitcastFrom<bool>(result)};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122913);
         }
     } else if (isStringOrSymbol(lhsTag) && isStringOrSymbol(rhsTag)) {
         auto lhsStr = getStringOrSymbolView(lhsTag, lhsValue);

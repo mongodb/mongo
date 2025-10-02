@@ -84,7 +84,7 @@ Date_t getDate(value::TypeTags dateTag, value::Value dateVal) {
             return objId.asDateT();
         }
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122948);
     }
 }
 

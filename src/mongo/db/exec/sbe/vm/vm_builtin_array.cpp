@@ -594,7 +594,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsArrayEmpty(Ari
     } else {
         // Earlier in this function we bailed out if the 'arrayType' wasn't Array, ArraySet or
         // bsonArray, so it should be impossible to reach this point.
-        MONGO_UNREACHABLE
+        MONGO_UNREACHABLE_TASSERT(11122942);
     }
 }
 
@@ -655,7 +655,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(Ari
         // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
         // this point.
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122943);
     }
 }  // ByteCode::builtinReverseArray
 
@@ -746,7 +746,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortArray(ArityT
         // Earlier in this function we bailed out if the 'inputType' wasn't
         // Array, ArraySet or bsonArray, so it should be impossible to reach
         // this point.
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122944);
     }
 }  // ByteCode::builtinSortArray
 

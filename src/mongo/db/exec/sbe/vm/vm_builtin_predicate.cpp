@@ -81,7 +81,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRunJsPredicate(A
     } else if (inputType == value::TypeTags::bsonObject) {
         obj = BSONObj(value::getRawPointerView(inputValue));
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122945);
     }
 
     auto predicate = value::getJsFunctionView(predicateValue);

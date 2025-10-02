@@ -294,7 +294,7 @@ vm::CodeFragment EPrimNary::compileDirect(CompileCtx& ctx) const {
                 code.appendMul(lhsParam, rhsParam);
                 break;
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122900);
         }
     };
 
@@ -328,7 +328,7 @@ std::vector<DebugPrinter::Block> EPrimNary::debugPrint() const {
                     ret.emplace_back("*");
                     break;
                 default:
-                    MONGO_UNREACHABLE;
+                    MONGO_UNREACHABLE_TASSERT(11122901);
             }
         }
     }
@@ -453,7 +453,7 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
                            : code.appendCmp3w(lhsParam, rhsParam);
             break;
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122902);
     }
     return code;
 }
@@ -535,7 +535,7 @@ std::vector<DebugPrinter::Block> EPrimBinary::debugPrint() const {
             ret.emplace_back("<=>");
             break;
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122903);
     }
 
     if (hasCollatorArg) {
@@ -565,14 +565,14 @@ vm::CodeFragment EPrimUnary::compileDirect(CompileCtx& ctx) const {
     auto param = appendParameter(code, ctx, _nodes[0].get());
 
     switch (_op) {
-        case negate:
+        case EPrimUnary::negate:
             code.appendNegate(param);
             break;
         case EPrimUnary::logicNot:
             code.appendNot(param);
             break;
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122904);
     }
     return code;
 }
@@ -588,7 +588,7 @@ std::vector<DebugPrinter::Block> EPrimUnary::debugPrint() const {
             ret.emplace_back("!");
             break;
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122905);
     }
 
     ret.emplace_back("`(`");
@@ -1850,7 +1850,7 @@ std::vector<DebugPrinter::Block> ENumericConvert::debugPrint() const {
             ret.emplace_back("decimal");
             break;
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122906);
     }
 
     ret.emplace_back("`)");

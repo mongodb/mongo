@@ -353,7 +353,7 @@ public:
     // This function should never be executed
     // since ExchangeProducer is not created in compile time.
     size_t estimateCompileTimeSize() const final {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122908);
     }
 
 protected:

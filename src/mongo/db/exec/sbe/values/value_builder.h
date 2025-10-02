@@ -362,7 +362,7 @@ private:
                     return {true, tag, val};
                 }
                 default:
-                    MONGO_UNREACHABLE;
+                    MONGO_UNREACHABLE_TASSERT(11122920);
             }
         }
         return {false, tag, val};

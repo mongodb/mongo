@@ -261,7 +261,7 @@ static std::pair<TypeTags, Value> deserializeValue(BufReader& buf,
             break;
         }
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122914);
     }
 
     return {tag, val};
@@ -432,7 +432,7 @@ static void serializeValue(BufBuilder& buf, TypeTags tag, Value val) {
             break;
         }
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122915);
     }
 }
 
@@ -641,7 +641,7 @@ static void serializeValueIntoKeyString(key_string::Builder& buf,
             break;
         }
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122916);
     }
 }
 
@@ -853,7 +853,7 @@ int getApproximateSize(TypeTags tag, Value val) {
             result += getExtendedTypeOps(tag)->getApproximateSize(val);
             break;
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122917);
     }
     return result;
 }

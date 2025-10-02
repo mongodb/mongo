@@ -647,7 +647,7 @@ PlanState ExchangeProducer::getNext() {
                 }
             } break;
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122907);
                 break;
         }
     }

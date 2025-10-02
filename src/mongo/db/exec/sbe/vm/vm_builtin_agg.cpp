@@ -2177,7 +2177,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggRemovableAvgFinalize
         auto [avgTag, avgVal] = value::makeCopyDecimal(avg);
         return {true, avgTag, avgVal};
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122938);
     }
 }
 
@@ -2349,7 +2349,7 @@ void ByteCode::aggRemovableSumImpl(value::Array* state,
         updateRemovableSumState(
             state, nanCount, posInfinityCount, negInfinityCount, doubleCount, decimalCount);
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122939);
     }
 }
 

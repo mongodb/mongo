@@ -170,7 +170,7 @@ FastTuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeTa
                 return {true, tag, val};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122909);
         }
     } else if (lhsTag == TypeTags::Date || rhsTag == TypeTags::Date) {
         if (isNumber(lhsTag)) {
@@ -293,7 +293,7 @@ FastTuple<bool, value::TypeTags, value::Value> genericNumConvert(value::TypeTags
                 return numericConvLossless<Decimal128>(value::bitcastTo<Decimal128>(lhsValue),
                                                        targetTag);
             default:
-                MONGO_UNREACHABLE
+                MONGO_UNREACHABLE_TASSERT(11122910);
         }
     }
     return {false, value::TypeTags::Nothing, 0};

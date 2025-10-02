@@ -81,7 +81,7 @@ bool arrayAny(TypeTags tag, Value val, const Cb& cb) {
             }
         }
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122918);
     }
     return false;
 }
@@ -160,7 +160,7 @@ inline void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
             invokeCb(cb, t, v, nullptr /*rawBson*/);
         }
     } else {
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122919);
     }
 }
 

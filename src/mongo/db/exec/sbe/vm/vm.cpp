@@ -189,7 +189,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::getElement(value::TypeT
     } else {
         // Earlier in this function we bailed out if the 'arrTag' wasn't Array, ArraySet or
         // bsonArray, so it should be impossible to reach this point.
-        MONGO_UNREACHABLE
+        MONGO_UNREACHABLE_TASSERT(11122951);
     }
 }
 

@@ -600,7 +600,7 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
                 return {TypeTags::NumberInt32, bitcastFrom<int32_t>(result)};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122922);
         }
     } else if (isStringOrSymbol(lhsTag) && isStringOrSymbol(rhsTag)) {
         auto lhsStr = getStringOrSymbolView(lhsTag, lhsValue);

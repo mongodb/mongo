@@ -988,7 +988,7 @@ bool tryHomogeneousFastPath(TopBottomSense sense,
                     homogeneousTopBottomHelper<Less, double>(isAscending, bitsetVals, sortKeyVals);
                 break;
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122936);
         }
 
         if (bestIdx == bitsetVals.size()) {
@@ -1852,7 +1852,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinValueBlockArithm
         }
 
     } else {
-        MONGO_UNREACHABLE
+        MONGO_UNREACHABLE_TASSERT(11122937);
     }
 }
 

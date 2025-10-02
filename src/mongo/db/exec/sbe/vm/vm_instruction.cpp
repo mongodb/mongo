@@ -830,7 +830,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                                      value::bitcastFrom<int32_t>(1));
                             break;
                         default:
-                            MONGO_UNREACHABLE;
+                            MONGO_UNREACHABLE_TASSERT(11122949);
                     }
                 }
                 break;
@@ -1416,7 +1416,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
 
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122950);
         }
     }
 }  // ByteCode::runInternal

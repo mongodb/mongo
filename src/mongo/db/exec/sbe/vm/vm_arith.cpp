@@ -314,7 +314,7 @@ FastTuple<bool, value::TypeTags, value::Value> genericTrigonometricFun(value::Ty
                 return {true, resTag, resValue};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122926);
         }
     }
     return {false, value::TypeTags::Nothing, 0};
@@ -743,7 +743,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericDiv(value::TypeT
                 return {true, tag, val};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122927);
         }
     }
 
@@ -797,7 +797,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericIDiv(value::Type
                 return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(result)};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122928);
         }
     }
 
@@ -840,7 +840,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericMod(value::TypeT
                 return {true, tag, val};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122929);
         }
     }
 
@@ -908,7 +908,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericCeil(value::Type
                 // Ceil on integer values is the identity function.
                 return {false, operandTag, operandValue};
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122930);
         }
     }
 
@@ -935,7 +935,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericFloor(value::Typ
                 // Floor on integer values is the identity function.
                 return {false, operandTag, operandValue};
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122931);
         }
     }
 
@@ -1156,7 +1156,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericPow(value::TypeT
         }
 
         // We should have checked earlier that 0 to a negative power is banned.
-        MONGO_UNREACHABLE;
+        MONGO_UNREACHABLE_TASSERT(11122932);
     } else if (baseLong == 1) {
         // 1^x = 1.
         return formatResult(1);
@@ -1267,7 +1267,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericAtan2(value::Typ
                 return {true, resTag, resValue};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122933);
         }
     }
     return {false, value::TypeTags::Nothing, 0};
@@ -1300,7 +1300,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericDegreesToRadians
                 return {true, resTag, resValue};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122934);
         }
     }
     return {false, value::TypeTags::Nothing, 0};
@@ -1323,7 +1323,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericRadiansToDegrees
                 return {true, resTag, resValue};
             }
             default:
-                MONGO_UNREACHABLE;
+                MONGO_UNREACHABLE_TASSERT(11122935);
         }
     }
     return {false, value::TypeTags::Nothing, 0};

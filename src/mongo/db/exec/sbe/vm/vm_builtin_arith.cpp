@@ -193,7 +193,7 @@ int32_t ByteCode::convertNumericToInt32(const value::TypeTags tag, const value::
             return dec.toInt(Decimal128::kRoundTiesToEven);
         }
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122940);
     }
 }
 
@@ -369,7 +369,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoubleSum(
                             value::bitcastFrom<double>(sum.getDouble())};
                 }
                 default:
-                    MONGO_UNREACHABLE;
+                    MONGO_UNREACHABLE_TASSERT(11122941);
             }
         }
     }

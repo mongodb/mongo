@@ -404,7 +404,7 @@ void appendValueToBsonArr(ArrayBuilder& builder, value::TypeTags tag, value::Val
             break;
         }
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122911);
     }
 }
 
@@ -522,7 +522,7 @@ void appendValueToBsonObj(ObjBuilder& builder,
             break;
         }
         default:
-            MONGO_UNREACHABLE;
+            MONGO_UNREACHABLE_TASSERT(11122912);
     }
 }
 
