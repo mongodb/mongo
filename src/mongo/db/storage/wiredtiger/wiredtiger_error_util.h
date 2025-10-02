@@ -50,8 +50,28 @@ void throwAppropriateException(bool txnTooLargeEnabled,
                                double cacheThreshold,
                                StringData prefix,
                                int retCode);
+
+/**
+ * Dumps the origin of an error code and the stacktrace from WiredTiger.
+ */
+void dumpErrorLog();
+
 Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix);
 Status wtRCToStatus_slow(int retCode, WiredTigerSession& session, StringData prefix);
+
+inline Status wtRCToStatus_error(int retCode, WT_SESSION* session, const char* prefix = nullptr) {
+    invariant(retCode != 0);
+    dumpErrorLog();
+    return wtRCToStatus_slow(retCode, session, prefix);
+}
+
+inline Status wtRCToStatus_error(int retCode,
+                                 WiredTigerSession& session,
+                                 const char* prefix = nullptr) {
+    invariant(retCode != 0);
+    dumpErrorLog();
+    return wtRCToStatus_slow(retCode, session, prefix);
+}
 
 /**
  * converts wiredtiger return codes to mongodb statuses.
@@ -90,25 +110,25 @@ inline void uassertWTOK(int ret, WT_SESSION* session) {
     uassertStatusOK(wtRCToStatus(ret, session));
 }
 
-#define MONGO_invariantWTOK_2(expression, session)                           \
-    do {                                                                     \
-        int _invariantWTOK_retCode = expression;                             \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                   \
-            invariantOKFailed(#expression,                                   \
-                              wtRCToStatus(_invariantWTOK_retCode, session), \
-                              MONGO_SOURCE_LOCATION());                      \
-        }                                                                    \
+#define MONGO_invariantWTOK_2(expression, session)                                 \
+    do {                                                                           \
+        int _invariantWTOK_retCode = expression;                                   \
+        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                         \
+            invariantOKFailed(#expression,                                         \
+                              wtRCToStatus_error(_invariantWTOK_retCode, session), \
+                              MONGO_SOURCE_LOCATION());                            \
+        }                                                                          \
     } while (false)
 
-#define MONGO_invariantWTOK_3(expression, session, contextExpr)                     \
-    do {                                                                            \
-        int _invariantWTOK_retCode = expression;                                    \
-        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                          \
-            invariantOKFailedWithMsg(#expression,                                   \
-                                     wtRCToStatus(_invariantWTOK_retCode, session), \
-                                     contextExpr,                                   \
-                                     MONGO_SOURCE_LOCATION());                      \
-        }                                                                           \
+#define MONGO_invariantWTOK_3(expression, session, contextExpr)                           \
+    do {                                                                                  \
+        int _invariantWTOK_retCode = expression;                                          \
+        if (MONGO_unlikely(_invariantWTOK_retCode != 0)) {                                \
+            invariantOKFailedWithMsg(#expression,                                         \
+                                     wtRCToStatus_error(_invariantWTOK_retCode, session), \
+                                     contextExpr,                                         \
+                                     MONGO_SOURCE_LOCATION());                            \
+        }                                                                                 \
     } while (false)
 
 #define MONGO_invariantWTOK_EXPAND(x) x /**< MSVC workaround */
