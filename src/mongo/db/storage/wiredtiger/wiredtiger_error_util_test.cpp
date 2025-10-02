@@ -40,38 +40,28 @@ class WiredTigerUtilHelperTest : public unittest::Test {
 public:
     struct TestCase {
         bool txnTooLarge;
-        bool tempUnavailable;
         bool cacheInsufficient;
         int sub_level_err;
     };
 
     void throwsWriteConflictException(TestCase testCase, ErrorCodes::Error err) {
-        ASSERT_THROWS_CODE(throwAppropriateException(testCase.txnTooLarge,
-                                                     testCase.tempUnavailable,
-                                                     session,
-                                                     cacheThreshold,
-                                                     prefix,
-                                                     retCode),
+        ASSERT_THROWS_CODE(throwAppropriateException(
+                               testCase.txnTooLarge, session, cacheThreshold, prefix, retCode),
                            StorageUnavailableException,
                            err)
             << "Expected " << ErrorCodes::errorString(err)
             << " error for txnTooLargeEnabled: " << testCase.txnTooLarge
-            << ", temporarilyUnavailableEnabled: " << testCase.tempUnavailable
             << ", and sub_level_err: " << subLevelErrorToString(testCase.sub_level_err);
     }
 
     void throwsCachePressureException(TestCase testCase, ErrorCodes::Error err) {
-        ASSERT_THROWS_CODE(throwCachePressureExceptionIfAppropriate(testCase.txnTooLarge,
-                                                                    testCase.tempUnavailable,
-                                                                    testCase.cacheInsufficient,
-                                                                    reason,
-                                                                    prefix,
-                                                                    retCode),
-                           StorageUnavailableException,
-                           err)
+        ASSERT_THROWS_CODE(
+            throwCachePressureExceptionIfAppropriate(
+                testCase.txnTooLarge, testCase.cacheInsufficient, reason, prefix, retCode),
+            StorageUnavailableException,
+            err)
             << "Expected " << ErrorCodes::errorString(err)
             << " error for txnTooLargeEnabled: " << testCase.txnTooLarge
-            << ", temporarilyUnavailableEnabled: " << testCase.tempUnavailable
             << ", cacheIsInsufficientForTransaction: " << testCase.cacheInsufficient
             << ", and sub_level_err: " << subLevelErrorToString(testCase.sub_level_err);
     }
@@ -119,22 +109,8 @@ TEST_F(WiredTigerUtilHelperTest, throwTransactionTooLargeForCacheException) {
     // cache is insufficient for transaction, and reason for rollback was cache pressure. Also
     // throws TransactionTooLargeForCacheException even if temporarilyUnavailableEnabled is enabled.
     std::vector<TestCase> transactionTooLargeTestCases = {
-        {.txnTooLarge = true,
-         .tempUnavailable = false,
-         .cacheInsufficient = true,
-         .sub_level_err = WT_OLDEST_FOR_EVICTION},
-        {.txnTooLarge = true,
-         .tempUnavailable = false,
-         .cacheInsufficient = true,
-         .sub_level_err = WT_CACHE_OVERFLOW},
-        {.txnTooLarge = true,
-         .tempUnavailable = true,
-         .cacheInsufficient = true,
-         .sub_level_err = WT_OLDEST_FOR_EVICTION},
-        {.txnTooLarge = true,
-         .tempUnavailable = true,
-         .cacheInsufficient = true,
-         .sub_level_err = WT_CACHE_OVERFLOW},
+        {.txnTooLarge = true, .cacheInsufficient = true, .sub_level_err = WT_OLDEST_FOR_EVICTION},
+        {.txnTooLarge = true, .cacheInsufficient = true, .sub_level_err = WT_CACHE_OVERFLOW},
     };
 
     for (auto testCase : transactionTooLargeTestCases) {
@@ -147,30 +123,12 @@ TEST_F(WiredTigerUtilHelperTest, throwTemporarilyUnavailableException) {
         // If both or one of txnTooLargeEnabled and cacheIsInsufficientForTransaction are false,
         // throws TemporarilyUnavailableException if it is enabled and rollback reason was cache
         // pressure.
-        {.txnTooLarge = false,
-         .tempUnavailable = true,
-         .cacheInsufficient = false,
-         .sub_level_err = WT_OLDEST_FOR_EVICTION},
-        {.txnTooLarge = false,
-         .tempUnavailable = true,
-         .cacheInsufficient = false,
-         .sub_level_err = WT_CACHE_OVERFLOW},
-        {.txnTooLarge = false,
-         .tempUnavailable = true,
-         .cacheInsufficient = true,
-         .sub_level_err = WT_OLDEST_FOR_EVICTION},
-        {.txnTooLarge = false,
-         .tempUnavailable = true,
-         .cacheInsufficient = true,
-         .sub_level_err = WT_CACHE_OVERFLOW},
-        {.txnTooLarge = true,
-         .tempUnavailable = true,
-         .cacheInsufficient = false,
-         .sub_level_err = WT_OLDEST_FOR_EVICTION},
-        {.txnTooLarge = true,
-         .tempUnavailable = true,
-         .cacheInsufficient = false,
-         .sub_level_err = WT_CACHE_OVERFLOW},
+        {.txnTooLarge = false, .cacheInsufficient = false, .sub_level_err = WT_OLDEST_FOR_EVICTION},
+        {.txnTooLarge = false, .cacheInsufficient = false, .sub_level_err = WT_CACHE_OVERFLOW},
+        {.txnTooLarge = false, .cacheInsufficient = true, .sub_level_err = WT_OLDEST_FOR_EVICTION},
+        {.txnTooLarge = false, .cacheInsufficient = true, .sub_level_err = WT_CACHE_OVERFLOW},
+        {.txnTooLarge = true, .cacheInsufficient = false, .sub_level_err = WT_OLDEST_FOR_EVICTION},
+        {.txnTooLarge = true, .cacheInsufficient = false, .sub_level_err = WT_CACHE_OVERFLOW},
     };
 
     for (auto testCase : temporarilyUnavailableTestCases) {
@@ -181,70 +139,21 @@ TEST_F(WiredTigerUtilHelperTest, throwTemporarilyUnavailableException) {
 TEST_F(WiredTigerUtilHelperTest, throwWriteConflictException) {
     std::vector<TestCase> writeConflictExceptionTestCases = {
         // Throws WCE if reason for rollback was not cache pressure.
-        {.txnTooLarge = true,
-         .tempUnavailable = false,
-         .cacheInsufficient = false /*ignored*/,
-         .sub_level_err = WT_NONE},
-        {.txnTooLarge = true,
-         .tempUnavailable = true,
-         .cacheInsufficient = false /*ignored*/,
-         .sub_level_err = WT_NONE},
-        {.txnTooLarge = false,
-         .tempUnavailable = true,
-         .cacheInsufficient = false /*ignored*/,
-         .sub_level_err = WT_NONE},
-        {.txnTooLarge = false,
-         .tempUnavailable = false,
-         .cacheInsufficient = false /*ignored*/,
-         .sub_level_err = WT_NONE},
+        {.txnTooLarge = false, .cacheInsufficient = false /*ignored*/, .sub_level_err = WT_NONE},
 
         // Throws WCE for transaction no matter the reason for rollback if both
-        // TransactionTooLargeForCache and temporarilyUnavailable are disabled.
+        // TransactionTooLargeForCache is disabled.
         {.txnTooLarge = false,
-         .tempUnavailable = false,
          .cacheInsufficient = false /*ignored*/,
          .sub_level_err = WT_OLDEST_FOR_EVICTION},
         {.txnTooLarge = false,
-         .tempUnavailable = false,
          .cacheInsufficient = false /*ignored*/,
-         .sub_level_err = WT_CACHE_OVERFLOW},
-        {.txnTooLarge = false,
-         .tempUnavailable = false,
-         .cacheInsufficient = false /*ignored*/,
-         .sub_level_err = WT_CACHE_OVERFLOW},
-        {.txnTooLarge = false,
-         .tempUnavailable = false,
-         .cacheInsufficient = false /*ignored*/,
-         .sub_level_err = WT_OLDEST_FOR_EVICTION},
-    };
+         .sub_level_err = WT_CACHE_OVERFLOW}};
 
     for (auto testCase : writeConflictExceptionTestCases) {
         throwsWriteConflictException(testCase, ErrorCodes::WriteConflict);
     }
 }
 
-TEST_F(WiredTigerUtilHelperTest, doesNotThrowCachePressureException) {
-    std::vector<TestCase> notCachePressureExceptionTestCases = {
-        // Does not throw cache pressure exception if cache is sufficient for transaction no matter
-        // the reason for rollback if temporarilyUnavailable is disabled.
-        {.txnTooLarge = true,
-         .tempUnavailable = false,
-         .cacheInsufficient = false,
-         .sub_level_err = WT_OLDEST_FOR_EVICTION},
-        {.txnTooLarge = true,
-         .tempUnavailable = false,
-         .cacheInsufficient = false,
-         .sub_level_err = WT_CACHE_OVERFLOW},
-    };
-
-    for (auto testCase : notCachePressureExceptionTestCases) {
-        ASSERT_DOES_NOT_THROW(throwCachePressureExceptionIfAppropriate(testCase.txnTooLarge,
-                                                                       testCase.tempUnavailable,
-                                                                       testCase.cacheInsufficient,
-                                                                       reason,
-                                                                       prefix,
-                                                                       retCode));
-    }
-}
 }  // namespace
 }  // namespace mongo

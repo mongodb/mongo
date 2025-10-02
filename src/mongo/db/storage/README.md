@@ -207,8 +207,7 @@ the write transaction until it succeeds, accompanied by a bounded exponential ba
 
 ## TemporarilyUnavailableException
 
-When the server parameter `enableTemporarilyUnavailableExceptions` is enabled (on by default), a
-TemporarilyUnavailableException may be thrown inside the server to indicate that an operation cannot
+A TemporarilyUnavailableException may be thrown inside the server to indicate that an operation cannot
 complete without blocking and must be retried. The storage engine may throw a
 TemporarilyUnavailableException (converted to a TemporarilyUnavailable error for users) when an
 operation is excessively rolled-back in the storage engine due to cache pressure or any reason that

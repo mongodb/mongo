@@ -56,11 +56,6 @@ config_fuzzer_params = {
             "period": 60,
             "fuzz_at": ["startup", "runtime"],
         },
-        "enableTemporarilyUnavailableExceptions": {
-            "choices": [True, False],
-            "period": 5,
-            "fuzz_at": ["startup", "runtime"],
-        },
         "indexBuildMinAvailableDiskSpaceMB": {
             "min": 250,
             "max": 750,

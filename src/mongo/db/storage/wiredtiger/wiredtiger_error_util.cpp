@@ -97,7 +97,6 @@ bool rollbackReasonWasCachePressure(int sub_level_err) {
 }
 
 void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
-                                              bool temporarilyUnavailableEnabled,
                                               bool cacheIsInsufficientForTransaction,
                                               const char* reason,
                                               StringData prefix,
@@ -107,14 +106,10 @@ void throwCachePressureExceptionIfAppropriate(bool txnTooLargeEnabled,
             generateContextStrStream(prefix, kTransactionTooLargeForCache, retCode)
             << " (" << reason << ")");
     }
-
-    if (temporarilyUnavailableEnabled) {
-        throwTemporarilyUnavailableException(generateContextStrStream(prefix, reason, retCode));
-    }
+    throwTemporarilyUnavailableException(generateContextStrStream(prefix, reason, retCode));
 }
 
 void throwAppropriateException(bool txnTooLargeEnabled,
-                               bool temporarilyUnavailableEnabled,
                                WT_SESSION* session,
                                double cacheThreshold,
                                StringData prefix,
@@ -130,11 +125,9 @@ void throwAppropriateException(bool txnTooLargeEnabled,
         session->get_last_error(session, &err, &sub_level_err, &reason);
     }
 
-    if ((txnTooLargeEnabled || temporarilyUnavailableEnabled) &&
-        rollbackReasonWasCachePressure(sub_level_err)) {
+    if (rollbackReasonWasCachePressure(sub_level_err)) {
         throwCachePressureExceptionIfAppropriate(
             txnTooLargeEnabled,
-            temporarilyUnavailableEnabled,
             cacheIsInsufficientForTransaction(session, cacheThreshold),
             reason,
             prefix,
@@ -151,14 +144,8 @@ Status wtRCToStatus_slow(int retCode, WT_SESSION* session, StringData prefix) {
     if (retCode == WT_ROLLBACK) {
         double cacheThreshold = gTransactionTooLargeForCacheThreshold.load();
         bool txnTooLargeEnabled = cacheThreshold < 1.0;
-        bool temporarilyUnavailableEnabled = gEnableTemporarilyUnavailableExceptions.load();
 
-        throwAppropriateException(txnTooLargeEnabled,
-                                  temporarilyUnavailableEnabled,
-                                  session,
-                                  cacheThreshold,
-                                  prefix,
-                                  retCode);
+        throwAppropriateException(txnTooLargeEnabled, session, cacheThreshold, prefix, retCode);
     }
 
     // Don't abort on WT_PANIC when repairing, as the error will be handled at a higher layer.

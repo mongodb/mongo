@@ -18,7 +18,6 @@ const replSet = new ReplSetTest({
         // Shrink the cache to cause cache pressure sooner.
         wiredTigerEngineConfigString: "cache_size=256M",
         setParameter: {
-            enableTemporarilyUnavailableExceptions: false,
             // Disable the transaction too large for cache check.
             transactionTooLargeForCacheThreshold: 0.1,
             // Disable the periodic cache pressure rollback runner.

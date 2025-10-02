@@ -21,7 +21,6 @@ const replSet = new ReplSetTest({
         wiredTigerCacheSizeGB: 1,
         setParameter: {
             logComponentVerbosity: tojson({control: 1, write: 1}),
-            enableTemporarilyUnavailableExceptions: true,
             // Disable the transaction too large for cache check.
             transactionTooLargeForCacheThreshold: 1.0,
             // Disable the periodic cache pressure rollback runner.

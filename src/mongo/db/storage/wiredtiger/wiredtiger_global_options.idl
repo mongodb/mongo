@@ -479,16 +479,6 @@ server_parameters:
         cpp_varname: gSpillWiredTigerEngineConfig
         redact: false
 
-    enableTemporarilyUnavailableExceptions:
-        description:
-            "Enables the use of TemporarilyUnavailableExceptions. When disabled, reverts to
-            throwing WriteConflictException."
-        set_at: [startup, runtime]
-        cpp_varname: "gEnableTemporarilyUnavailableExceptions"
-        cpp_vartype: AtomicWord<bool>
-        default: true
-        redact: false
-
     transactionTooLargeForCacheThreshold:
         description:
             "Threshold on the proportion of total dirty cache bytes that the running
