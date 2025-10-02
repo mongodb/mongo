@@ -1527,6 +1527,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /jstests/sharding/**/direct_shard_connection_ddls_on_replicaset.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/**/direct_shard_connection_ddls_during_promotion_to_*.js @10gen/server-catalog-and-routing-routing-and-topology @svc-auto-approve-bot
 /jstests/sharding/**/incompatible_shard_key_indexes.js @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
+/jstests/sharding/**/sharding_ready.js @10gen/server-cluster-scalability @svc-auto-approve-bot
 
 # The following patterns are parsed from ./jstests/sharding/analyze_shard_key/OWNERS.yml
 /jstests/sharding/analyze_shard_key/**/* @10gen/server-cluster-scalability @svc-auto-approve-bot

@@ -106,3 +106,6 @@ filters:
   - "incompatible_shard_key_indexes.js":
     approvers:
       - 10gen/server-catalog-and-routing-shard-catalog
+  - "sharding_ready.js":
+    approvers:
+      - 10gen/server-cluster-scalability
