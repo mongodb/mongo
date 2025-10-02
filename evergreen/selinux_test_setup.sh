@@ -25,7 +25,7 @@ fi
 
 # selinux policy should work both when applied before and after install
 # we will randomly apply it before or after installation is completed
-SEORDER="$(($RANDOM % 2))"
+SEORDER="$(($(od -An -N1 -tu1 /dev/urandom) % 2))"
 if [ "$SEORDER" == "0" ]; then
     apply_selinux_policy
 fi
