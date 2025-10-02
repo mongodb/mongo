@@ -25,6 +25,7 @@ executor:
       global_vars:
         TestData:
           defaultReadConcernLevel: null
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   fixture:
     class: ShardedClusterFixture
     mongod_options:

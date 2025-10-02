@@ -32,6 +32,7 @@ executor:
             causalConsistency: true
             retryWrites: true
       nodb: ""
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   fixture:
     class: ShardedClusterFixture
     configsvr_options:

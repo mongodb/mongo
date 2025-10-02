@@ -41,6 +41,8 @@ executor:
         await import('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
         await import('jstests/libs/override_methods/implicit_passthrough_to_shard_changestreams.js');
+      # Set longer host discovery time to handle change stream resumable errors.
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

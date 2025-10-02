@@ -39,6 +39,8 @@ executor:
         await import('jstests/libs/override_methods/set_read_and_write_concerns.js');
         await import('jstests/libs/override_methods/enable_sessions.js');
         await import('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+      # Set longer host discovery time to handle change stream resumable errors.
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   hooks:
     - class: CheckReplDBHash
     - class: CheckMetadataConsistencyInBackground

@@ -26,6 +26,7 @@ executor:
         TestData:
           defaultReadConcernLevel: null
           isMultiShardedClusterFixture: true
+      setShellParameter: defaultFindReplicaSetHostTimeoutMS=120000
   fixture:
     class: MultiShardedClusterFixture
     common_mongod_options:
