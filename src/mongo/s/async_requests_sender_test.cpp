@@ -36,6 +36,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/client/retry_strategy_server_parameters_gen.h"
 #include "mongo/db/global_catalog/type_shard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/client_cursor/cursor_response.h"
@@ -93,6 +94,8 @@ public:
     }
 
 protected:
+    static constexpr int kMaxCommandExecutions = kDefaultClientMaxRetryAttemptsDefault + 1;
+
     std::vector<RemoteCommandTargeterMock*> _targeters;  // Targeters are owned by the factory.
 };
 
@@ -439,11 +442,6 @@ TEST_F(AsyncRequestsSenderTest, PreLoadedShardIsUsedForInitialRequest) {
 }
 
 TEST_F(AsyncRequestsSenderTest, MultipleRetriesReceivedInconclusiveError) {
-    auto shardRegistry = Grid::get(operationContext())->shardRegistry();
-    auto shard0 = uassertStatusOK(shardRegistry->getShard(operationContext(), kTestShardIds[0]));
-    auto shard1 = uassertStatusOK(shardRegistry->getShard(operationContext(), kTestShardIds[1]));
-    auto shard2 = uassertStatusOK(shardRegistry->getShard(operationContext(), kTestShardIds[2]));
-
     std::vector<AsyncRequestsSender::Request> requests;
     requests.emplace_back(kTestShardIds[0], BSON("find" << "bar"));
     requests.emplace_back(kTestShardIds[1], BSON("find" << "bar"));
@@ -508,6 +506,65 @@ TEST_F(AsyncRequestsSenderTest, MultipleRetriesReceivedInconclusiveError) {
         ASSERT(request.cmdObj["find"]);
         return Status(ErrorCodes::NotWritablePrimary, "NotWritablePrimary error");
     });
+
+    future.default_timed_get();
+}
+
+TEST_F(AsyncRequestsSenderTest, MultipleRetriesSystemOverloaded) {
+    std::vector<AsyncRequestsSender::Request> requests;
+    requests.emplace_back(kTestShardIds[0], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[1], BSON("find" << "bar"));
+    requests.emplace_back(kTestShardIds[2], BSON("find" << "bar"));
+
+    BSONObj resWithSystemOverloadedError =
+        createErrorSystemOverloaded(ErrorCodes::IngressRequestRateLimitExceeded);
+
+    auto ars = AsyncRequestsSender(operationContext(),
+                                   executor(),
+                                   kTestNss.dbName(),
+                                   requests,
+                                   ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                   Shard::RetryPolicy::kIdempotent,
+                                   nullptr,
+                                   {});
+
+    auto future = launchAsync([&]() {
+        auto response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+
+        response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+
+        response = ars.next();
+        ASSERT(response.swResponse.getStatus().isOK());
+        auto errorLabels = response.swResponse.getValue().getErrorLabels();
+        ASSERT(std::ranges::find(errorLabels, ErrorLabel::kSystemOverloadedError) !=
+               errorLabels.end());
+        ASSERT_BSONOBJ_EQ(response.swResponse.getValue().data, resWithSystemOverloadedError);
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return CursorResponse(kTestNss, 0LL, {BSON("x" << 2)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    for (int i = 0; i < kMaxCommandExecutions; ++i) {
+        onCommand([&](const auto& request) {
+            ASSERT(request.cmdObj["find"]);
+            return resWithSystemOverloadedError;
+        });
+
+        if (i < kDefaultClientMaxRetryAttemptsDefault) {
+            advanceUntilReadyRequest();
+        }
+    }
 
     future.default_timed_get();
 }

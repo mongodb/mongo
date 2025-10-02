@@ -50,6 +50,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -206,6 +207,11 @@ private:
                    HostAndPort designatedHost,
                    std::shared_ptr<Shard> shard = nullptr);
 
+        RemoteData(const RemoteData&) = delete;
+        RemoteData& operator=(const RemoteData&) = delete;
+        RemoteData(RemoteData&&) = default;
+        RemoteData& operator=(RemoteData&&) = default;
+
         /**
          * Returns a SemiFuture containing a shard object associated with this remote.
          *
@@ -261,15 +267,26 @@ private:
          * Schedules the remote command on the ARS's TaskExecutor
          */
         SemiFuture<RemoteCommandCallbackArgs> scheduleRemoteCommand(
-            std::vector<HostAndPort>&& hostAndPort);
+            std::span<const HostAndPort> hostAndPort);
 
         /**
          * Handles the remote response
          */
-        SemiFuture<RemoteCommandCallbackArgs> handleResponse(RemoteCommandCallbackArgs&& rcr);
+        SemiFuture<RemoteCommandCallbackArgs> handleResponse(RemoteCommandCallbackArgs rcr);
 
     private:
         bool _done = false;
+
+        /**
+         * Simple structure that ensures the retry strategy is created with an owner.
+         */
+        struct OwnedRetryStrategy {
+            OwnedRetryStrategy(std::shared_ptr<Shard> shard, Shard::RetryPolicy retryPolicy)
+                : strategy{*shard, retryPolicy}, owner{std::move(shard)} {}
+
+            Shard::RetryStrategy strategy;
+            std::shared_ptr<Shard> owner;
+        };
 
         AsyncRequestsSender* const _ars;
 
@@ -285,11 +302,15 @@ private:
         // Optional shard from shard registry for given shard id.
         std::shared_ptr<Shard> _shard;
 
+        // The retry strategy that will be used to evaluate if we should retry.
+        boost::optional<OwnedRetryStrategy> _ownedRetryStrategy;
+
         // The exact host on which the remote command was run. Is unset until a request has been
         // sent.
         boost::optional<HostAndPort> _shardHostAndPort;
 
         // The number of times we've retried sending the command to this remote.
+        // TODO: SERVER-110000: Consider using the retry count from the retry strategy.
         int _retryCount = 0;
 
         // Record the last writeConcernError received during any retry attempt and return this
@@ -347,6 +368,9 @@ private:
     // Interface for yielding and unyielding resources while waiting on results from the network.
     // Null if yielding isn't necessary.
     std::unique_ptr<ResourceYielder> _resourceYielder;
+
+    // A cancellation source to stop any requests that are waiting for backoff.
+    CancellationSource _cancellationSource;
 };
 
 }  // namespace mongo
