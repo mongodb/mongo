@@ -122,7 +122,9 @@ std::pair<SbStage, PlanStageSlots> generateClusteredCollScan(
 
     const bool forward = csn->direction == CollectionScanParams::FORWARD;
 
-    invariant(csn->doClusteredCollectionScanSbe());
+    tassert(11051828,
+            "Expecting CollectionScanNode to allow clustered collection scan",
+            csn->doClusteredCollectionScanSbe());
 
     tassert(9884961, "resumeScanPoint not supported in SBE", !csn->resumeScanPoint);
 
@@ -254,7 +256,9 @@ std::pair<SbStage, PlanStageSlots> generateGenericCollScan(StageBuilderState& st
 
     if (csn->filter) {
         // 'stopApplyingFilterAfterFirstMatch' is only for oplog scans; this method doesn't do them.
-        invariant(!csn->stopApplyingFilterAfterFirstMatch);
+        tassert(11051827,
+                "Unexpected stopApplyingFilterAfterFirstMatch flag in non-oplog scan",
+                !csn->stopApplyingFilterAfterFirstMatch);
 
         auto filterExpr = generateFilter(state, csn->filter.get(), resultSlot, outputs);
         if (!filterExpr.isNull()) {

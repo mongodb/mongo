@@ -80,13 +80,11 @@ namespace {
  * returned through the relevant '*KeyInclusive' parameter. Returns 'false' otherwise.
  */
 bool canBeDecomposedIntoSingleIntervals(const std::vector<OrderedIntervalList>& intervalLists,
-                                        bool* lowKeyInclusive,
-                                        bool* highKeyInclusive) {
-    invariant(lowKeyInclusive);
-    invariant(highKeyInclusive);
+                                        bool& lowKeyInclusive,
+                                        bool& highKeyInclusive) {
 
-    *lowKeyInclusive = true;
-    *highKeyInclusive = true;
+    lowKeyInclusive = true;
+    highKeyInclusive = true;
 
     size_t listNum = 0;
 
@@ -110,8 +108,8 @@ bool canBeDecomposedIntoSingleIntervals(const std::vector<OrderedIntervalList>& 
     }
 
     // Set the inclusivity from the non-point interval.
-    *lowKeyInclusive = intervalLists[listNum].intervals[0].startInclusive;
-    *highKeyInclusive = intervalLists[listNum].intervals[0].endInclusive;
+    lowKeyInclusive = intervalLists[listNum].intervals[0].startInclusive;
+    highKeyInclusive = intervalLists[listNum].intervals[0].endInclusive;
 
     // And after the non-point interval we can have any number of "all values" intervals.
     for (++listNum; listNum < intervalLists.size(); ++listNum) {
@@ -158,7 +156,7 @@ std::vector<std::pair<BSONObj, BSONObj>> decomposeIntoSingleIntervals(
     const std::vector<OrderedIntervalList>& intervalLists,
     bool lowKeyInclusive,
     bool highKeyInclusive) {
-    invariant(intervalLists.size() > 0);
+    tassert(11051801, "Expecting non-empty intervalLists vector", intervalLists.size() > 0);
 
     // Appends the 'interval' bounds to the low and high keys and return the updated keys.
     // Inclusivity of each bound is set through the relevant '*KeyInclusive' parameter.
@@ -970,7 +968,7 @@ IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
                 bounds, &lowKey, &lowKeyInclusive, &highKey, &highKeyInclusive)) {
             return {{lowKey, highKey}};
         } else if (canBeDecomposedIntoSingleIntervals(
-                       bounds.fields, &lowKeyInclusive, &highKeyInclusive)) {
+                       bounds.fields, lowKeyInclusive, highKeyInclusive)) {
             return decomposeIntoSingleIntervals(bounds.fields, lowKeyInclusive, highKeyInclusive);
         } else {
             // Index bounds cannot be represented as valid low/high keys.

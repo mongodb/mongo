@@ -423,7 +423,7 @@ SbExpr generateArrayCheckForSort(StageBuilderState& state,
                                  FieldIndex level,
                                  sbe::value::FrameIdGenerator* frameIdGenerator,
                                  boost::optional<SbSlot> fieldSlot = boost::none) {
-    invariant(level < fp.getPathLength());
+    tassert(11051803, "FieldPath length is too short", level < fp.getPathLength());
 
     tassert(8102000,
             "Expected either 'inputExpr' or 'fieldSlot' to be defined",
@@ -467,7 +467,7 @@ SbExpr generateSortTraverse(boost::optional<SbVar> inputVar,
                             boost::optional<SbSlot> fieldSlot = boost::none) {
     using namespace std::literals;
 
-    invariant(level < fp.getPathLength());
+    tassert(11051802, "FieldPath length is too short", level < fp.getPathLength());
 
     tassert(8102001,
             "Expected either 'inputVar' or 'fieldSlot' to be defined",

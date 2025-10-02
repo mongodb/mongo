@@ -166,7 +166,7 @@ SbExpr generateLocalKeyStream(SbExpr inputExpr,
     using namespace std::literals;
 
     SbExprBuilder b(state);
-    invariant(level < fp.getPathLength());
+    tassert(11051800, "FieldPath length is too short", level < fp.getPathLength());
 
     tassert(9033500,
             "Expected an input expression or top level field",

@@ -260,7 +260,9 @@ public:
     // this PlanStageSlots does not have a mapping for 'name'.
     SbSlot get(const UnownedSlotName& name) const {
         auto it = _data->slotNameToIdMap.find(name);
-        invariant(it != _data->slotNameToIdMap.end());
+        tassert(11051830,
+                str::stream() << "PlanStageSlots does not have a mapping for name " << name.second,
+                it != _data->slotNameToIdMap.end());
         return it->second;
     }
 
@@ -377,7 +379,6 @@ public:
         tassert(8428000, "Expected result object to be set", hasResultObj());
 
         auto it = _data->slotNameToIdMap.find(kResult);
-        invariant(it != _data->slotNameToIdMap.end());
 
         return it->second;
     }
@@ -411,7 +412,9 @@ public:
         tassert(8428001, "Expected ResultInfo to be set", hasResultInfo());
 
         auto it = _data->slotNameToIdMap.find(kResult);
-        invariant(it != _data->slotNameToIdMap.end());
+        tassert(11051829,
+                "slotNameToIdMap is missing the 'result' mapping",
+                it != _data->slotNameToIdMap.end());
 
         return it->second;
     }

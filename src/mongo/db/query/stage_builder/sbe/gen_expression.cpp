@@ -108,7 +108,10 @@ struct ExpressionVisitorContext {
         : state(state), rootSlot(std::move(rootSlot)), slots(&slots) {}
 
     void ensureArity(size_t arity) {
-        invariant(exprStack.size() >= arity);
+        tassert(11051826,
+                str::stream() << "Expected expression stack to hold at least " << arity
+                              << " values",
+                exprStack.size() >= arity);
     }
 
     void pushExpr(SbExpr expr) {
@@ -156,7 +159,7 @@ SbExpr generateTraverseHelper(SbExpr inputExpr,
     using namespace std::literals;
 
     SbExprBuilder b(state);
-    invariant(level < fp.getPathLength());
+    tassert(11051825, "FieldPath length is too short", level < fp.getPathLength());
 
     tassert(6950802,
             "Expected an input expression or top level field",
@@ -1068,7 +1071,9 @@ public:
         using namespace std::literals;
 
         const auto& children = expr->getChildren();
-        invariant(children.size() == 5);
+        tassert(11051824,
+                "Expecting DateDiff expression to have 5 children nodes",
+                children.size() == 5);
 
         auto timeZoneDBSlot = *_context->state.getTimeZoneDBSlot();
         SbVar timeZoneDBVar{timeZoneDBSlot};
@@ -1203,7 +1208,9 @@ public:
     }
     void visit(const ExpressionDateFromString* expr) final {
         const auto& children = expr->getChildren();
-        invariant(children.size() == 5);
+        tassert(11051823,
+                "Expecting DateFromString expression to have 5 children nodes",
+                children.size() == 5);
         _context->ensureArity(
             1 + (expr->isFormatSpecified() ? 1 : 0) + (expr->isTimezoneSpecified() ? 1 : 0) +
             (expr->isOnErrorSpecified() ? 1 : 0) + (expr->isOnNullSpecified() ? 1 : 0));
@@ -1380,7 +1387,8 @@ public:
         // This expression can carry null children depending on the set of fields provided,
         // to compute a date from parts so we only need to pop if a child exists.
         const auto& children = expr->getChildren();
-        invariant(children.size() == 11);
+        tassert(
+            11051822, "Expecting DateFromParts to have 11 children nodes", children.size() == 11);
 
         SbExpr eTimezone = children[10] ? popExpr() : SbExpr{};
         SbExpr eIsoDayOfWeek = children[9] ? popExpr() : SbExpr{};
@@ -1653,7 +1661,9 @@ public:
 
     void visit(const ExpressionDateToString* expr) final {
         const auto& children = expr->getChildren();
-        invariant(children.size() == 4);
+        tassert(11051821,
+                "Expecting DateToString expression to have 4 children nodes",
+                children.size() == 4);
         _context->ensureArity(1 + (expr->isFormatSpecified() ? 1 : 0) +
                               (expr->isTimezoneSpecified() ? 1 : 0) +
                               (expr->isOnNullSpecified() ? 1 : 0));
@@ -1775,7 +1785,9 @@ public:
     }
     void visit(const ExpressionDateTrunc* expr) final {
         const auto& children = expr->getChildren();
-        invariant(children.size() == 5);
+        tassert(11051820,
+                "Expecting DateTrunc expression to have 5 children nodes",
+                children.size() == 5);
         _context->ensureArity(2 + (expr->isBinSizeSpecified() ? 1 : 0) +
                               (expr->isTimezoneSpecified() ? 1 : 0) +
                               (expr->isStartOfWeekSpecified() ? 1 : 0));
@@ -2038,7 +2050,9 @@ public:
     }
     void visit(const ExpressionIfNull* expr) final {
         auto numChildren = expr->getChildren().size();
-        invariant(numChildren >= 2);
+        tassert(11051819,
+                "Expecting IfNull expression to have 2 or more children nodes",
+                numChildren >= 2);
 
         SbExpr::Vector values;
         values.reserve(numChildren);
@@ -2575,12 +2589,16 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionSetDifference* expr) final {
-        invariant(expr->getChildren().size() == 2);
+        tassert(11051818,
+                "Expecting SetDifference expression to have 2 children nodes",
+                expr->getChildren().size() == 2);
 
         generateSetExpression(expr, SetOperation::Difference);
     }
     void visit(const ExpressionSetEquals* expr) final {
-        invariant(expr->getChildren().size() >= 2);
+        tassert(11051817,
+                "Expecting SetEquals expression to have at least 2 children nodes",
+                expr->getChildren().size() >= 2);
 
         generateSetExpression(expr, SetOperation::Equals);
     }
@@ -2684,7 +2702,9 @@ public:
         visitRoundTruncExpression(expr);
     }
     void visit(const ExpressionSplit* expr) final {
-        invariant(expr->getChildren().size() == 2);
+        tassert(11051816,
+                "Expecting Split expression to have 2 children nodes",
+                expr->getChildren().size() == 2);
         _context->ensureArity(2);
 
         auto [arrayWithEmptyStringTag, arrayWithEmptyStringVal] = sbe::value::makeNewArray();
@@ -2751,7 +2771,9 @@ public:
         pushExpr(_b.makeLet(frameId, SbExpr::makeSeq(popExpr()), std::move(sqrtExpr)));
     }
     void visit(const ExpressionStrcasecmp* expr) final {
-        invariant(expr->getChildren().size() == 2);
+        tassert(11051815,
+                "Expecting Strcasecmp expression to have 2 children nodes",
+                expr->getChildren().size() == 2);
         _context->ensureArity(2);
 
         generateStringCaseConversionExpression(_context, "toUpper");
@@ -2762,7 +2784,9 @@ public:
         pushExpr(_b.makeBinaryOp(abt::Operations::Cmp3w, std::move(lhs), std::move(rhs)));
     }
     void visit(const ExpressionSubstrBytes* expr) final {
-        invariant(expr->getChildren().size() == 3);
+        tassert(11051814,
+                "Expecting SubstrBytes expression to have 3 children nodes",
+                expr->getChildren().size() == 3);
         _context->ensureArity(3);
 
         SbExpr byteCount = popExpr();
@@ -2821,7 +2845,9 @@ public:
             _b.makeFunction("substrBytes", std::move(functionArgs))));
     }
     void visit(const ExpressionSubstrCP* expr) final {
-        invariant(expr->getChildren().size() == 3);
+        tassert(11051813,
+                "Expecting SubstrCP expression to have 3 children nodes",
+                expr->getChildren().size() == 3);
         _context->ensureArity(3);
 
         SbExpr len = popExpr();
@@ -2920,7 +2946,9 @@ public:
             frameId, SbExpr::makeSeq(std::move(strExpression)), std::move(strLenCPExpr)));
     }
     void visit(const ExpressionSubtract* expr) final {
-        invariant(expr->getChildren().size() == 2);
+        tassert(11051812,
+                "Expecting Subtract expression to have 2 children nodes",
+                expr->getChildren().size() == 2);
         _context->ensureArity(2);
 
         auto rhs = popExpr();
@@ -3466,10 +3494,14 @@ private:
     template <typename ExprType>
     void visitRoundTruncExpression(const ExprType* expr) {
         const std::string opName(expr->getOpName());
-        invariant(opName == "$round" || opName == "$trunc");
+        tassert(11051811,
+                "Expecting $round or $trunc operation name",
+                opName == "$round" || opName == "$trunc");
 
         const auto& children = expr->getChildren();
-        invariant(children.size() == 1 || children.size() == 2);
+        tassert(11051810,
+                str::stream() << "Expecting 1 or 2 children nodes in " << opName,
+                children.size() == 1 || children.size() == 2);
         const bool hasPlaceArg = (children.size() == 2);
         _context->ensureArity(children.size());
 
@@ -3515,7 +3547,9 @@ private:
      * semantics.
      */
     void visitMultiBranchLogicExpression(const Expression* expr, abt::Operations logicOp) {
-        invariant(logicOp == abt::Operations::And || logicOp == abt::Operations::Or);
+        tassert(11051809,
+                "Expecting $and or $or logic operator",
+                logicOp == abt::Operations::And || logicOp == abt::Operations::Or);
 
         size_t numChildren = expr->getChildren().size();
         if (numChildren == 0) {
@@ -3568,7 +3602,9 @@ private:
 
     void generateDateExpressionAcceptingTimeZone(StringData exprName, const Expression* expr) {
         const auto& children = expr->getChildren();
-        invariant(children.size() == 2);
+        tassert(11051808,
+                str::stream() << "Expecting " << exprName << " expression to have 2 children nodes",
+                children.size() == 2);
 
         auto timezoneExpression = children[1] ? popExpr() : _b.makeStrConstant("UTC"_sd);
         auto dateExpression = popExpr();
@@ -3790,7 +3826,9 @@ private:
                               ExpressionVisitorContext* _context,
                               const std::string& indexOfFunction) {
         const auto& children = expr->getChildren();
-        invariant(children.size() >= 2 && children.size() <= 4);
+        tassert(11051807,
+                "Expecting expression to have between 2 and 4 children nodes",
+                children.size() >= 2 && children.size() <= 4);
 
         // Set up the frame and get arguments from the stack.
         auto frameId = _context->state.frameId();
@@ -4247,7 +4285,8 @@ private:
                                            const std::string& dateExprName) {
         const auto& children = expr->getChildren();
         auto arity = children.size();
-        invariant(arity == 4);
+        tassert(
+            11051806, "Expecting DateArithmetics expression to have 4 children nodes", arity == 4);
         auto timezoneExpr = children[3] ? popExpr() : _b.makeStrConstant("UTC"_sd);
         auto amountExpr = popExpr();
         auto unitExpr = popExpr();
@@ -4373,7 +4412,9 @@ SbExpr generateExpressionFieldPath(StageBuilderState& state,
                                    const PlanStageSlots& slots,
                                    std::map<Variables::Id, sbe::FrameId>* environment) {
     SbExprBuilder b(state);
-    invariant(fieldPath.getPathLength() >= 1);
+    tassert(11051805,
+            "Expecting FieldPath expression to have non-zero length",
+            fieldPath.getPathLength() >= 1);
 
     boost::optional<SbSlot> topLevelFieldSlot;
     bool expectsDocumentInputOnly = false;

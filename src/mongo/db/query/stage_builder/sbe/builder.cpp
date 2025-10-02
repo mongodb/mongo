@@ -841,7 +841,10 @@ void PlanStageSlots::mergeResultInfos(
             auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(projects));
             stage = std::move(outStage);
 
-            invariant(keptFieldsMissing.size() == outSlots.size());
+            tassert(
+                11051840,
+                "Expect the length of keptFieldsMissing to match the length of output slot vector",
+                keptFieldsMissing.size() == outSlots.size());
 
             for (size_t i = 0; i < keptFieldsMissing.size(); ++i) {
                 outputs.set(std::pair(kField, std::move(keptFieldsMissing[i])), outSlots[i]);
@@ -962,8 +965,10 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildTree() {
 }
 
 SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolutionNode* root) {
-    // For a given SlotBasedStageBuilder instance, this build() method can only be called once.
-    invariant(!_buildHasStarted);
+    tassert(
+        11051839,
+        "For a given SlotBasedStageBuilder instance, this build() method can only be called once",
+        !_buildHasStarted);
     _buildHasStarted = true;
 
     _root = root;
@@ -976,11 +981,11 @@ SlotBasedStageBuilder::PlanType SlotBasedStageBuilder::build(const QuerySolution
 
     // Assert that we produced a 'resultSlot' and that we produced a 'recordIdSlot' if it was
     // needed.
-    invariant(outputs.hasResultObj());
+    tassert(11051838, "Expected 'resultSlot' to be produced", outputs.hasResultObj());
 
     const bool needsRecordIdSlot = _cq.getForceGenerateRecordId();
     if (needsRecordIdSlot) {
-        invariant(outputs.has(kRecordId));
+        tassert(11051837, "Expected 'recordIdSlot' to be produced", outputs.has(kRecordId));
     }
 
     auto resultSlot = outputs.getResultObjIfExists();
@@ -1066,7 +1071,7 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildVirtualScan(
     }
 
     if (reqs.has(kRecordId)) {
-        invariant(recordIdSlot.has_value());
+        tassert(11051836, "Expected 'recordId' to be part of scanSlots", recordIdSlot.has_value());
         outputs.set(kRecordId, *recordIdSlot);
     }
 
@@ -1085,7 +1090,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildIndexScan(
     SbBuilder b(_state, root->nodeId());
 
     auto ixn = static_cast<const IndexScanNode*>(root);
-    invariant(reqs.has(kReturnKey) || !ixn->addKeyMetadata);
+    tassert(11051835,
+            "Expected IndexScanNode to produce 'returnKey' slot",
+            reqs.has(kReturnKey) || !ixn->addKeyMetadata);
 
     const auto generateIndexScanFunc =
         ixn->iets.empty() ? generateIndexScan : generateIndexScanWithDynamicBounds;
@@ -1359,7 +1366,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildFetch(const Query
         auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(projects));
         stage = std::move(outStage);
 
-        invariant(sortKeyNames.size() == outSlots.size());
+        tassert(11051834,
+                "Expect the length of sortKeyNames to match the length of output slot vector",
+                sortKeyNames.size() == outSlots.size());
         for (size_t i = 0; i < sortKeyNames.size(); ++i) {
             outputs.set(std::make_pair(PlanStageSlots::kSortKey, std::move(sortKeyNames[i])),
                         outSlots[i]);
@@ -1580,7 +1589,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
         auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(projects));
         stage = std::move(outStage);
 
-        invariant(sortPattern.size() <= outSlots.size());
+        tassert(11051833,
+                "sortPattern length must not exceed the number of projected slots",
+                sortPattern.size() <= outSlots.size());
         for (size_t i = 0; i < sortPattern.size(); ++i) {
             orderBy.push_back(outSlots[i]);
         }
@@ -1622,7 +1633,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSort(const QueryS
             auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(projects));
             stage = std::move(outStage);
 
-            invariant(sortPattern.size() == outSlots.size());
+            tassert(11051832,
+                    "Expect the length of sortPattern to match the length of output slot vector",
+                    sortPattern.size() == outSlots.size());
             for (size_t i = 0; i < sortPattern.size(); ++i) {
                 orderBy.push_back(outSlots[i]);
             }
@@ -1740,7 +1753,9 @@ std::pair<SbStage, PlanStageSlots> SlotBasedStageBuilder::buildSortCovered(
     auto [outStage, outSlots] = b.makeProject(std::move(stage), std::move(projects));
     stage = std::move(outStage);
 
-    invariant(orderBy.size() == outSlots.size());
+    tassert(11051831,
+            "Expect the length of orderBy slot vector to match the length of output slot vector",
+            orderBy.size() == outSlots.size());
     for (size_t idx = 0; idx < orderBy.size(); ++idx) {
         orderBy[idx] = outSlots[idx];
     }

@@ -686,7 +686,8 @@ public:
     void visit(const NorMatchExpression* expr) final {}
 
     void visit(const NotMatchExpression* expr) final {
-        invariant(expr->numChildren() == 1);
+        tassert(
+            11051804, "Expecting Match expression to have 1 child node", expr->numChildren() == 1);
     }
 
     void visit(const OrMatchExpression* expr) final {}
