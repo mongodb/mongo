@@ -33,6 +33,8 @@
 
 #include <string>
 
+#include <boost/filesystem/path.hpp>
+
 /*
  * This file defines the storage for options that come from the command line related to data file
  * persistence.  Many executables that can access data files directly such as mongod and certain
@@ -47,7 +49,7 @@ struct StorageGlobalParams {
     void reset_forTest();
 
     // Returns the directory path used by the spill storage engine to store spilled data.
-    std::string getSpillDbPath() const;
+    boost::filesystem::path getSpillDbPath() const;
 
     // Default data directory for mongod when running in non-config server mode.
     static const char* kDefaultDbPath;

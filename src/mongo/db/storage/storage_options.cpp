@@ -72,9 +72,9 @@ void StorageGlobalParams::_reset() {
     forceDisableTableLogging = false;
 }
 
-std::string StorageGlobalParams::getSpillDbPath() const {
-    return gSpillPath.empty() ? (boost::filesystem::path(dbpath) / "_tmp" / "spilldb").string()
-                              : gSpillPath;
+boost::filesystem::path StorageGlobalParams::getSpillDbPath() const {
+    return gSpillPath.empty() ? (boost::filesystem::path(dbpath) / "_tmp" / "spilldb")
+                              : boost::filesystem::path(gSpillPath);
 }
 
 StorageGlobalParams storageGlobalParams;

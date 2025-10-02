@@ -179,7 +179,7 @@ public:
                 getSpillWiredTigerConfigFromStartupOptions();
             spillWiredTigerKVEngine = std::make_unique<SpillWiredTigerKVEngine>(
                 std::string{getCanonicalName()},
-                params.getSpillDbPath(),
+                params.getSpillDbPath().string(),
                 &opCtx->fastClockSource(),
                 std::move(wtConfig),
                 SpillWiredTigerExtensions::get(opCtx->getServiceContext()));
