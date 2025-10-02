@@ -1,6 +1,7 @@
 """The unittest.TestCase for model-checking TLA+ specifications."""
 
 import os
+import shlex
 from typing import Optional
 
 from buildscripts.resmokelib import core, logging
@@ -56,6 +57,6 @@ class TLAPlusTestCase(interface.ProcessTestCase):
 
         return core.programs.generic_program(
             self.logger,
-            [self.model_check_command, self.test_name],
+            [*shlex.split(self.model_check_command), self.test_name],
             process_kwargs=process_kwargs,
         )
