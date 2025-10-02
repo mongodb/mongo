@@ -169,7 +169,7 @@ boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
                                        const Document& root,
                                        const Expression* timeZone,
                                        Variables* variables) {
-    invariant(tzdb);
+    tassert(11103500, "Expected non-null TimeZoneDatabase", tzdb);
 
     if (!timeZone) {
         return mongo::TimeZoneDatabase::utcZone();

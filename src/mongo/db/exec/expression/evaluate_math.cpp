@@ -1218,7 +1218,11 @@ private:
     }
 
     static Value performCastDecimalToInt(BSONType targetType, Value inputValue) {
-        invariant(targetType == BSONType::numberInt || targetType == BSONType::numberLong);
+        tassert(
+            11103502,
+            fmt::format("Expected targetType to be either numberInt or numberLong, but found {}",
+                        typeName(targetType)),
+            targetType == BSONType::numberInt || targetType == BSONType::numberLong);
         Decimal128 inputDecimal = inputValue.getDecimal();
 
         // Performing these checks up front allows us to provide more specific error messages than
@@ -1253,7 +1257,9 @@ private:
                     << "Conversion would overflow target type in $convert with no onError value: "
                     << inputDecimal.toString(),
                 (signalingFlags & Decimal128::SignalingFlag::kInvalid) == 0);
-        invariant(signalingFlags == Decimal128::SignalingFlag::kNoFlag);
+        tassert(11103503,
+                "Expected signalingFlags to be kNoFlag",
+                signalingFlags == Decimal128::SignalingFlag::kNoFlag);
 
         return result;
     }
@@ -2098,7 +2104,10 @@ Value performConversion(const ExpressionConvert& expr,
                         boost::optional<ConversionBase> base,
                         boost::optional<BinDataFormat> format,
                         boost::optional<ConvertByteOrderType> byteOrder) {
-    invariant(!inputValue.nullish());
+    tassert(11103504,
+            fmt::format("Expected inputValue to not be nullish, but found {}",
+                        typeName(inputValue.getType())),
+            !inputValue.nullish());
 
     static const ConversionTable table;
     BSONType inputType = inputValue.getType();
@@ -2394,8 +2403,9 @@ namespace {
  * 'base' and 'exp' are both integers. Assumes 'exp' is in the range [0, 63].
  */
 bool representableAsLong(long long base, long long exp) {
-    invariant(exp <= 63);
-    invariant(exp >= 0);
+    tassert(11103505,
+            fmt::format("Expected exp to be in the [0, 63] range, but found {}", exp),
+            0 <= exp && exp <= 63);
     struct MinMax {
         long long min;
         long long max;
@@ -2584,7 +2594,9 @@ Value evaluate(const ExpressionPow& expr, const Document& root, Variables* varia
         }
 
         if (exp) {
-            invariant(exp == 1);
+            tassert(11103507,
+                    fmt::format("Expected exp to be equal to 1, but found {}", exp),
+                    exp == 1);
             result *= base;
         }
 

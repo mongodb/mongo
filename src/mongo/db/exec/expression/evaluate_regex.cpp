@@ -229,9 +229,9 @@ RegexExecutionState buildInitialState(const std::string& opName,
  * Will uassert for any errors other than `pcre::Errc::ERROR_NOMATCH`.
  */
 pcre::MatchData execute(RegexExecutionState* regexState, const std::string& opName) {
-    invariant(regexState);
-    invariant(!regexState->nullish());
-    invariant(regexState->pcrePtr);
+    tassert(11103508, "Expected non-null regexState", regexState);
+    tassert(11103509, "Expected non-nullish regexState", !regexState->nullish());
+    tassert(11103510, "Expected regexState to contain a valid pcrePtr", regexState->pcrePtr);
 
     StringData in = *regexState->input;
     auto m = regexState->pcrePtr->matchView(in, {}, regexState->startBytePos);

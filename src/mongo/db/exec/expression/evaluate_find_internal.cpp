@@ -71,7 +71,10 @@ Value evaluate(const ExpressionInternalFindElemMatch& expr,
                const Document& root,
                Variables* variables) {
     auto input = expr.getChildren()[0]->evaluate(root, variables);
-    invariant(input.getType() == BSONType::object);
+    tassert(
+        11103501,
+        fmt::format("Expected the input to be an object, but got {}", typeName(input.getType())),
+        input.getType() == BSONType::object);
     return projection_executor_utils::applyFindElemMatchProjection(
         input.getDocument(), *expr.getMatchExpr(), expr.getFieldPath());
 }
