@@ -471,10 +471,16 @@ public:
                        [channel]() { return channel->GetState(true /*try_to_connect*/); });
                })
             .until([reactor, deadline](const StatusWith<grpc_connectivity_state>& swChannelState) {
-                // The channel is ready.
-                if (MONGO_likely(swChannelState.isOK() &&
-                                 swChannelState.getValue() == GRPC_CHANNEL_READY)) {
-                    return true;
+                if (MONGO_likely(swChannelState.isOK())) {
+                    LOGV2_DEBUG(11184500,
+                                3,
+                                "Checking gRPC connectivity state",
+                                "state"_attr = swChannelState.getValue());
+
+                    // The channel is ready.
+                    if (MONGO_likely(swChannelState.getValue() == GRPC_CHANNEL_READY)) {
+                        return true;
+                    }
                 }
 
                 // We've exceeded the deadline.
