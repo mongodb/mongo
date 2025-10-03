@@ -1782,7 +1782,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /src/mongo/db/**/persistent_task_store* @10gen/server-catalog-and-routing-shard-catalog @svc-auto-approve-bot
 /src/mongo/db/**/validate_api_parameters* @10gen/query-optimization @svc-auto-approve-bot
 /src/mongo/db/**/cursor_in_use_info* @10gen/query-execution @svc-auto-approve-bot
-/src/mongo/db/**/find_one_bm* @10gen/performance @svc-auto-approve-bot
+/src/mongo/db/**/crud_bm* @10gen/performance @svc-auto-approve-bot
 /src/mongo/db/**/tenant_id* @10gen/server-security @svc-auto-approve-bot
 /src/mongo/db/**/deferred_writer* @10gen/server-dbcheck @svc-auto-approve-bot
 /src/mongo/db/**/flow_control_ticketholder* @10gen/server-workload-resilience @svc-auto-approve-bot

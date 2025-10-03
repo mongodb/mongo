@@ -156,7 +156,7 @@ void setupStorage(ServiceContext* svcCtx, ClusterRole role) {
     });
 }
 
-class FindOneBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
+class CrudBenchmarkFixture : public ServiceEntryPointBenchmarkFixture {
 public:
     void setUpServiceContext(ServiceContext* svcCtx) override {
         auto service = svcCtx->getService(getClusterRole());
@@ -181,7 +181,16 @@ public:
     }
 
     static auto makeFindOneById() {
-        return BSON("find" << kCollection << "$db" << kDatabase << "filter" << BSON("_id" << 1));
+        return BSON("find" << kCollection << "$db" << kDatabase << "filter" << BSON("_id" << 1)
+                           << "limit" << 1 << "singleBatch" << true);
+    }
+
+    static auto makeUpdateOneById() {
+        return BSON(
+            "update" << kCollection << "$db" << kDatabase << "updates"
+                     << BSON_ARRAY(BSON("q" << BSON("_id" << 1) << "u"
+                                            << BSON("$set" << BSON("data" << "MongoDB Updated"))
+                                            << "multi" << false << "upsert" << false)));
     }
 
 private:
@@ -202,12 +211,18 @@ private:
     static constexpr auto kDatabase = "test"_sd;
 };
 
-BENCHMARK_DEFINE_F(FindOneBenchmarkFixture, BM_FIND_ONE)
+BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_FIND_ONE)
 (benchmark::State& state) {
     runBenchmark(state, makeFindOneById());
 }
 
-BENCHMARK_REGISTER_F(FindOneBenchmarkFixture, BM_FIND_ONE)->ThreadRange(1, kCommandBMMaxThreads);
+BENCHMARK_DEFINE_F(CrudBenchmarkFixture, BM_UPDATE_ONE)
+(benchmark::State& state) {
+    runBenchmark(state, makeUpdateOneById());
+}
+
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_FIND_ONE)->ThreadRange(1, kCommandBMMaxThreads);
+BENCHMARK_REGISTER_F(CrudBenchmarkFixture, BM_UPDATE_ONE)->ThreadRange(1, kCommandBMMaxThreads);
 
 }  // namespace
 }  // namespace mongo

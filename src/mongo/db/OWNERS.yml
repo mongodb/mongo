@@ -294,7 +294,7 @@ filters:
   - "cursor_in_use_info*":
     approvers:
       - 10gen/query-execution
-  - "find_one_bm*":
+  - "crud_bm*":
     approvers:
       - 10gen/performance
   - "tenant_id*":

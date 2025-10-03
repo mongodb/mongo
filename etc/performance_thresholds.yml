@@ -44,7 +44,7 @@
 ########################################################################################################
 
 tests:
-  FindOneBenchmarkFixture/BM_FIND_ONE:
+  CrudBenchmarkFixture/BM_FIND_ONE:
     al2023-arm64-sep-benchmark:
       - thread_level: 1
         metrics:

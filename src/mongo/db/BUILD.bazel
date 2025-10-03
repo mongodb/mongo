@@ -4417,9 +4417,9 @@ mongo_cc_benchmark(
 )
 
 mongo_cc_benchmark(
-    name = "find_one_bm",
+    name = "crud_bm",
     srcs = [
-        "find_one_bm.cpp",
+        "crud_bm.cpp",
         "service_entry_point_bm_fixture.h",
     ],
     tags = ["sep_bm"],

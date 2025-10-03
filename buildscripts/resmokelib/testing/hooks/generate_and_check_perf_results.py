@@ -6,7 +6,7 @@ import json
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import requests
 import tenacity
@@ -146,6 +146,7 @@ class GenerateAndCheckPerfResults(interface.Hook):
             for item in test_thresholds:
                 thread_level = item["thread_level"]
                 for metric in item["metrics"]:
+                    self.has_checked_results = True
                     value = self._retrieve_base_commit_value(
                         url=GET_TIMESERIES_URL,
                         test_name=test_name,
@@ -156,6 +157,11 @@ class GenerateAndCheckPerfResults(interface.Hook):
                         base_commit=base_commit_hash,
                         project=SEP_BENCHMARKS_PROJECT,
                     )
+                    if value is None:
+                        self.logger.warning(
+                            f"Skipping threshold check because no time series data found for test {test_name}, measurement {metric['name']} on variant {self.variant} in project {SEP_BENCHMARKS_PROJECT}."
+                        )
+                        continue
                     metrics_to_check.append(
                         IndividualMetricThreshold(
                             test_name=test_name,
@@ -181,8 +187,6 @@ class GenerateAndCheckPerfResults(interface.Hook):
                         )
                     else:
                         transformed_metrics[reported_metric] = individual_metric
-            if len(metrics_to_check) > 0:
-                self.has_checked_results = True
             # Add a dynamic resmoke test to make sure that the pass/fail results are reported correctly.
             hook_test_case = CheckPerfResultTestCase.create_after_test(
                 self.logger, test, self, metrics_to_check, transformed_metrics
@@ -272,8 +276,8 @@ class GenerateAndCheckPerfResults(interface.Hook):
         args: Dict[str, Any],
         base_commit: str,
         project: str,
-    ) -> int:
-        """Retrieve the base commit value for a given timeseries for a specific commit hash."""
+    ) -> Optional[int]:
+        """Retrieve the base commit value for a given timeseries for a specific commit hash. None implies there was no base value."""
         headers = {"accept": "application/json", "Content-Type": "application/json"}
         payload = {
             "infos": [
@@ -306,9 +310,10 @@ class GenerateAndCheckPerfResults(interface.Hook):
 
         time_series = data.get("time_series", [])
         if not time_series or not time_series[0].get("data"):
-            raise CedarReportError(
+            self.logger.info(
                 f"No time series data found for test {test_name}, measurement {measurement} on variant {variant} in project {project}."
             )
+            return None
 
         for point in time_series[0]["data"]:
             if point.get("commit") == base_commit:
@@ -326,9 +331,10 @@ class GenerateAndCheckPerfResults(interface.Hook):
         if value is not None:
             return value
 
-        raise CedarReportError(
+        self.logger.info(
             f"No value found for test {test_name}, measurement {measurement} on variant {variant} in project {project}"
         )
+        return None
 
 
 class CheckPerfResultTestCase(interface.DynamicTestCase):
