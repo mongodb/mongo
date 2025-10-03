@@ -201,15 +201,28 @@ void OplogWriterImpl::_run() {
     invariant(!_replCoord->getMemberState().arbiter());
 
     const auto flushJournal = !getGlobalServiceContext()->getStorageEngine()->isEphemeral();
-    const auto opCtxHolder = cc().makeOperationContext();
-    auto opCtx = opCtxHolder.get();
+
+    ServiceContext::UniqueOperationContext opCtxHolder;
+    OperationContext* opCtx = nullptr;
 
     // Oplog writes are crucial to the stability of the replica set. We give the operations
     // Immediate priority so that it skips waiting for ticket acquisition and flow control.
-    ScopedAdmissionPriority<ExecutionAdmissionContext> priority(
-        opCtx, AdmissionContext::Priority::kExempt);
+    boost::optional<ScopedAdmissionPriority<ExecutionAdmissionContext>> priority;
 
+    const auto resetOpCtx = [&] {
+        priority.reset();
+        opCtxHolder.reset();
+
+        opCtxHolder = cc().makeOperationContext();
+        opCtx = opCtxHolder.get();
+        priority.emplace(opCtx, AdmissionContext::Priority::kExempt);
+    };
+
+    resetOpCtx();
+
+    // TODO(SERVER-110834): Revisit the opCtx refresh timing wrt leaking cursors.
     while (true) {
+
         // For pausing replication in tests.
         if (MONGO_unlikely(rsSyncApplyStop.shouldFail())) {
             LOGV2(8543102,
@@ -231,8 +244,12 @@ void OplogWriterImpl::_run() {
             continue;
         }
 
-        // Extract the opTime and wallTime of the last op in the batch.
         auto ops = batch.releaseBatch();
+
+        // Reset and reacquire the opCtxHolder and scoped admission priority.
+        resetOpCtx();
+
+        // Extract the opTime and wallTime of the last op in the batch.
         auto lastOpTimeAndWallTime =
             invariantStatusOK(OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(ops.back()));
 
