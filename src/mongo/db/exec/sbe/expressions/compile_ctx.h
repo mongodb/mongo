@@ -36,6 +36,7 @@
 #include "mongo/db/exec/sbe/vm/vm_types.h"
 #include "mongo/db/pipeline/search/search_helper.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/modules.h"
 
 #include <memory>
 #include <utility>
