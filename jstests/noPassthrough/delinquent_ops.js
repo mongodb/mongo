@@ -11,6 +11,11 @@
  *
  * This file also tests the operations that have long-duration ticket acquisitions (so called
  * delinquent) are reporting the delinquent stats correctly.
+ *
+ * @tags: [
+ *      # TODO (SERVER-111522): Make MultiplePoolsTicketingSystem to correctly report statistics.
+ *      incompatible_with_execution_control_with_prioritization,
+ * ]
  */
 
 import {configureFailPoint} from "jstests/libs/fail_point_util.js";
