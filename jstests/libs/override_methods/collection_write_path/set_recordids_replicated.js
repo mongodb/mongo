@@ -39,6 +39,9 @@ function runCommandWithRecordIdsReplicated(conn, dbName, commandName, commandObj
         if (commandObj.hasOwnProperty("clusteredIndex")) {
             return func.apply(conn, makeFuncArgs(commandObj));
         }
+        if (commandObj.hasOwnProperty("timeseries")) {
+            return func.apply(conn, makeFuncArgs(commandObj));
+        }
         commandObj = Object.assign({}, commandObj);
         if (!commandObj.hasOwnProperty("recordIdsReplicated")) {
             commandObj.recordIdsReplicated = true;

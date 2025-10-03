@@ -56,7 +56,7 @@
     selector:
       exclude_files: null
       roots:
-        - jstests/noPassthrough/index_builds/*.js
+        - jstests/noPassthrough/**/index_builds/*.js
 - name: all_replica_sets_index_builds_tests_selector
   value:
     selector:

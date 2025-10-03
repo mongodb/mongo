@@ -48,5 +48,5 @@ selector:
     - requires_commit_quorum
     - requires_capped
   roots:
-    - jstests/noPassthrough/index_builds/*.js
+    - jstests/noPassthrough/**/index_builds/*.js
 test_kind: js_test
