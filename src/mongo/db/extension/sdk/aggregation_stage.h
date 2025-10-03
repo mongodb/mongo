@@ -57,7 +57,7 @@ public:
 /**
  * ExtensionLogicalAggregationStage is a boundary object representation of a
  * ::MongoExtensionLogicalAggregationStage. It is meant to abstract away the C++ implementation
- * by the extension, and provides the interface at the API boundary which will be called upon by the
+ * by the extension and provides the interface at the API boundary which will be called upon by the
  * host. The static VTABLE member points to static methods which ensure the correct conversion from
  * C++ context to the C API context.
  *
@@ -77,7 +77,8 @@ private:
         delete static_cast<ExtensionLogicalAggregationStage*>(extlogicalStage);
     }
 
-    static const ::MongoExtensionLogicalAggregationStageVTable VTABLE;
+    static constexpr ::MongoExtensionLogicalAggregationStageVTable VTABLE = {.destroy =
+                                                                                 &_extDestroy};
     std::unique_ptr<LogicalAggregationStage> _stage;
 };
 
@@ -113,7 +114,7 @@ protected:
 /**
  * ExtensionAggregationStageDescriptor is a boundary object representation of a
  * ::MongoExtensionAggregationStageDescriptor. It is meant to abstract away the C++ implementation
- * by the extension, and provides the interface at the API boundary which will be called upon by the
+ * by the extension and provides the interface at the API boundary which will be called upon by the
  * host. The static VTABLE member points to static methods which ensure the correct conversion from
  * C++ context to the C API context.
  *
@@ -169,7 +170,9 @@ private:
         });
     }
 
-    static const ::MongoExtensionAggregationStageDescriptorVTable VTABLE;
+    static constexpr ::MongoExtensionAggregationStageDescriptorVTable VTABLE = {
+        .get_type = &_extGetType, .get_name = &_extGetName, .parse = &_extParse};
+
     std::unique_ptr<AggregationStageDescriptor> _descriptor;
 };
 
@@ -191,7 +194,7 @@ public:
 /**
  * ExtensionAggregationStageAstNode is a boundary object representation of a
  * ::MongoExtensionAggregationStageAstNode. It is meant to abstract away the C++ implementation
- * by the extension, and provides the interface at the API boundary which will be called upon by the
+ * by the extension and provides the interface at the API boundary which will be called upon by the
  * host. The static VTABLE member points to static methods which ensure the correct conversion from
  * C++ context to the C API context.
  *
@@ -232,7 +235,8 @@ private:
         });
     }
 
-    static const MongoExtensionAggregationStageAstNodeVTable VTABLE;
+    static constexpr ::MongoExtensionAggregationStageAstNodeVTable VTABLE = {
+        .destroy = &_extDestroy, .bind = &_extBind};
     std::unique_ptr<AggregationStageAstNode> _astNode;
 };
 
@@ -261,7 +265,7 @@ public:
 /**
  * ExtensionAggregationStageParseNode is a boundary object representation of a
  * ::MongoExtensionAggregationStageParseNode. It is meant to abstract away the C++ implementation by
- * the extension, and provides the interface at the API boundary which will be called upon by the
+ * the extension and provides the interface at the API boundary which will be called upon by the
  * host. The static VTABLE member points to static methods which ensure the correct conversion from
  * C++ context to the C API context.
  *
@@ -384,8 +388,11 @@ private:
         });
     }
 
-    static const ::MongoExtensionAggregationStageParseNodeVTable VTABLE;
+    static constexpr ::MongoExtensionAggregationStageParseNodeVTable VTABLE = {
+        .destroy = &_extDestroy,
+        .get_query_shape = &_extGetQueryShape,
+        .get_expanded_size = &_extGetExpandedSize,
+        .expand = &_extExpand};
     std::unique_ptr<AggregationStageParseNode> _parseNode;
 };
-
 }  // namespace mongo::extension::sdk

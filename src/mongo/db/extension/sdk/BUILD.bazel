@@ -3,7 +3,6 @@ load("//bazel:mongo_src_rules.bzl", "mongo_cc_library")
 mongo_cc_library(
     name = "sdk_cpp",
     srcs = [
-        "aggregation_stage.cpp",
         "byte_buf.cpp",
         "extension_helper.cpp",
         "extension_status.cpp",
