@@ -111,6 +111,9 @@ GetNextResult ListSampledQueriesStage::doGetNext() {
         }
     }
 
+    tassert(11124500,
+            "expecting '_sharedState->execPipeline' to be initialized",
+            _sharedState->execPipeline);
     if (auto doc = _sharedState->execPipeline->getNext()) {
         auto queryDoc = SampledQueryDocument::parse(
             doc->toBson(), IDLParserContext(DocumentSourceListSampledQueries::kStageName));
