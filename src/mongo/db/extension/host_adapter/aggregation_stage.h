@@ -44,13 +44,12 @@
 namespace mongo::extension::host_adapter {
 
 /**
- * ExtensionLogicalAggregationStageHandle is an owned handle wrapper around a
+ * LogicalAggregationStageHandle is an owned handle wrapper around a
  * MongoExtensionLogicalAggregationStage.
  */
-class ExtensionLogicalAggregationStageHandle
-    : public OwnedHandle<::MongoExtensionLogicalAggregationStage> {
+class LogicalAggregationStageHandle : public OwnedHandle<::MongoExtensionLogicalAggregationStage> {
 public:
-    ExtensionLogicalAggregationStageHandle(::MongoExtensionLogicalAggregationStage* ptr)
+    LogicalAggregationStageHandle(::MongoExtensionLogicalAggregationStage* ptr)
         : OwnedHandle<::MongoExtensionLogicalAggregationStage>(ptr) {
         _assertValidVTable();
     }
@@ -60,13 +59,13 @@ protected:
 };
 
 /**
- * ExtensionAggregationStageDescriptorHandle is a wrapper around a
+ * AggregationStageDescriptorHandle is a wrapper around a
  * MongoExtensionAggregationStageDescriptor.
  */
-class ExtensionAggregationStageDescriptorHandle
+class AggregationStageDescriptorHandle
     : public UnownedHandle<const ::MongoExtensionAggregationStageDescriptor> {
 public:
-    ExtensionAggregationStageDescriptorHandle(
+    AggregationStageDescriptorHandle(
         absl::Nonnull<const ::MongoExtensionAggregationStageDescriptor*> descriptor)
         : UnownedHandle<const ::MongoExtensionAggregationStageDescriptor>(descriptor) {
         _assertValidVTable();
@@ -97,7 +96,7 @@ public:
      * On failure, the error triggers an assertion.
      *
      */
-    ExtensionLogicalAggregationStageHandle parse(BSONObj stageBson) const;
+    LogicalAggregationStageHandle parse(BSONObj stageBson) const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
@@ -114,13 +113,12 @@ protected:
 };
 
 /**
- * ExtensionAggregationStageAstNodeHandle is an owned handle wrapper around a
+ * AggregationStageAstNodeHandle is an owned handle wrapper around a
  * MongoExtensionAggregationStageAstNode.
  */
-class ExtensionAggregationStageAstNodeHandle
-    : public OwnedHandle<::MongoExtensionAggregationStageAstNode> {
+class AggregationStageAstNodeHandle : public OwnedHandle<::MongoExtensionAggregationStageAstNode> {
 public:
-    ExtensionAggregationStageAstNodeHandle(::MongoExtensionAggregationStageAstNode* ptr)
+    AggregationStageAstNodeHandle(::MongoExtensionAggregationStageAstNode* ptr)
         : OwnedHandle<::MongoExtensionAggregationStageAstNode>(ptr) {
         _assertValidVTable();
     }
@@ -133,7 +131,7 @@ public:
      * On failure, the error triggers an assertion.
      *
      */
-    ExtensionLogicalAggregationStageHandle bind() const;
+    LogicalAggregationStageHandle bind() const;
 
 protected:
     void _assertVTableConstraints(const VTable_t& vtable) const override {
@@ -142,18 +140,18 @@ protected:
     }
 };
 
-class ExtensionAggregationStageParseNodeHandle;
+class AggregationStageParseNodeHandle;
 using VariantNodeHandle =
-    std::variant<ExtensionAggregationStageParseNodeHandle, ExtensionAggregationStageAstNodeHandle>;
+    std::variant<AggregationStageParseNodeHandle, AggregationStageAstNodeHandle>;
 
 /**
- * ExtensionAggregationStageParseNodeHandle is a wrapper around a
+ * AggregationStageParseNodeHandle is a wrapper around a
  * MongoExtensionAggregationStageParseNode.
  */
-class ExtensionAggregationStageParseNodeHandle
+class AggregationStageParseNodeHandle
     : public OwnedHandle<::MongoExtensionAggregationStageParseNode> {
 public:
-    ExtensionAggregationStageParseNodeHandle(
+    AggregationStageParseNodeHandle(
         absl::Nonnull<::MongoExtensionAggregationStageParseNode*> parseNode)
         : OwnedHandle<::MongoExtensionAggregationStageParseNode>(parseNode) {
         _assertValidVTable();

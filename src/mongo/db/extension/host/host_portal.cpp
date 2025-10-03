@@ -39,7 +39,7 @@ void HostPortal::registerStageDescriptor(
     tassert(
         10596400, "Got null stage descriptor during extension registration", descriptor != nullptr);
     DocumentSourceExtension::registerStage(
-        host_adapter::ExtensionAggregationStageDescriptorHandle(descriptor));
+        host_adapter::AggregationStageDescriptorHandle(descriptor));
 }
 
 ::MongoExtensionStatus* HostPortal::_extRegisterStageDescriptor(

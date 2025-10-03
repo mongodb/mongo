@@ -36,16 +36,15 @@
 namespace mongo::extension::host_adapter {
 MONGO_FAIL_POINT_DEFINE(failExtensionExpand);
 
-ExtensionLogicalAggregationStageHandle ExtensionAggregationStageDescriptorHandle::parse(
-    BSONObj stageBson) const {
+LogicalAggregationStageHandle AggregationStageDescriptorHandle::parse(BSONObj stageBson) const {
     ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
     // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
     sdk::enterC(
         [&]() { return vtable().parse(get(), sdk::objAsByteView(stageBson), &logicalStagePtr); });
-    return ExtensionLogicalAggregationStageHandle(logicalStagePtr);
+    return LogicalAggregationStageHandle(logicalStagePtr);
 }
 
-std::vector<VariantNodeHandle> ExtensionAggregationStageParseNodeHandle::expand() const {
+std::vector<VariantNodeHandle> AggregationStageParseNodeHandle::expand() const {
     // Host allocates buffer with the expected size.
     const auto expandedSize = getExpandedSize();
     tassert(
@@ -117,12 +116,12 @@ std::vector<VariantNodeHandle> ExtensionAggregationStageParseNodeHandle::expand(
     return expandedVec;
 }
 
-ExtensionLogicalAggregationStageHandle ExtensionAggregationStageAstNodeHandle::bind() const {
+LogicalAggregationStageHandle AggregationStageAstNodeHandle::bind() const {
     ::MongoExtensionLogicalAggregationStage* logicalStagePtr;
 
     // The API's contract mandates that logicalStagePtr will only be allocated if status is OK.
     sdk::enterC([&]() { return vtable().bind(get(), &logicalStagePtr); });
 
-    return ExtensionLogicalAggregationStageHandle(logicalStagePtr);
+    return LogicalAggregationStageHandle(logicalStagePtr);
 }
 }  // namespace mongo::extension::host_adapter

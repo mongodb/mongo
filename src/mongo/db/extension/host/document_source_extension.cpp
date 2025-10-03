@@ -48,7 +48,7 @@ PrivilegeVector DocumentSourceExtension::LiteParsed::requiredPrivileges(
 
 // static
 void DocumentSourceExtension::registerStage(
-    host_adapter::ExtensionAggregationStageDescriptorHandle descriptor) {
+    host_adapter::AggregationStageDescriptorHandle descriptor) {
     auto nameStringData = descriptor.getName();
     auto id = DocumentSource::allocateId(nameStringData);
     auto nameAsString = std::string(nameStringData);
@@ -78,7 +78,7 @@ void DocumentSourceExtension::registerStage(
 void DocumentSourceExtension::registerStage(
     const std::string& name,
     DocumentSource::Id id,
-    extension::host_adapter::ExtensionAggregationStageDescriptorHandle descriptor) {
+    extension::host_adapter::AggregationStageDescriptorHandle descriptor) {
     DocumentSource::registerParser(
         name,
         [id, descriptor](BSONElement specElem,
@@ -98,7 +98,7 @@ DocumentSourceExtension::DocumentSourceExtension(
     boost::intrusive_ptr<ExpressionContext> exprCtx,
     Id id,
     BSONObj rawStage,
-    extension::host_adapter::ExtensionAggregationStageDescriptorHandle staticDescriptor)
+    extension::host_adapter::AggregationStageDescriptorHandle staticDescriptor)
     : DocumentSource(name, exprCtx),
       _stageName(std::string(name)),
       _id(id),

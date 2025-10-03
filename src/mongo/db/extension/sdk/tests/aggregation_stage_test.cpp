@@ -244,11 +244,11 @@ public:
     // This special handle class is only used within this fixture so that we can unit test the
     // assertVTableConstraints functionality of the handle.
     class TestParseNodeVTableHandle
-        : public extension::host_adapter::ExtensionAggregationStageParseNodeHandle {
+        : public extension::host_adapter::AggregationStageParseNodeHandle {
     public:
         TestParseNodeVTableHandle(
             absl::Nonnull<::MongoExtensionAggregationStageParseNode*> parseNode)
-            : extension::host_adapter::ExtensionAggregationStageParseNodeHandle(parseNode) {};
+            : extension::host_adapter::AggregationStageParseNodeHandle(parseNode) {};
 
         void assertVTableConstraints(const VTable_t& vtable) {
             _assertVTableConstraints(vtable);
@@ -258,11 +258,10 @@ public:
 
 class AstNodeVTableTest : public unittest::Test {
 public:
-    class TestAstNodeVTableHandle
-        : public extension::host_adapter::ExtensionAggregationStageAstNodeHandle {
+    class TestAstNodeVTableHandle : public extension::host_adapter::AggregationStageAstNodeHandle {
     public:
         TestAstNodeVTableHandle(absl::Nonnull<::MongoExtensionAggregationStageAstNode*> astNode)
-            : extension::host_adapter::ExtensionAggregationStageAstNodeHandle(astNode) {};
+            : extension::host_adapter::AggregationStageAstNodeHandle(astNode) {};
 
         void assertVTableConstraints(const VTable_t& vtable) {
             _assertVTableConstraints(vtable);
@@ -273,47 +272,43 @@ public:
 TEST(AggregationStageTest, CountingParseExpansionSucceedsTest) {
     auto countingParseNode =
         std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(CountingParse::make());
-    auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
-        countingParseNode.release()};
+    auto handle =
+        extension::host_adapter::AggregationStageParseNodeHandle{countingParseNode.release()};
 
     auto expanded = handle.expand();
     ASSERT_EQUALS(expanded.size(), 1);
 
     // TODO SERVER-111605 Check expansion results by name once get_name is added.
-    ASSERT_TRUE(
-        std::holds_alternative<extension::host_adapter::ExtensionAggregationStageAstNodeHandle>(
-            expanded[0]));
+    ASSERT_TRUE(std::holds_alternative<extension::host_adapter::AggregationStageAstNodeHandle>(
+        expanded[0]));
 }
 
 TEST(AggregationStageTest, NestedExpansionSucceedsTest) {
     auto nestedDesugarParseNode =
         std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
             NestedDesugaringParseNode::make());
-    auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
-        nestedDesugarParseNode.release()};
+    auto handle =
+        extension::host_adapter::AggregationStageParseNodeHandle{nestedDesugarParseNode.release()};
 
     auto expanded = handle.expand();
     ASSERT_EQUALS(expanded.size(), 2);
 
     // TODO SERVER-111605 Check expansion results by name once get_name is added.
     // First element is the AST node.
-    ASSERT_TRUE(
-        std::holds_alternative<extension::host_adapter::ExtensionAggregationStageAstNodeHandle>(
-            expanded[0]));
+    ASSERT_TRUE(std::holds_alternative<extension::host_adapter::AggregationStageAstNodeHandle>(
+        expanded[0]));
 
     // Second element is the nested ParseNode.
-    ASSERT_TRUE(
-        std::holds_alternative<extension::host_adapter::ExtensionAggregationStageParseNodeHandle>(
-            expanded[1]));
+    ASSERT_TRUE(std::holds_alternative<extension::host_adapter::AggregationStageParseNodeHandle>(
+        expanded[1]));
     auto& nestedHandle =
-        std::get<extension::host_adapter::ExtensionAggregationStageParseNodeHandle>(expanded[1]);
+        std::get<extension::host_adapter::AggregationStageParseNodeHandle>(expanded[1]);
 
     // Expand the nested node.
     auto nestedExpanded = nestedHandle.expand();
     ASSERT_EQUALS(nestedExpanded.size(), 1);
-    ASSERT_TRUE(
-        std::holds_alternative<extension::host_adapter::ExtensionAggregationStageAstNodeHandle>(
-            nestedExpanded[0]));
+    ASSERT_TRUE(std::holds_alternative<extension::host_adapter::AggregationStageAstNodeHandle>(
+        nestedExpanded[0]));
 }
 
 TEST(AggregationStageTest, HandlesPreventMemoryLeaksOnSuccess) {
@@ -325,7 +320,7 @@ TEST(AggregationStageTest, HandlesPreventMemoryLeaksOnSuccess) {
             NestedDesugaringParseNode::make());
 
     {
-        auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
+        auto handle = extension::host_adapter::AggregationStageParseNodeHandle{
             nestedDesugarParseNode.release()};
 
         [[maybe_unused]] auto expanded = handle.expand();
@@ -347,8 +342,8 @@ TEST(AggregationStageTest, HandlesPreventMemoryLeaksOnFailure) {
         std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
             NestedDesugaringParseNode::make());
 
-    auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
-        nestedDesugarParseNode.release()};
+    auto handle =
+        extension::host_adapter::AggregationStageParseNodeHandle{nestedDesugarParseNode.release()};
 
     auto failExpand = globalFailPointRegistry().find("failExtensionExpand");
     failExpand->setMode(FailPoint::skip, 1);
@@ -372,8 +367,8 @@ DEATH_TEST(AggregationStageTest, EmptyDesugarExpansionFails, "11113803") {
     auto emptyDesugarParseNode =
         std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
             DesugarToEmptyParseNode::make());
-    auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
-        emptyDesugarParseNode.release()};
+    auto handle =
+        extension::host_adapter::AggregationStageParseNodeHandle{emptyDesugarParseNode.release()};
 
     [[maybe_unused]] auto expanded = handle.expand();
 }
@@ -382,7 +377,7 @@ DEATH_TEST(AggregationStageTest, GetExpandedSizeLessThanActualExpansionSizeFails
     auto getExpandedSizeLessThanActualExpansionSizeParseNode =
         std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
             GetExpandedSizeLessThanActualExpansionSizeParseNode::make());
-    auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{
         getExpandedSizeLessThanActualExpansionSizeParseNode.release()};
 
     [[maybe_unused]] auto expanded = handle.expand();
@@ -392,7 +387,7 @@ DEATH_TEST(AggregationStageTest, GetExpandedSizeGreaterThanActualExpansionSizeFa
     auto getExpandedSizeGreaterThanActualExpansionSizeParseNode =
         std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
             GetExpandedSizeGreaterThanActualExpansionSizeParseNode::make());
-    auto handle = extension::host_adapter::ExtensionAggregationStageParseNodeHandle{
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{
         getExpandedSizeGreaterThanActualExpansionSizeParseNode.release()};
 
     [[maybe_unused]] auto expanded = handle.expand();
@@ -431,7 +426,7 @@ DEATH_TEST_F(ParseNodeVTableTest, InvalidParseNodeVTableFailsExpand, "10977602")
 TEST(AggregationStageTest, NoOpAstNodeTest) {
     auto noOpAggregationStageAstNode =
         std::make_unique<extension::sdk::ExtensionAggregationStageAstNode>(NoOpAstNode::make());
-    auto handle = extension::host_adapter::ExtensionAggregationStageAstNodeHandle{
+    auto handle = extension::host_adapter::AggregationStageAstNodeHandle{
         noOpAggregationStageAstNode.release()};
 
     [[maybe_unused]] auto logicalStageHandle = handle.bind();
