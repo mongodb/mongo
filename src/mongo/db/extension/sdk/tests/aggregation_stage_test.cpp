@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/extension/host_adapter/aggregation_stage.h"
 #include "mongo/db/extension/public/api.h"
+#include "mongo/db/extension/sdk/query_shape_opts_handle.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -61,7 +62,6 @@ public:
         return std::make_unique<NoOpLogicalAggregationStage>();
     }
 
-
     static inline std::unique_ptr<extension::sdk::AggregationStageAstNode> make() {
         return std::make_unique<NoOpAstNode>();
     }
@@ -80,6 +80,10 @@ public:
         expanded.reserve(kExpansionSize);
         expanded.emplace_back(std::make_unique<NoOpAstNode>());
         return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
     }
 
     static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
@@ -114,6 +118,10 @@ public:
 
     std::vector<extension::sdk::VariantNode> expand() const override {
         return {};
+    }
+
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
     }
 
     static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
@@ -166,6 +174,10 @@ public:
         return expanded;
     }
 
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
     static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
         return std::make_unique<CountingParse>();
     }
@@ -190,6 +202,10 @@ public:
         return expanded;
     }
 
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
     static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
         return std::make_unique<NestedDesugaringParseNode>();
     }
@@ -212,6 +228,10 @@ public:
         return expanded;
     }
 
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
+    }
+
     static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
         return std::make_unique<GetExpandedSizeLessThanActualExpansionSizeParseNode>();
     }
@@ -232,6 +252,10 @@ public:
         expanded.emplace_back(std::make_unique<CountingAST>());
         expanded.emplace_back(std::make_unique<CountingParse>());
         return expanded;
+    }
+
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        return BSONObj();
     }
 
     static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
@@ -441,5 +465,102 @@ DEATH_TEST_F(AstNodeVTableTest, InvalidAstNodeVTable, "11113700") {
     vtable.bind = nullptr;
     handle.assertVTableConstraints(vtable);
 };
+
+class SimpleQueryShapeParseNode : public extension::sdk::AggregationStageParseNode {
+public:
+    static constexpr StringData kStageName = "$simpleQueryShape";
+    static constexpr StringData kStageSpec = "mongodb";
+
+    size_t getExpandedSize() const override {
+        return 0;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        return {};
+    }
+
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        return BSON(kStageName << kStageSpec);
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
+        return std::make_unique<SimpleQueryShapeParseNode>();
+    }
+};
+
+TEST(AggregationStageTest, SimpleComputeQueryShapeSucceeds) {
+    auto parseNode = std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
+        SimpleQueryShapeParseNode::make());
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode.release()};
+
+    SerializationOptions opts{};
+    auto queryShape = handle.getQueryShape(opts);
+    ASSERT_BSONOBJ_EQ(
+        BSON(SimpleQueryShapeParseNode::kStageName << SimpleQueryShapeParseNode::kStageSpec),
+        queryShape);
+}
+
+class IdentifierQueryShapeParseNode : public extension::sdk::AggregationStageParseNode {
+public:
+    static constexpr StringData kStageName = "$identifierQueryShape";
+    static constexpr StringData kIndexFieldName = "index";
+    static constexpr StringData kIndexValue = "identifier";
+
+    size_t getExpandedSize() const override {
+        return 0;
+    }
+
+    std::vector<extension::sdk::VariantNode> expand() const override {
+        return {};
+    }
+
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const override {
+        extension::sdk::QueryShapeOptsHandle ctxHandle(ctx);
+        BSONObjBuilder builder;
+
+        builder.append(kIndexFieldName, ctxHandle.serializeIdentifier(std::string(kIndexValue)));
+
+        return BSON(kStageName << builder.obj());
+    }
+
+    static inline std::unique_ptr<extension::sdk::AggregationStageParseNode> make() {
+        return std::make_unique<IdentifierQueryShapeParseNode>();
+    }
+
+    static std::string applyHmacForTest(StringData sd) {
+        return "REDACT_" + std::string{sd};
+    }
+};
+
+TEST(AggregationStageTest, SerializingIdentifierQueryShapeSucceedsWithNoTransformation) {
+    auto parseNode = std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
+        IdentifierQueryShapeParseNode::make());
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode.release()};
+
+    SerializationOptions opts{};
+    auto queryShape = handle.getQueryShape(opts);
+    ASSERT_BSONOBJ_EQ(BSON(IdentifierQueryShapeParseNode::kStageName
+                           << BSON(IdentifierQueryShapeParseNode::kIndexFieldName
+                                   << IdentifierQueryShapeParseNode::kIndexValue)),
+                      queryShape);
+}
+
+TEST(AggregationStageTest, SerializingIdentifierQueryShapeSucceedsWithTransformation) {
+    auto parseNode = std::make_unique<extension::sdk::ExtensionAggregationStageParseNode>(
+        IdentifierQueryShapeParseNode::make());
+    auto handle = extension::host_adapter::AggregationStageParseNodeHandle{parseNode.release()};
+
+    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
+    opts.transformIdentifiers = true;
+    opts.transformIdentifiersCallback = IdentifierQueryShapeParseNode::applyHmacForTest;
+
+    auto queryShape = handle.getQueryShape(opts);
+    ASSERT_BSONOBJ_EQ(BSON(IdentifierQueryShapeParseNode::kStageName
+                           << BSON(IdentifierQueryShapeParseNode::kIndexFieldName
+                                   << IdentifierQueryShapeParseNode::applyHmacForTest(
+                                          IdentifierQueryShapeParseNode::kIndexValue))),
+                      queryShape);
+}
+
 }  // namespace
 }  // namespace mongo

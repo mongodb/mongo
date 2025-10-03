@@ -147,6 +147,27 @@ const int32_t MONGO_EXTENSION_STATUS_RUNTIME_ERROR = -1;
 const int32_t MONGO_EXTENSION_STATUS_OK = 0;
 
 /**
+ * MongoHostQueryShapeOpts exposes helpers for an extension to serialize certain values
+ * inside of a stage's BSON specification for query shape serialization.
+ *
+ * The pointer is only valid during a single call to serialization and should not be retained by the
+ * extension.
+ */
+typedef struct MongoHostQueryShapeOpts {
+    const struct MongoHostQueryShapeOptsVTable* vtable;
+} MongoHostQueryShapeOpts;
+
+typedef struct MongoHostQueryShapeOptsVTable {
+    /**
+     * Populates the ByteBuf with the serialized version of the identifier. Ownership is
+     * transferred to the caller.
+     */
+    MongoExtensionStatus* (*serialize_identifier)(const MongoHostQueryShapeOpts* ctx,
+                                                  const MongoExtensionByteView* ident,
+                                                  MongoExtensionByteBuf** output);
+} MongoHostQueryShapeOptsVTable;
+
+/**
  * Types of aggregation stages that can be implemented as an extension.
  */
 typedef enum MongoExtensionAggregationStageType : uint32_t {
@@ -274,6 +295,7 @@ typedef struct MongoExtensionAggregationStageParseNodeVTable {
      */
     MongoExtensionStatus* (*get_query_shape)(
         const MongoExtensionAggregationStageParseNode* parseNode,
+        const MongoHostQueryShapeOpts* ctx,
         MongoExtensionByteBuf** queryShape);
 
     /**

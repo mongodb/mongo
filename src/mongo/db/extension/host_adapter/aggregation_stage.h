@@ -157,7 +157,7 @@ public:
         _assertValidVTable();
     }
 
-    // TODO(SERVER-111368): Add getQueryShape().
+    BSONObj getQueryShape(const SerializationOptions& opts) const;
 
     /**
      * Expands this parse node into its child nodes and returns them as a vector of host-side

@@ -9,6 +9,7 @@ mongo_cc_library(
     name = "extensions_host_adapter",
     srcs = [
         "aggregation_stage.cpp",
+        "query_shape_opts_adapter.cpp",
     ],
     hdrs = [
         "aggregation_stage.h",
@@ -16,6 +17,7 @@ mongo_cc_library(
         "extension_handle.h",
         "extension_status.h",
         "handle.h",
+        "query_shape_opts_adapter.h",
         "//src/mongo/db/extension/host:host_portal.h",
     ],
     visibility = ["//visibility:public"],

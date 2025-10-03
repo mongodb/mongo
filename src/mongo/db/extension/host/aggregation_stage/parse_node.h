@@ -128,6 +128,7 @@ private:
 
     static ::MongoExtensionStatus* _hostGetQueryShape(
         const ::MongoExtensionAggregationStageParseNode* parseNode,
+        const ::MongoHostQueryShapeOpts* ctx,
         ::MongoExtensionByteBuf** queryShape) noexcept {
         return sdk::enterCXX([]() {
             tasserted(10977800,

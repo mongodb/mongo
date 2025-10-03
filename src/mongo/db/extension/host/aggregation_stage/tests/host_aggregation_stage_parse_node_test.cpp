@@ -59,6 +59,10 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
+    BSONObj getQueryShape(const ::MongoHostQueryShapeOpts*) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     static inline std::unique_ptr<sdk::AggregationStageParseNode> make() {
         return std::make_unique<NoOpExtensionParseNode>();
     }
@@ -148,7 +152,7 @@ DEATH_TEST(HostParseNodeTest, HostGetQueryShapeUnimplemented, "10977800") {
     auto handle = host_adapter::AggregationStageParseNodeHandle{noOpParseNode.release()};
 
     ::MongoExtensionByteBuf* shape = {};
-    handle.vtable().get_query_shape(noOpParseNode.get(), &shape);
+    handle.vtable().get_query_shape(noOpParseNode.get(), nullptr, &shape);
 }
 
 DEATH_TEST(HostParseNodeTest, HostGetExpandedSizeUnimplemented, "11113803") {

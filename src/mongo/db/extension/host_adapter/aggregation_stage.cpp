@@ -28,6 +28,7 @@
  */
 #include "mongo/db/extension/host_adapter/aggregation_stage.h"
 
+#include "mongo/db/extension/host_adapter/query_shape_opts_adapter.h"
 #include "mongo/db/extension/sdk/byte_buf.h"
 #include "mongo/db/extension/sdk/extension_status.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
@@ -42,6 +43,26 @@ LogicalAggregationStageHandle AggregationStageDescriptorHandle::parse(BSONObj st
     sdk::enterC(
         [&]() { return vtable().parse(get(), sdk::objAsByteView(stageBson), &logicalStagePtr); });
     return LogicalAggregationStageHandle(logicalStagePtr);
+}
+
+BSONObj AggregationStageParseNodeHandle::getQueryShape(const SerializationOptions& opts) const {
+    ::MongoExtensionByteBuf* buf;
+    const auto& vtbl = vtable();
+    auto* ptr = get();
+    host::QueryShapeOptsAdapter optsCtx(&opts);
+
+    sdk::enterC([&]() { return vtbl.get_query_shape(ptr, &optsCtx, &buf); });
+
+    if (!buf) {
+        // TODO SERVER-111882 tassert here instead of returning empty string, since this would
+        // indicate programmer error. The implementation of get_query_shape cannot return nullptr.
+        return BSONObj();
+    }
+
+    // Take ownership of the returned buffer so that it gets cleaned up, then retrieve an owned
+    // BSONObj to return to the host.
+    sdk::VecByteBufHandle ownedBuf{static_cast<sdk::VecByteBuf*>(buf)};
+    return sdk::bsonObjFromByteView(ownedBuf.getByteView()).getOwned();
 }
 
 std::vector<VariantNodeHandle> AggregationStageParseNodeHandle::expand() const {

@@ -19,6 +19,7 @@ mongo_cc_library(
         "handle.h",
         "host_portal.h",
         "host_services.h",
+        "query_shape_opts_handle.h",
         "versioned_extension.h",
     ],
     visibility = ["//visibility:public"],

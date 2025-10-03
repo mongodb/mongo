@@ -255,7 +255,7 @@ class AggregationStageParseNode {
 public:
     virtual ~AggregationStageParseNode() = default;
 
-    // TODO(SERVER-111368): Add getQueryShape().
+    virtual BSONObj getQueryShape(const ::MongoHostQueryShapeOpts* ctx) const = 0;
 
     virtual size_t getExpandedSize() const = 0;
 
@@ -295,9 +295,17 @@ private:
 
     static ::MongoExtensionStatus* _extGetQueryShape(
         const ::MongoExtensionAggregationStageParseNode* parseNode,
+        const ::MongoHostQueryShapeOpts* ctx,
         ::MongoExtensionByteBuf** queryShape) noexcept {
-        // TODO(SERVER-111368): Implement.
-        MONGO_UNIMPLEMENTED;
+        return enterCXX([&]() {
+            *queryShape = nullptr;
+
+            const auto& impl =
+                static_cast<const ExtensionAggregationStageParseNode*>(parseNode)->getImpl();
+
+            // Allocate a buffer on the heap. Ownership is transferred to the caller.
+            *queryShape = new VecByteBuf(impl.getQueryShape(ctx));
+        });
     };
 
     static size_t _extGetExpandedSize(
