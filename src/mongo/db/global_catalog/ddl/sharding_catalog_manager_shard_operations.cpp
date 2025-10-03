@@ -735,7 +735,7 @@ boost::optional<RemoveShardProgress> ShardingCatalogManager::checkPreconditionsA
     // failed addShard/removeShard operation.
     topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
 
-    const auto shardName = shardId.toString();
+    const auto& shardName = shardId.toString();
     audit::logRemoveShard(opCtx->getClient(), shardName);
 
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
@@ -819,7 +819,7 @@ void ShardingCatalogManager::stopDrain(OperationContext* opCtx, const ShardId& s
     // failed addShard/removeShard operation.
     topology_change_helpers::resetDDLBlockingForTopologyChangeIfNeeded(opCtx);
 
-    const auto shardName = shardId.toString();
+    const auto& shardName = shardId.toString();
 
     // Take the cluster cardinality parameter lock and the shard membership lock in exclusive mode
     // so that no add/remove shard operation and its set cluster cardinality parameter operation can
@@ -898,7 +898,7 @@ RemoveShardProgress ShardingCatalogManager::checkDrainingProgress(OperationConte
 
 bool ShardingCatalogManager::isShardCurrentlyDraining(OperationContext* opCtx,
                                                       const ShardId& shardId) {
-    const auto shardName = shardId.toString();
+    const auto& shardName = shardId.toString();
     return topology_change_helpers::runCountCommandOnConfig(
                opCtx,
                _localConfigShard,
@@ -925,7 +925,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     const auto shard = *optShard;
     const auto replicaSetName =
         uassertStatusOK(ConnectionString::parse(shard.getHost())).getReplicaSetName();
-    const auto shardName = shardId.toString();
+    const auto& shardName = shardId.toString();
 
     if (shardId == ShardId::kConfigServerId) {
         topology_change_helpers::joinMigrations(opCtx);
