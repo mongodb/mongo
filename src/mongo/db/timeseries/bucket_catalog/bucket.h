@@ -112,9 +112,7 @@ public:
     bool isReopened = false;
 
     // The total compressed size in bytes of the bucket's BSON serialization,
-    // not including measurements to be inserted until a WriteBatch is committed. With the feature
-    // flag off, the total uncompressed size in bytes of the bucket's BSON serialization, including
-    // measurements to be inserted.
+    // not including measurements to be inserted until a WriteBatch is committed.
     int32_t size = 0;
 
     // The total number of measurements in the bucket, including uncommitted measurements and
