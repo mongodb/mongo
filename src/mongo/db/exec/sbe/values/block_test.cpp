@@ -40,6 +40,7 @@
 #include "mongo/db/exec/sbe/values/ts_block.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/idl/server_parameter_test_controller.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
@@ -1367,6 +1368,24 @@ TEST_F(ValueBlockTest, ArgMinMaxGetAt) {
         ASSERT_EQ(monoblock->argMin(), boost::none);
         ASSERT_EQ(monoblock->argMax(), boost::none);
     }
+}
+
+DEATH_TEST_REGEX_F(ValueBlockTest, OutOfBoundsAt, "Tripwire assertion.*11089617") {
+    auto block = value::MonoBlock::makeNothingBlock(1);
+    ASSERT_THAT(block->at(0),
+                ValueEq(std::pair{value::TypeTags::Nothing, value::bitcastFrom<int64_t>(0)}));
+    // Expect this at() to tassert
+    auto _ = block->at(1);
+}
+
+DEATH_TEST_REGEX_F(ValueBlockTest, OutOfBoundsAt2, "Tripwire assertion.*11089618") {
+    auto block = std::make_unique<value::Int64Block>();
+    block->push_back(static_cast<int64_t>(10));
+    auto& valueBlock = static_cast<value::ValueBlock&>(*block);
+    ASSERT_THAT(valueBlock.at(0),
+                ValueEq(std::pair{value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(10)}));
+    // Expect this at() to tassert
+    auto _ = valueBlock.at(1);
 }
 
 TEST_F(ValueBlockTest, AllTrueFalseTest) {

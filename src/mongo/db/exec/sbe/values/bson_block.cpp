@@ -171,7 +171,8 @@ std::vector<std::unique_ptr<CellBlock>> BSONExtractorImpl::extractFromTopLevelFi
     StringData topLevelField,
     const std::span<const TypeTags>& tags,
     const std::span<const Value>& vals) {
-    invariant(tags.size() == vals.size());
+    tassert(
+        11089616, "Number of Tags doesn't match the number of Values", tags.size() == vals.size());
 
     auto node = _root.getChildren.find(topLevelField);
 

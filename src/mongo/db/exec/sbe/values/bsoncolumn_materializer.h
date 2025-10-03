@@ -279,46 +279,75 @@ inline SBEColumnMaterializer::Element SBEColumnMaterializer::materialize(
     return bson::convertFrom<true /* view */>(allocatedElem.element());
 }
 
-template <typename T>
-T SBEColumnMaterializer::get(const Element& elem) {
-    if constexpr (std::is_same_v<T, double>) {
-        return value::bitcastTo<double>(elem.second);
-    } else if constexpr (std::is_same_v<T, StringData>) {
-        return value::getStringView(elem.first, elem.second);
-    } else if constexpr (std::is_same_v<T, BSONObj>) {
-        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Obj();
-    } else if constexpr (std::is_same_v<T, BSONArray>) {
-        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Array();
-    } else if constexpr (std::is_same_v<T, BSONBinData>) {
-        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).BinData();
-    } else if constexpr (std::is_same_v<T, OID>) {
-        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).ObjectID();
-    } else if constexpr (std::is_same_v<T, bool>) {
-        return value::bitcastTo<double>(elem.second);
-    } else if constexpr (std::is_same_v<T, Date_t>) {
-        return Date_t::fromMillisSinceEpoch(value::bitcastTo<long long>(elem.second));
-    } else if constexpr (std::is_same_v<T, BSONRegEx>) {
-        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Regex();
-    } else if constexpr (std::is_same_v<T, BSONDBRef>) {
-        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).DBRef();
-    } else if constexpr (std::is_same_v<T, BSONCode>) {
-        return BSONCode(value::getStringView(elem.first, elem.second));
-    } else if constexpr (std::is_same_v<T, BSONSymbol>) {
-        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Symbol();
-    } else if constexpr (std::is_same_v<T, BSONCodeWScope>) {
-        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).CodeWScope();
-    } else if constexpr (std::is_same_v<T, int32_t>) {
-        return value::bitcastTo<int32_t>(elem.second);
-    } else if constexpr (std::is_same_v<T, Timestamp>) {
-        return Timestamp(value::bitcastTo<unsigned long long>(elem.second));
-    } else if constexpr (std::is_same_v<T, int64_t>) {
-        return value::bitcastTo<int64_t>(elem.second);
-    } else if constexpr (std::is_same_v<T, Decimal128>) {
-        return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Decimal();
-    }
-    invariant(false);
-    return T{};
+template <>
+inline double SBEColumnMaterializer::get<double>(const Element& elem) {
+    return value::bitcastTo<double>(elem.second);
 }
+template <>
+inline StringData SBEColumnMaterializer::get<StringData>(const Element& elem) {
+    return value::getStringView(elem.first, elem.second);
+}
+template <>
+inline BSONObj SBEColumnMaterializer::get<BSONObj>(const Element& elem) {
+    return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Obj();
+}
+template <>
+inline BSONArray SBEColumnMaterializer::get<BSONArray>(const Element& elem) {
+    return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Array();
+}
+template <>
+inline BSONBinData SBEColumnMaterializer::get<BSONBinData>(const Element& elem) {
+    return BSONElementValue(value::bitcastTo<const char*>(elem.second)).BinData();
+}
+template <>
+inline OID SBEColumnMaterializer::get<OID>(const Element& elem) {
+    return BSONElementValue(value::bitcastTo<const char*>(elem.second)).ObjectID();
+}
+template <>
+inline bool SBEColumnMaterializer::get<bool>(const Element& elem) {
+    return value::bitcastTo<bool>(elem.second);
+}
+template <>
+inline Date_t SBEColumnMaterializer::get<Date_t>(const Element& elem) {
+    return Date_t::fromMillisSinceEpoch(value::bitcastTo<long long>(elem.second));
+}
+template <>
+inline BSONRegEx SBEColumnMaterializer::get<BSONRegEx>(const Element& elem) {
+    return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Regex();
+}
+template <>
+inline BSONDBRef SBEColumnMaterializer::get<BSONDBRef>(const Element& elem) {
+    return BSONElementValue(value::bitcastTo<const char*>(elem.second)).DBRef();
+}
+template <>
+inline BSONCode SBEColumnMaterializer::get<BSONCode>(const Element& elem) {
+    return BSONCode(value::getStringView(elem.first, elem.second));
+}
+template <>
+inline BSONSymbol SBEColumnMaterializer::get<BSONSymbol>(const Element& elem) {
+    return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Symbol();
+}
+template <>
+inline BSONCodeWScope SBEColumnMaterializer::get<BSONCodeWScope>(const Element& elem) {
+    return BSONElementValue(value::bitcastTo<const char*>(elem.second)).CodeWScope();
+}
+template <>
+inline int32_t SBEColumnMaterializer::get<int32_t>(const Element& elem) {
+    return value::bitcastTo<int32_t>(elem.second);
+}
+template <>
+inline Timestamp SBEColumnMaterializer::get<Timestamp>(const Element& elem) {
+    return Timestamp(value::bitcastTo<unsigned long long>(elem.second));
+}
+template <>
+inline int64_t SBEColumnMaterializer::get<int64_t>(const Element& elem) {
+    return value::bitcastTo<int64_t>(elem.second);
+}
+template <>
+inline Decimal128 SBEColumnMaterializer::get<Decimal128>(const Element& elem) {
+    return BSONElementValue(value::bitcastTo<const char*>(elem.second)).Decimal();
+}
+
 
 /**
  * The path we want to materialize from the reference object. Has method elementsToMaterialize which

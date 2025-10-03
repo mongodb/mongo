@@ -236,7 +236,7 @@ void BsonWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
             std::pair(get.field, std::make_unique<BsonWalkNode<ProjectionRecorder>>()));
         it->second->add(path, outFilterRecorder, outProjRecorder, pathIdx + 1);
     } else if (holds_alternative<CellBlock::Traverse>(path[pathIdx])) {
-        invariant(pathIdx != 0);
+        tassert(11089614, "Unexpected pathIdx", pathIdx != 0);
         if (!traverseChild) {
             traverseChild = std::make_unique<BsonWalkNode<ProjectionRecorder>>();
         }
@@ -248,15 +248,14 @@ void BsonWalkNode<ProjectionRecorder>::add(const CellBlock::Path& path,
 
         traverseChild->add(path, outFilterRecorder, outProjRecorder, pathIdx + 1);
     } else if (holds_alternative<CellBlock::Id>(path[pathIdx])) {
-        invariant(pathIdx != 0);
-
+        tassert(11089610, "Unexpected pathIdx", pathIdx != 0);
         if (outFilterRecorder) {
             filterRecorder = outFilterRecorder;
         }
         if (outProjRecorder) {
             projRecorder = outProjRecorder;
         }
-        invariant(pathIdx == path.size() - 1);
+        tassert(11089612, "Unexpected pathIdx", pathIdx == path.size() - 1);
     }
 }
 

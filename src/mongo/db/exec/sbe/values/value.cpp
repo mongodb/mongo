@@ -939,7 +939,9 @@ void readKeyStringValueIntoAccessors(const SortedDataKeyValueView& keyString,
                                      std::vector<OwnedValueAccessor>* accessors,
                                      boost::optional<IndexKeysInclusionSet> indexKeysToInclude) {
     OwnedValueAccessorValueBuilder valBuilder(valueBufferBuilder);
-    invariant(!indexKeysToInclude || indexKeysToInclude->count() == accessors->size());
+    tassert(11089607,
+            "Number of index keys doesn't match the number of accessors",
+            !indexKeysToInclude || indexKeysToInclude->count() == accessors->size());
 
     auto ks = keyString.getKeyStringWithoutRecordIdView();
     BufReader reader(ks.data(), ks.size());
