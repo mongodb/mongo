@@ -42,6 +42,10 @@ class BSONObjBuilder;
 class OperationContext;
 
 namespace repl {
+namespace apply_ops_command_info_details {
+bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd);
+}  // namespace apply_ops_command_info_details
+
 class ApplyOps {
 public:
     static constexpr StringData kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;

@@ -2058,6 +2058,7 @@ mongo_cc_unit_test(
     name = "db_repl_misc_test",
     srcs = [
         "abstract_async_component_test.cpp",
+        "apply_ops_command_info_test.cpp",
         "apply_ops_test.cpp",
         "delayable_timeout_callback_test.cpp",
         "get_next_optimes_test.cpp",

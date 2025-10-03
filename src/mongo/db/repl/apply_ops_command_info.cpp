@@ -50,7 +50,7 @@
 namespace mongo {
 namespace repl {
 
-namespace {
+namespace apply_ops_command_info_details {
 
 /**
  * Return true iff the applyOpsCmd can be executed in a single WriteUnitOfWork.
@@ -78,7 +78,7 @@ bool _parseAreOpsCrudOnly(const BSONObj& applyOpCmd) {
     return true;
 }
 
-}  // namespace
+}  // namespace apply_ops_command_info_details
 
 // static
 ApplyOpsCommandInfo ApplyOpsCommandInfo::parse(const BSONObj& applyOpCmd) {
@@ -95,7 +95,7 @@ bool ApplyOpsCommandInfo::areOpsCrudOnly() const {
 }
 
 ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
-    : _areOpsCrudOnly(_parseAreOpsCrudOnly(applyOpCmd)) {
+    : _areOpsCrudOnly(apply_ops_command_info_details::_parseAreOpsCrudOnly(applyOpCmd)) {
     const auto tid = repl::OplogEntry::parseTid(applyOpCmd);
     const auto vts = tid
         ? boost::make_optional(auth::ValidatedTenancyScopeFactory::create(
