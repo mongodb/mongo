@@ -438,7 +438,9 @@ private:
     SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;
 
     // The aggregation pipeline defined with the user request, prior to optimization and view
-    // resolution. If the user did not define a pipeline this will be 'boost::none'.
+    // resolution. If the user did not define a pipeline this will be 'boost::none'. Subpipelines on
+    // timeseries could have no '_userPipeline' but will always create a pipeline during execution
+    // to unpack raw buckets.
     boost::optional<std::vector<BSONObj>> _userPipeline;
 
     // Holds 'let' variables defined in $lookup stage. 'let' variables are stored in the vector in

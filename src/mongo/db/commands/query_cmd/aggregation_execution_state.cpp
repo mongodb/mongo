@@ -748,20 +748,18 @@ bool AggCatalogState::requiresExtendedRangeSupportForTimeseries(
         }
     });
 
-    // It's possible that an involved nss that resolves to a timeseries buckets collection requires
-    // extended range support (e.g. in the foreign coll of a $lookup), so we check for that as well.
+    // It's possible that an involved nss resolves to a timeseries collection that requires extended
+    // range support (e.g. in the foreign coll of a $lookup), so we check for that as well.
     if (!requiresExtendedRange) {
         for (auto& [_, resolvedNs] : resolvedNamespaces) {
             const auto& nss = resolvedNs.ns;
-            if (nss.isTimeseriesBucketsCollection()) {
-                auto readTimestamp = shard_role_details::getRecoveryUnit(_aggExState.getOpCtx())
-                                         ->getPointInTimeReadTimestamp();
-                auto collPtr = CollectionPtr(getCatalog()->establishConsistentCollection(
-                    _aggExState.getOpCtx(), NamespaceStringOrUUID(nss), readTimestamp));
-                if (collPtr && collPtr->getRequiresTimeseriesExtendedRangeSupport()) {
-                    requiresExtendedRange = true;
-                    break;
-                }
+            auto readTimestamp = shard_role_details::getRecoveryUnit(_aggExState.getOpCtx())
+                                     ->getPointInTimeReadTimestamp();
+            auto collPtr = CollectionPtr(getCatalog()->establishConsistentCollection(
+                _aggExState.getOpCtx(), NamespaceStringOrUUID(nss), readTimestamp));
+            if (collPtr && collPtr->getRequiresTimeseriesExtendedRangeSupport()) {
+                requiresExtendedRange = true;
+                break;
             }
         }
     }

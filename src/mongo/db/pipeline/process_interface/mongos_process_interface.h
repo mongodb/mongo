@@ -285,8 +285,9 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         Pipeline* ownedPipeline,
         bool attachCursorAfterOptimizing,
-        std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline =
-            nullptr,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           Pipeline* pipeline,
+                           CollectionMetadata collData)> finalizePipeline = nullptr,
         bool shouldUseCollectionDefaultCollator = false,
         boost::optional<const AggregateCommandRequest&> aggRequest = boost::none,
         ExecShardFilterPolicy shardFilterPolicy = AutomaticShardFiltering{}) final {
@@ -370,8 +371,9 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         Pipeline* ownedPipeline,
         bool attachCursorAfterOptimizing,
-        std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline =
-            nullptr,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           Pipeline* pipeline,
+                           CollectionMetadata collData)> finalizePipeline = nullptr,
         ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
         boost::optional<BSONObj> readConcern = boost::none,
         bool shouldUseCollectionDefaultCollator = false) final;

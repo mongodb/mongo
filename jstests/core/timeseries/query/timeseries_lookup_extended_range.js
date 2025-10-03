@@ -43,8 +43,22 @@ function runTest(extendedRangeDocs) {
     assert.commandWorked(foreignColl.insert(extendedRangeDocs));
 
     const pipeline = [{$lookup: {from: foreignColl.getName(), pipeline: [{$sort: {t: 1}}], as: "result"}}];
-    const res = localColl.aggregate(pipeline).toArray();
+    let res = localColl.aggregate(pipeline).toArray();
     assert.eq(res.length, 1);
+
+    // Rerun the pipeline on a view on the foreign collection.
+    const foreignView = db.foreign_view;
+    assert(foreignView.drop());
+    assert.commandWorked(db.createView(foreignView.getName(), foreignColl.getName(), [{$set: {"viewVal": 100}}]));
+
+    const pipelineWithView = [{$lookup: {from: foreignView.getName(), pipeline: [{$sort: {t: 1}}], as: "result"}}];
+    res = localColl.aggregate(pipelineWithView).toArray();
+    assert.eq(res.length, 1);
+    const docs = res[0]["result"];
+    // Assert the documents returned have the "viewVal" field.
+    docs.forEach((doc) => {
+        assert.eq(doc.viewVal, 100);
+    });
 }
 
 runTest(beforeEpochDocs);

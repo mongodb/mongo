@@ -236,8 +236,10 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* ownedPipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(Pipeline* pipeline, MongoProcessInterface::CollectionMetadata collData)>
-        finalizePipeline = nullptr,
+    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       Pipeline* pipeline,
+                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
+        nullptr,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none,
     bool shouldUseCollectionDefaultCollator = false);

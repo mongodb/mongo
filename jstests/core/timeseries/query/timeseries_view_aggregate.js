@@ -5,6 +5,8 @@
  * ]
  */
 
+import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
+
 const timeFieldName = "time";
 const metaFieldName = "status";
 const bucketMaxSpanSeconds = 3600;
@@ -143,4 +145,58 @@ dataset.forEach((doc) => {
 runTest(dataset, pipeline, expectedResults, viewPipeline);
 
 // TODO SERVER-103134 Add tests for pipelines with sub-pipelines, including $graphLookup.
-// TODO SERVER-103133 Add tests for pipelines with sub-pipelines, including $lookup.
+// TODO SERVER-103133 Add tests for pipelines with sub-pipelines, including $unionWith.
+
+// Test $lookup on a foreign collection that is a view on a timeseries collection.
+{
+    const normalCollName = jsTestName() + "_normal";
+    const normalColl = db.getCollection(normalCollName);
+    const tsColl = db.getCollection(jsTestName() + "_timeseries");
+    tsColl.drop();
+    normalColl.drop();
+    db[viewName].drop();
+
+    const normalDocs = [
+        {name: "Alice", key: "active"},
+        {name: "Bob", key: "inactive"},
+        {name: "Carol", key: "active"},
+    ];
+    assert.commandWorked(normalColl.insertMany(normalDocs));
+
+    // Create a timeseries collection and view.
+    assert.commandWorked(
+        db.createCollection(tsColl.getName(), {
+            timeseries: {timeField: timeFieldName},
+        }),
+    );
+    const tsDocs = [
+        {_id: 1, status: "active", time: new Date("2025-09-01T13:00:00"), age: 25},
+        {_id: 2, status: "inactive", time: new Date("2025-09-01T14:00:00"), age: 30},
+        {_id: 3, status: "active", time: new Date("2025-09-01T15:00:00"), age: 35},
+    ];
+    assert.commandWorked(tsColl.insertMany(tsDocs));
+    assert.commandWorked(db.createView(viewName, tsColl.getName(), [{$match: {age: {$lte: 30}}}]));
+
+    const pipeline = [
+        {
+            $lookup: {
+                from: viewName,
+                localField: "key",
+                foreignField: "status",
+                as: "matched",
+            },
+        },
+        {$project: {_id: 0, key: 0, "matched.time": 0}},
+    ];
+    const expectedResults = [
+        {name: "Alice", matched: [{_id: 1, status: "active", age: 25}]},
+        {name: "Bob", matched: [{_id: 2, status: "inactive", age: 30}]},
+        {name: "Carol", matched: [{_id: 1, status: "active", age: 25}]},
+    ];
+    const results = normalColl.aggregate(pipeline).toArray();
+    assertArrayEq({
+        actual: results,
+        expected: expectedResults,
+        extraErrorMsg: "Unexpected results with $lookup on a view on a timeseries collection",
+    });
+}

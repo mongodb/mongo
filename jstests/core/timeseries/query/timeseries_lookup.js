@@ -11,7 +11,6 @@
  *   # TODO SERVER-88275: background moveCollections can cause the aggregation below to fail with
  *   # QueryPlanKilled.
  *   assumes_balancer_off,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {assertArrayEq} from "jstests/aggregation/extras/utils.js";
@@ -381,6 +380,348 @@ TimeseriesTest.run((insert) => {
                 },
             ],
             extraErrorMsg: `Unexpected result of running pipeline ${tojson(lookupStage)}`,
+        });
+    })();
+
+    // Tests changing the value of the meta field, then running a $match.
+    (function testCorrelatedAddFieldsFollowedByUnCorrelatedMatch() {
+        const lookupStage = {
+            $lookup: {
+                from: "foreign",
+                let: {lkey: "$key"},
+                pipeline: [
+                    {$addFields: {[metaFieldName]: "$$lkey"}},
+                    {$match: {$expr: {$lt: [`$${metaFieldName}`, "$val1"]}}},
+                    {$project: {[metaFieldName]: 1, val: "$val1", _id: 0}},
+                ],
+                as: "joined",
+            },
+        };
+        const result = testDB.local.aggregate(lookupStage);
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {
+                    "_id": 0,
+                    "key": 1,
+                    "joined": [
+                        {"m": 1, "val": 42},
+                        {"m": 1, "val": 17},
+                    ],
+                },
+                {
+                    "_id": 1,
+                    "key": 2,
+                    "joined": [
+                        {"m": 2, "val": 42},
+                        {"m": 2, "val": 17},
+                    ],
+                },
+            ],
+            extraErrorMsg: `Unexpected result of running pipeline ${tojson(lookupStage)}`,
+        });
+    })();
+}
+
+// Validate $lookup optimizations work as expected with timeseries collections.
+{
+    const timeFieldName = "time";
+    const metaFieldName = "m";
+
+    const testDB = db.getSiblingDB(jsTestName());
+    const localColl = testDB.local;
+    const foreignColl = testDB.foreign;
+    localColl.drop();
+    foreignColl.drop();
+
+    localColl.insertMany([
+        {_id: 0, key: 1, a: 10},
+        {_id: 1, key: 2, a: 20},
+    ]);
+    testDB.createCollection(foreignColl.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}});
+    foreignColl.insertMany([
+        {[timeFieldName]: new Date(), _id: 0, [metaFieldName]: 1, val1: 42, val2: 100},
+        {[timeFieldName]: new Date(), _id: 2, [metaFieldName]: 2, val1: 17, val2: 100},
+        {[timeFieldName]: new Date(), _id: 2, [metaFieldName]: 2, val1: 20, val2: 100},
+    ]);
+
+    // $lookup can absorb an $unwind that unwinds the "as" field.
+    (function lookupAbsorbUnwindEqualityMatch() {
+        const pipeline = [
+            {
+                $lookup: {
+                    from: foreignColl.getName(),
+                    localField: "key",
+                    foreignField: `${metaFieldName}`,
+                    as: "joined",
+                },
+            },
+            {$unwind: "$joined"},
+            {$project: {_id: 1, key: 1, "joined.m": 1, "joined.val1": 1}},
+        ];
+        const result = localColl.aggregate(pipeline);
+
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {_id: 0, key: 1, joined: {val1: 42, m: 1}},
+                {_id: 1, key: 2, joined: {val1: 17, m: 2}},
+                {_id: 1, key: 2, joined: {val1: 20, m: 2}},
+            ],
+            extraErrorMsg: "Unexpected result for $lookup with an equality match followed by $unwind",
+        });
+    })();
+
+    (function lookupAbsorbUnwindWithPipeline() {
+        const pipeline = [
+            {
+                $lookup: {
+                    from: foreignColl.getName(),
+                    let: {lkey: "$key"},
+                    pipeline: [
+                        {$match: {$expr: {$eq: [`$${metaFieldName}`, "$$lkey"]}}},
+                        {$project: {val1: 1, m: 1, _id: 0}},
+                    ],
+                    as: "joined",
+                },
+            },
+            {$unwind: "$joined"},
+            {$project: {_id: 1, key: 1, "joined.m": 1, "joined.val1": 1}},
+        ];
+        const result = localColl.aggregate(pipeline);
+
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {_id: 0, key: 1, joined: {val1: 42, m: 1}},
+                {_id: 1, key: 2, joined: {val1: 17, m: 2}},
+                {_id: 1, key: 2, joined: {val1: 20, m: 2}},
+            ],
+            extraErrorMsg: "Unexpected result for $lookup with a pipeline followed by $unwind",
+        });
+    })();
+
+    //  $lookup can reorder with $sort if $sort doesn't depend on any fields in the $lookup.
+    (function lookupReorderWithSort() {
+        const pipeline = [
+            {
+                $lookup: {
+                    from: foreignColl.getName(),
+                    localField: "key",
+                    foreignField: `${metaFieldName}`,
+                    as: "joined",
+                },
+            },
+            {$sort: {a: 1}},
+            {$project: {"joined.time": 0}},
+        ];
+        const result = localColl.aggregate(pipeline);
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {_id: 0, key: 1, a: 10, joined: [{m: 1, _id: 0, val1: 42, val2: 100}]},
+                {
+                    _id: 1,
+                    key: 2,
+                    a: 20,
+                    joined: [
+                        {m: 2, _id: 2, val1: 17, val2: 100},
+                        {m: 2, _id: 2, val1: 20, val2: 100},
+                    ],
+                },
+            ],
+            extraErrorMsg: "Unexpected result for $lookup reorder with $sort",
+        });
+    })();
+
+    //  $lookup can absorb a $match when $match is on the "as" field.
+    (function lookupAbsorbMatch() {
+        const pipeline = [
+            {
+                $lookup: {
+                    from: foreignColl.getName(),
+                    localField: "key",
+                    foreignField: `${metaFieldName}`,
+                    as: "joined",
+                },
+            },
+            {$unwind: "$joined"},
+            {$match: {"joined.val1": {$gte: 20}}},
+            {$project: {_id: 0, key: 1, "joined.m": 1, "joined.val1": 1}},
+        ];
+
+        const result = localColl.aggregate(pipeline);
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {key: 1, joined: {val1: 42, m: 1}},
+                {key: 2, joined: {val1: 20, m: 2}},
+            ],
+            extraErrorMsg: "Unexpected result for $lookup followed by $match",
+        });
+    })();
+
+    // Validates $internalUnpackBucket can internalize a $project stage.
+    (function unpackCanInternalizeProject() {
+        const pipeline = [
+            {
+                $lookup: {
+                    from: foreignColl.getName(),
+                    as: "docs",
+                    let: {},
+                    pipeline: [{$project: {val1: 1, [metaFieldName]: 1, _id: 0}}],
+                },
+            },
+            {$project: {key: 1, docs: 1, _id: 0}},
+        ];
+        const result = localColl.aggregate(pipeline);
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {
+                    key: 1,
+                    docs: [
+                        {m: 2, val1: 17},
+                        {m: 2, val1: 20},
+                        {m: 1, val1: 42},
+                    ],
+                },
+                {
+                    key: 2,
+                    docs: [
+                        {m: 2, val1: 17},
+                        {m: 2, val1: 20},
+                        {m: 1, val1: 42},
+                    ],
+                },
+            ],
+            extraErrorMsg: "Unexpected result for $unpack internalize $project",
+        });
+    })();
+}
+
+// Validate nested lookup stages work on timeseries collections.
+{
+    const timeFieldName = "time";
+    const metaFieldName = "m";
+
+    const testDB = db.getSiblingDB(jsTestName());
+    const localColl = testDB.local;
+    const foreignColl = testDB.foreign;
+    const otherColl = testDB.other;
+    localColl.drop();
+    foreignColl.drop();
+    otherColl.drop();
+
+    assert.commandWorked(
+        localColl.insertMany([
+            {_id: 0, key: 1, a: 10},
+            {_id: 1, key: 2, a: 20},
+        ]),
+    );
+    assert.commandWorked(
+        otherColl.insertMany([
+            {_id: 0, key: 1, b: 15},
+            {_id: 1, key: 2, b: 25},
+        ]),
+    );
+    assert.commandWorked(
+        testDB.createCollection(foreignColl.getName(), {
+            timeseries: {timeField: timeFieldName, metaField: metaFieldName},
+        }),
+    );
+    assert.commandWorked(
+        foreignColl.insertMany([
+            {[timeFieldName]: new Date(), _id: 0, [metaFieldName]: 1, val1: 1, val2: 20},
+            {[timeFieldName]: new Date(), _id: 2, [metaFieldName]: 2, val1: 2, val2: 25},
+            {[timeFieldName]: new Date(), _id: 2, [metaFieldName]: 2, val1: 3, val2: 100},
+        ]),
+    );
+
+    (function nestedLookupStages() {
+        const pipeline = [
+            {
+                $lookup: {
+                    from: foreignColl.getName(),
+                    let: {lkey: "$key"},
+                    pipeline: [
+                        {$match: {$expr: {$eq: ["$$lkey", "$val1"]}}},
+                        {$set: {foo: {$const: 123}}},
+                        {
+                            $lookup: {
+                                from: otherColl.getName(),
+                                let: {val2_field: "$val2"},
+                                pipeline: [
+                                    {$match: {$expr: {$eq: ["$$val2_field", "$b"]}}},
+                                    {$project: {[timeFieldName]: 0}},
+                                ],
+                                as: "updates",
+                            },
+                        },
+                        {$unwind: {path: "$updates", preserveNullAndEmptyArrays: true}},
+                    ],
+                    as: "reviews",
+                },
+            },
+            {$project: {"reviews.time": 0}},
+        ];
+        const result = localColl.aggregate(pipeline);
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {_id: 0, key: 1, a: 10, reviews: [{_id: 0, m: 1, val1: 1, val2: 20, foo: 123}]},
+                {
+                    _id: 1,
+                    key: 2,
+                    a: 20,
+                    reviews: [{_id: 2, m: 2, val1: 2, val2: 25, foo: 123, updates: {_id: 1, key: 2, b: 25}}],
+                },
+            ],
+            extraErrorMsg: "Unexpected result for nested $lookup",
+        });
+    })();
+
+    // Similar pipeline as above, but the nested $lookup is inside a view definition.
+    (function nestedLookupStagesWithResolvedViews() {
+        const viewName = "viewOn_" + foreignColl.getName();
+        const viewPipeline = [
+            {
+                $lookup: {
+                    from: otherColl.getName(),
+                    let: {val2_field: "$val2"},
+                    pipeline: [{$match: {$expr: {$eq: ["$$val2_field", "$b"]}}}, {$project: {[timeFieldName]: 0}}],
+                    as: "updates",
+                },
+            },
+        ];
+        assert.commandWorked(testDB.createView(viewName, foreignColl.getName(), viewPipeline));
+        const pipeline = [
+            {
+                $lookup: {
+                    from: viewName,
+                    let: {lkey: "$key"},
+                    pipeline: [
+                        {$match: {$expr: {$eq: ["$$lkey", "$val1"]}}},
+                        {$unwind: {path: "$updates", preserveNullAndEmptyArrays: true}},
+                    ],
+                    as: "reviews",
+                },
+            },
+            {$project: {"reviews.time": 0}},
+        ];
+        const result = localColl.aggregate(pipeline);
+        assertArrayEq({
+            actual: result.toArray(),
+            expected: [
+                {_id: 0, key: 1, a: 10, reviews: [{_id: 0, m: 1, val1: 1, val2: 20}]},
+                {
+                    _id: 1,
+                    key: 2,
+                    a: 20,
+                    reviews: [{_id: 2, m: 2, val1: 2, val2: 25, updates: {_id: 1, key: 2, b: 25}}],
+                },
+            ],
+            extraErrorMsg: "Unexpected result for $lookup nested in a $lookup inside a view",
         });
     })();
 }

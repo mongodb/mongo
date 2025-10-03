@@ -760,7 +760,9 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* ownedPipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(Pipeline* pipeline, CollectionMetadata collData)> finalizePipeline,
+    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       Pipeline* pipeline,
+                       CollectionMetadata collData)> finalizePipeline,
     bool shouldUseCollectionDefaultCollator,
     boost::optional<const AggregateCommandRequest&> aggRequest,
     ExecShardFilterPolicy shardFilterPolicy) {
@@ -781,7 +783,7 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
     // reading from the cache.
     if (!requiresCollectionAcquisition(*pipeline) || !attachCursorAfterOptimizing) {
         if (finalizePipeline) {
-            finalizePipeline(pipeline.get(), std::monostate{});
+            finalizePipeline(expCtx, pipeline.get(), std::monostate{});
         }
         return pipeline;
     }
@@ -797,7 +799,7 @@ CommonMongodProcessInterface::finalizeAndAttachCursorToPipelineForLocalRead(
 
     // After acquiring all of the collections, we can make and optimize the pipeline.
     if (finalizePipeline) {
-        finalizePipeline(pipeline.get(), primaryAcquisition);
+        finalizePipeline(expCtx, pipeline.get(), primaryAcquisition);
     }
     return attachCursorSourceToPipelineForLocalReadImpl(pipeline.release(),
                                                         allAcquisitions,

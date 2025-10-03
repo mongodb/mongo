@@ -1727,7 +1727,9 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
     invariant(*itr == this);
 
     // See ../query/timeseries/README.md for a description of all the rewrites implemented in this
-    // function.
+    // function. The order of optimizations in this function is important, since some optimizations
+    // blocks others. Additionally, if an optimization is internalizing logic that could be
+    // correlated in a $lookup, it must be placed after finding the sequential cache.
 
     if (itr != container->begin() && _checkIfNeedsIdPredicates.value_or(true)) {
         // If we were able to push a $match stage before this unpack stage, see if the predicates
@@ -1851,7 +1853,11 @@ DocumentSourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimize
         if (cacheFound) {
             // We want to call optimizeAt() on the rest of the pipeline first, and exit this
             // function since any calls to optimize() will interfere with the
-            // sequentialDocumentCache's ability to properly place itself or abandon.
+            // sequentialDocumentCache's ability to properly place itself or abandon. This ensures
+            // the unpack stage is always uncorrelated.
+            tassert(10313200,
+                    "Cannot internalize any $match stages with a cache",
+                    !_sharedState->_eventFilter);
             return DocumentSourceInternalUnpackBucket::optimizeAtRestOfPipeline(itr, container);
         } else {
             if (auto nextStage = dynamic_cast<DocumentSourceGeoNear*>(std::next(itr)->get())) {

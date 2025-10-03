@@ -148,7 +148,8 @@ bool pushDownPipelineStageIfCompatible(
     const boost::intrusive_ptr<DocumentSource>& stage,
     SbeCompatibility minRequiredCompatibility,
     const CompatiblePipelineStages& allowedStages,
-    std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown) {
+    std::vector<boost::intrusive_ptr<DocumentSource>>& stagesForPushdown,
+    const MultipleCollectionAccessor& collections) {
 
     auto stageId = stage->getId();
     if (stageId == DocumentSourceMatch::id) {
@@ -168,9 +169,14 @@ bool pushDownPipelineStageIfCompatible(
         stagesForPushdown.emplace_back(std::move(stage));
         return true;
     } else if (stageId == DocumentSourceLookUp::id) {
-        if (!allowedStages.lookup ||
-            static_cast<DocumentSourceLookUp*>(stage.get())->sbeCompatibility() <
-                minRequiredCompatibility) {
+        DocumentSourceLookUp* lookup = static_cast<DocumentSourceLookUp*>(stage.get());
+        if (!allowedStages.lookup || lookup->sbeCompatibility() < minRequiredCompatibility) {
+            return false;
+        }
+        const auto& secondaryCollections = collections.getSecondaryCollections();
+        if (const auto& coll = secondaryCollections.find(lookup->getFromNs());
+            coll != secondaryCollections.end() && coll->second &&
+            coll->second->isTimeseriesCollection()) {
             return false;
         }
         stagesForPushdown.emplace_back(std::move(stage));
@@ -429,7 +435,8 @@ constexpr size_t kSbeMaxPipelineStages = 100;
  * $lookup via 'DocumentSourceLookUp':
  *   - The 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is false,
  *   - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines), and
- *   - The foreign collection is fully local to this node and is not a view.
+ *   - The foreign collection is fully local to this node, is not a view, and is not timeseries,
+ *     since timeseries collections always require a pipeline.
  *   - There is no absorbed $unwind stage ('_unwindSrc') or 'trySbeEngine' is enabled.
  *   - There is no absorbed $match stage ('_matchSrc').
  *
@@ -557,7 +564,8 @@ bool findSbeCompatibleStagesForPushdown(
                                                *itr,
                                                minRequiredCompatibility,
                                                allowedStages,
-                                               stagesForPushdown)) {
+                                               stagesForPushdown,
+                                               collections)) {
             // Stop pushing stages down once we hit an incompatible stage.
             allStagesPushedDown = false;
             break;

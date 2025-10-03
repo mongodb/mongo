@@ -135,7 +135,8 @@ private:
         const std::vector<BSONObj>& viewPipeline,
         bool attachCursorAfterOptimizing,
         ShardTargetingPolicy shardTargetingPolicy,
-        std::function<void(mongo::Pipeline* pipeline,
+        std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                           mongo::Pipeline* pipeline,
                            MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
             nullptr);
 

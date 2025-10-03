@@ -350,7 +350,7 @@ void Pipeline::validateWithCollectionMetadata(const CollectionOrViewAcquisition&
 }
 
 void Pipeline::validateWithCollectionMetadata(const CollectionRoutingInfo& cri) const {
-    if (cri.getChunkManager().isTimeseriesCollection()) {
+    if (cri.hasRoutingTable() && cri.getChunkManager().isTimeseriesCollection()) {
         validateForTimeseries(&_sources);
     }
 }

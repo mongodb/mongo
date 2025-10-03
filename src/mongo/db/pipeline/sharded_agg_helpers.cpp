@@ -602,13 +602,18 @@ bool canUseLocalReadAsCursorSource(OperationContext* opCtx,
  */
 std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
     OperationContext* opCtx,
-    const ExpressionContext& expCtx,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
     RoutingContext& routingCtx,
     std::unique_ptr<Pipeline>& pipelineToTarget,
     const AggregateCommandRequest& aggRequest,
     bool useCollectionDefaultCollator,
-    const ShardId& localShardId) {
-    const auto& nss = expCtx.getNamespaceString();
+    const ShardId& localShardId,
+    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       Pipeline* pipeline,
+                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
+        nullptr,
+    std::unique_ptr<Pipeline> preFinalizedPipeline = nullptr) {
+    const auto& nss = expCtx->getNamespaceString();
     const auto& targetingCri = routingCtx.getCollectionRoutingInfo(nss);
 
     try {
@@ -639,16 +644,27 @@ std::unique_ptr<Pipeline> tryAttachCursorSourceForLocalRead(
         // shard role but does not refresh the shard if the shard has stale metadata.
         // Proceeding to do normal shard targeting, which will go through the
         // service_entry_point and refresh the shard if needed.
-        auto pipelineWithCursor =
-            expCtx.getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
-                pipelineToTarget.release(), aggRequest, useCollectionDefaultCollator);
+
+        // Pass in the 'preFinalizedPipeline', since 'finalizeAndAttachCursorToPipelineForLocalRead'
+        // will acquire new collection acquisition and perform 'finalizePipeline' on the new
+        // collection metadata.
+        auto pipelineWithCursor = finalizePipeline
+            ? expCtx->getMongoProcessInterface()->finalizeAndAttachCursorToPipelineForLocalRead(
+                  expCtx,
+                  preFinalizedPipeline.release(),
+                  true /* attachCursorAfterOptimizing */,
+                  finalizePipeline,
+                  useCollectionDefaultCollator,
+                  aggRequest)
+            : expCtx->getMongoProcessInterface()->attachCursorSourceToPipelineForLocalRead(
+                  pipelineToTarget.release(), aggRequest, useCollectionDefaultCollator);
 
         LOGV2_DEBUG(5837600,
                     3,
                     "Performing local read",
-                    logAttrs(expCtx.getNamespaceString()),
+                    logAttrs(expCtx->getNamespaceString()),
                     "pipeline"_attr = pipelineWithCursor->serializeForLogging(),
-                    "comment"_attr = expCtx.getOperationContext()->getComment());
+                    "comment"_attr = expCtx->getOperationContext()->getComment());
 
         return pipelineWithCursor;
     } catch (ExceptionFor<ErrorCodes::StaleDbVersion>&) {
@@ -1704,7 +1720,12 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
     boost::optional<BSONObj> shardCursorsSortSpec,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
-    bool useCollectionDefaultCollator) {
+    bool useCollectionDefaultCollator,
+    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       Pipeline* pipeline,
+                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline =
+        nullptr,
+    std::unique_ptr<Pipeline> preFinalizedPipeline = nullptr) {
 
     tassert(9597602,
             "Pipeline should not start with $mergeCursors",
@@ -1729,12 +1750,14 @@ std::unique_ptr<Pipeline> targetShardsAndAddMergeCursorsWithRoutingCtx(
             expCtx->getOperationContext(), pipelineTargetingInfo, *localShardId, readConcern)) {
         if (auto pipelineWithCursor =
                 tryAttachCursorSourceForLocalRead(expCtx->getOperationContext(),
-                                                  *expCtx,
+                                                  expCtx,
                                                   routingCtx,
                                                   pipelineToTarget,
                                                   aggRequest,
                                                   useCollectionDefaultCollator,
-                                                  *localShardId)) {
+                                                  *localShardId,
+                                                  finalizePipeline,
+                                                  std::move(preFinalizedPipeline))) {
             return pipelineWithCursor;
         }
 
@@ -1847,8 +1870,9 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     Pipeline* ownedPipeline,
     bool attachCursorAfterOptimizing,
-    std::function<void(Pipeline* pipeline, MongoProcessInterface::CollectionMetadata collData)>
-        finalizePipeline,
+    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       Pipeline* pipeline,
+                       MongoProcessInterface::CollectionMetadata collData)> finalizePipeline,
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern,
     bool shouldUseCollectionDefaultCollator) {
@@ -1862,7 +1886,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
     // results reading from the cache.
     if (firstStageCanExecuteWithoutCursor(*pipeline) || !attachCursorAfterOptimizing) {
         if (finalizePipeline) {
-            finalizePipeline(pipeline.get(), std::monostate{});
+            finalizePipeline(expCtx, pipeline.get(), std::monostate{});
         }
         return pipeline;
     }
@@ -1889,7 +1913,7 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                 routingCtx.getCollectionRoutingInfo(expCtx->getNamespaceString());
 
             if (finalizePipeline) {
-                finalizePipeline(pipelineToTarget.get(), cri);
+                finalizePipeline(expCtx, pipelineToTarget.get(), cri);
             }
 
             LOGV2_DEBUG(11028102,
@@ -1908,7 +1932,9 @@ std::unique_ptr<Pipeline> finalizeAndMaybePreparePipelineForExecution(
                 boost::none /* shardCursorsSortSpec */,
                 shardTargetingPolicy,
                 readConcern,
-                shouldUseCollectionDefaultCollator);
+                shouldUseCollectionDefaultCollator,
+                finalizePipeline,
+                pipeline->clone());
         });
 }
 

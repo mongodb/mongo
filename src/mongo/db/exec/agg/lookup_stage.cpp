@@ -312,7 +312,8 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipelineFromViewDefinition(
     const std::vector<BSONObj>& viewPipeline,
     bool attachCursorAfterOptimizing,
     ShardTargetingPolicy shardTargetingPolicy,
-    std::function<void(mongo::Pipeline* pipeline,
+    std::function<void(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                       mongo::Pipeline* pipeline,
                        MongoProcessInterface::CollectionMetadata collData)> finalizePipeline) {
 
     // We don't want to optimize or attach a cursor source here because we need to update
@@ -440,21 +441,27 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
     // If we don't have a cache, optimize and translate, and attach a cursor to the pipeline
     // immediately.
     if (!_cache || _cache->isAbandoned()) {
-        const auto& finalizePipeline = [](mongo::Pipeline* pipeline,
+        const auto& finalizePipeline = [](const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          mongo::Pipeline* pipeline,
                                           MongoProcessInterface::CollectionMetadata collData) {
             tassert(11028104, "Expected pipeline to finalize", pipeline);
-            // TODO SERVER-103133 enable for viewless timeseries.
-            // visit(OverloadedVisitor{
-            //           [&](std::monostate) {},
-            //           [&](std::reference_wrapper<const CollectionOrViewAcquisition> collOrView) {
-            //               pipeline->validateWithCollectionMetadata(collOrView);
-            //               pipeline->performPreOptimizationRewrites(_fromExpCtx, collOrView);
-            //           },
-            //           [&](std::reference_wrapper<const CollectionRoutingInfo> cri) {
-            //               pipeline->validateWithCollectionMetadata(cri);
-            //               pipeline->performPreOptimizationRewrites(_fromExpCtx, cri);
-            //           }},
-            //       collData);
+            visit(OverloadedVisitor{[&](std::monostate) {},
+                                    [&](const CollectionOrViewAcquisition& collOrView) {
+                                        pipeline->validateWithCollectionMetadata(collOrView);
+                                        pipeline->performPreOptimizationRewrites(expCtx,
+                                                                                 collOrView);
+                                    },
+                                    [&](const CollectionRoutingInfo& cri) {
+                                        // If there is no routing table, an aggregate command will
+                                        // be sent to the shard that owns this collection, where the
+                                        // translation will happen, or the collection is completely
+                                        // local and will use 'CollectionOrViewAcquisition'.
+                                        if (cri.hasRoutingTable()) {
+                                            pipeline->validateWithCollectionMetadata(cri);
+                                            pipeline->performPreOptimizationRewrites(expCtx, cri);
+                                        }
+                                    }},
+                  collData);
             pipeline->optimizePipeline();
             pipeline->validateCommon(true /* alreadyOptimized */);
         };
@@ -479,30 +486,30 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
     }
 
     std::unique_ptr<mongo::Pipeline> pipeline;
-    // If the cache has either been abandoned or has not yet been built, attach a cursor.
-    bool attachCursorAfterOptimizing = !_cache->isServing();
+    // If the subpipeline is reading documents from the cache, we should not attach a cursor.
+    bool cacheIsServing = _cache->isServing();
 
-    const auto& finalizePipeline = [this](mongo::Pipeline* pipeline,
+    const auto& finalizePipeline = [this](const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          mongo::Pipeline* pipeline,
                                           MongoProcessInterface::CollectionMetadata collData) {
         tassert(11028105, "Expected pipeline to finalize", pipeline);
+        visit(OverloadedVisitor{[&](std::monostate) {},
+                                [&](const CollectionOrViewAcquisition& collOrView) {
+                                    pipeline->validateWithCollectionMetadata(collOrView);
+                                    pipeline->performPreOptimizationRewrites(expCtx, collOrView);
+                                },
+                                [&](const CollectionRoutingInfo& cri) {
+                                    // If there is no routing table, an aggregate command will be
+                                    // sent to the shard that owns this collection where the
+                                    // translation will happen, or the collection is completely
+                                    // local and will use 'CollectionOrViewAcquisition'.
+                                    if (cri.hasRoutingTable()) {
+                                        pipeline->validateWithCollectionMetadata(cri);
+                                        pipeline->performPreOptimizationRewrites(expCtx, cri);
+                                    }
+                                }},
+              collData);
 
-        // TODO SERVER-103133 enable for viewless timeseries.
-        // visit(OverloadedVisitor{
-        //           [&](std::monostate) {},
-        //           [&](std::reference_wrapper<const CollectionOrViewAcquisition> collOrView) {
-        //               pipeline->validateWithCollectionMetadata(collOrView);
-        //               pipeline->performPreOptimizationRewrites(_fromExpCtx, collOrView);
-        //           },
-        //           [&](std::reference_wrapper<const CollectionRoutingInfo> cri) {
-        //               pipeline->validateWithCollectionMetadata(cri);
-        //               pipeline->performPreOptimizationRewrites(_fromExpCtx, cri);
-        //           }},
-        //       collData);
-        // Update the resolvedPipeline with the translated stages, so we can avoid completing
-        // the translation when the cache is serving.
-        // if (pipeline->isTranslated()) {
-        //     _sharedState->resolvedPipeline = pipeline->serializeToBson();
-        // }
         // We've already validated above the cache exists and is not abandoned, so we should
         // always apply the optimization here. We do not validate the pipeline after adding the
         // cache stage optimization.
@@ -514,7 +521,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
         pipeline = pExpCtx->getMongoProcessInterface()->finalizeAndMaybePreparePipelineForExecution(
             fromExpCtx,
             parsedPipeline.release(),
-            attachCursorAfterOptimizing,
+            !cacheIsServing,
             finalizePipeline,
             shardTargetingPolicy);
     } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& e) {
@@ -523,7 +530,7 @@ std::unique_ptr<mongo::Pipeline> LookUpStage::buildPipeline(
         pipeline = buildPipelineFromViewDefinition(fromExpCtx,
                                                    e->getNamespace(),
                                                    e->getPipeline(),
-                                                   attachCursorAfterOptimizing,
+                                                   !cacheIsServing,
                                                    shardTargetingPolicy,
                                                    finalizePipeline);
     }

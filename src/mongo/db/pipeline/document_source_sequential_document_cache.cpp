@@ -122,8 +122,10 @@ DocumentSourceContainer::iterator DocumentSourceSequentialDocumentCache::doOptim
 
     // The 'prefixSplit' iterator is now pointing to the first stage of the correlated suffix. If
     // the split point is the first stage, then the entire pipeline is correlated and we should not
-    // attempt to perform any caching. Abandon the cache and return.
-    if (prefixSplit == container->begin()) {
+    // attempt to perform any caching. Abandon the cache and return. If the cache is already serving
+    // documents, it should not be abandoned, because it must be the case that the the documents are
+    // uncorrelated.
+    if (prefixSplit == container->begin() && !_cache->isServing()) {
         _cache->abandon();
         return container->end();
     }
