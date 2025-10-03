@@ -1,5 +1,8 @@
 # Code Owners
 
+After modifying any OWNERS files, the overall ownership database (`.github/CODEOWNERS`) must be rebuilt.
+This is done by running `bazel run codeowners`.
+
 ## OWNERS.yml File Format
 
 This is loosely based on [kubernetes](https://www.kubernetes.dev/docs/guide/owners/) and [chromium](https://chromium.googlesource.com/chromium/src/+/HEAD/docs/code_reviews.md) OWNERS files.

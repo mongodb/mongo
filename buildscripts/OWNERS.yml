@@ -23,6 +23,9 @@ filters:
   - "hang_analyzer.py":
     approvers:
       - 10gen/devprod-correctness
+  - "errorcodes.py":
+    approvers:
+      - 10gen/server-programmability
   - "evergreen_resmoke_job_count.py":
     approvers:
       - 10gen/devprod-correctness

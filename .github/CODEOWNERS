@@ -54,6 +54,7 @@ WORKSPACE.bazel @10gen/devprod-build @svc-auto-approve-bot
 /buildscripts/setup_multiversion_mongodb.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/setup_spawnhost_coredump @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/hang_analyzer.py @10gen/devprod-correctness @svc-auto-approve-bot
+/buildscripts/errorcodes.py @10gen/server-programmability @svc-auto-approve-bot
 /buildscripts/evergreen_resmoke_job_count.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/evergreen_task_timeout.py @10gen/devprod-correctness @svc-auto-approve-bot
 /buildscripts/evergreen_gen_smoke_test_tasks.py @10gen/devprod-correctness @svc-auto-approve-bot
