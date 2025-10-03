@@ -808,7 +808,7 @@ TEST(ExpressionConvertTest, CanRoundTripBitArrays) {
 
     const auto buildArr = [](const auto& bitArray) {
         BSONArrayBuilder bab;
-        for (const auto& bit : bitArray) {
+        for (bool bit : bitArray) {
             bab.append(bit);
         }
         return bab.arr();

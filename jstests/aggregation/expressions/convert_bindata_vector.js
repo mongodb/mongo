@@ -345,10 +345,6 @@ let bsonToBinErrorCases = [
     {invalid_bson_array: ["oh", "hi", "mark"], error_code: ErrorCodes.ConversionFailure},
     // Must be an array
     {invalid_bson_array: "theroom", error_code: ErrorCodes.ConversionFailure},
-    // TODO: SERVER-105121 the following test passes because number conversions to not check
-    // BinData subtype.  Therefore, this conversion is actually valid and passes.  After the fix is
-    // implemented, this test should be re-enabled.
-    //{invalid_bson_array: 100, error_code: ErrorCodes.ConversionFailure},
     {invalid_bson_array: {mongodb: "skunkworks"}, error_code: ErrorCodes.ConversionFailure},
     // TODO SERVER-106059 Remove this test.
     {
