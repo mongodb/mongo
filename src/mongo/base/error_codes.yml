@@ -946,8 +946,12 @@ error_codes:
       name: ShardRemovedError,
       categories: [NonResumableChangeStreamError],
     }
-
   - {code: 465, name: PlacementHistoryInitializationInProgress}
+  - {
+      code: 466,
+      name: SchemaRegistryNonRetryableError,
+      categories: [StreamProcessorUserError],
+    }
 
   # Error codes 4000-8999 are reserved.
 
