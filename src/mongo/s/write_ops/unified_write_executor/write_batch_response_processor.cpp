@@ -445,7 +445,7 @@ void WriteBatchResponseProcessor::processErrorForBatch(OperationContext* opCtx,
             processError(firstOp, status, shardId);
         }
     } else {
-        // If the write command is unordered and not in a transaciton, record an error for each
+        // If the write command is unordered and not in a transaction, record an error for each
         // op in 'ops'.
         for (const auto& op : ops) {
             processError(op, status, shardId);

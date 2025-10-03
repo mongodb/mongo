@@ -84,21 +84,19 @@ struct WriteOpAnalyzerTestImpl : public ShardingTestFixture {
         setupShards(shards);
     }
 
-    void setClusterParameter() {
+    void setClusterParameter(std::string parameter) {
         OnlyTargetDataOwningShardsForMultiWritesParam updatedParam;
         ClusterServerParameter baseCSP;
         baseCSP.setClusterParameterTime(LogicalTime(Timestamp(Date_t::now())));
-        baseCSP.set_id("onlyTargetDataOwningShardsForMultiWrites"_sd);
+        baseCSP.set_id(parameter);
         updatedParam.setClusterServerParameter(baseCSP);
         updatedParam.setEnabled(true);
-        auto param = ServerParameterSet::getClusterParameterSet()->get(
-            "onlyTargetDataOwningShardsForMultiWrites");
+        auto param = ServerParameterSet::getClusterParameterSet()->get(parameter);
         ASSERT_OK(param->set(updatedParam.toBSON(), boost::none));
     }
 
-    void resetClusterParameter() {
-        auto param = ServerParameterSet::getClusterParameterSet()->get(
-            "onlyTargetDataOwningShardsForMultiWrites");
+    void resetClusterParameter(std::string parameter) {
+        auto param = ServerParameterSet::getClusterParameterSet()->get(parameter);
         ASSERT_OK(param->reset(boost::none));
     }
 
@@ -821,8 +819,8 @@ TEST_F(WriteOpAnalyzerTestImpl, MultiWriteInATransaction) {
 
 TEST_F(WriteOpAnalyzerTestImpl,
        MultiWriteWithOnlyTargetDataOwningShardsForMultiWritesParamEnabled) {
-    // Fetch the "onlyTargetDataOwningShardsForMultiWrites" cluster param.
-    setClusterParameter();
+    // Set the "onlyTargetDataOwningShardsForMultiWrites" cluster param to true.
+    setClusterParameter("onlyTargetDataOwningShardsForMultiWrites");
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
     UUID uuid = UUID::gen();
@@ -860,7 +858,37 @@ TEST_F(WriteOpAnalyzerTestImpl,
     ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[1].shardVersion->placementVersion());
 
     rtx->onRequestSentForNss(nss);
-    resetClusterParameter();
+    resetClusterParameter("onlyTargetDataOwningShardsForMultiWrites");
+}
+
+TEST_F(WriteOpAnalyzerTestImpl, PauseMigrationsDuringMultiUpdatesParamEnabledWithMultiUpdate) {
+    // Set the "pauseMigrationsDuringMultiUpdates" cluster param to true.
+    setClusterParameter("pauseMigrationsDuringMultiUpdates");
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test", "coll");
+    UUID uuid = UUID::gen();
+    auto rtx = createRoutingContextSharded({{uuid, nss}});
+
+    BulkWriteCommandRequest request(
+        {[&]() {
+            auto op =
+                BulkWriteUpdateOp(0,
+                                  BSON("x" << BSON("$gt" << -1) << "_id" << BSON("$gt" << -1)),
+                                  write_ops::UpdateModification(BSON("$set" << BSON("a" << 1))));
+            op.setMulti(true);
+            return op;
+        }()},
+        {NamespaceInfoEntry(nss)});
+
+    WriteOp op1(request, 0);
+    auto analysis = uassertStatusOK(analyzer.analyze(operationContext(), *rtx, op1));
+    ASSERT_EQ(2, analysis.shardsAffected.size());
+    ASSERT_EQ(BatchType::kMultiWriteBlockingMigrations, analysis.type);
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[0].shardVersion->placementVersion());
+    ASSERT(ChunkVersion::IGNORED() != analysis.shardsAffected[1].shardVersion->placementVersion());
+
+    rtx->onRequestSentForNss(nss);
+    setClusterParameter("pauseMigrationsDuringMultiUpdates");
 }
 
 }  // namespace

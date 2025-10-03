@@ -34,9 +34,6 @@ selector:
     - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_inserts.js
     - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_timeseries_meta_updates.js
 
-    # TODO: SERVER-110574 Support for 'pauseMigrationsDuringMultiUpdatesParameter'.
-    - jstests/concurrency/fsm_workloads/random_moveChunk/random_moveChunk_multi_update_delete_paused_migrations.js
-
   exclude_with_any_tags:
     - requires_standalone
     - does_not_support_causal_consistency

@@ -58,6 +58,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -267,30 +268,6 @@ void populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 }
 
-bool shouldCoordinateMultiWrite(OperationContext* opCtx,
-                                PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations) {
-    if (!pauseMigrations.isEnabled()) {
-        // If the cluster parameter is off, return false.
-        return false;
-    }
-
-    if (opCtx->isCommandForwardedFromRouter()) {
-        // Coordinating a multi update involves running the update on a mongod (the db primary
-        // shard), but it uses the same codepath as mongos. This flag is set to prevent the mongod
-        // from repeatedly coordinating the update and forwarding it to itself.
-        return false;
-    }
-
-    if (TransactionRouter::get(opCtx)) {
-        // Similar to the upsert case, if we are in a transaction then the whole of the operation
-        // will execute either before or after any conflicting chunk migrations, so the problem is
-        // avoided.
-        return false;
-    }
-
-    return true;
-}
-
 // 'baseCommandSizeBytes' specifies the base size of a batch command request prior to adding any
 // individual operations to it. This function will ensure that 'baseCommandSizeBytes' plus the
 // result of calling 'getWriteSizeFn' on each write added to a batch will not result in a command
@@ -372,7 +349,7 @@ StatusWith<WriteType> targetWriteOps(OperationContext* opCtx,
         const auto& targeter = getTargeterFn(writeOp);
 
         const bool enableMultiWriteBlockingMigrations =
-            shouldCoordinateMultiWrite(opCtx, pauseMigrations);
+            coordinate_multi_update_util::shouldCoordinateMultiWrite(opCtx, pauseMigrations);
 
         auto [targetStatus, result] = [&]() -> std::pair<Status, WriteOp::TargetWritesResult> {
             try {

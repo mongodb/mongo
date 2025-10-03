@@ -31,6 +31,7 @@
 
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
+#include "mongo/s/request_types/coordinate_multi_update_gen.h"
 #include "mongo/s/write_ops/unified_write_executor/write_op_batcher.h"
 #include "mongo/util/modules.h"
 
@@ -90,6 +91,10 @@ public:
                                const WriteBatch& batch);
 
 private:
+    enum class ShouldAppendLsidAndTxnNumber : bool {};
+    enum class ShouldAppendWriteConcern : bool {};
+    enum class FilterGenericArguments : bool {};
+
     WriteBatchResponse _execute(OperationContext* opCtx,
                                 RoutingContext& routingCtx,
                                 const EmptyBatch& batch);
@@ -106,21 +111,27 @@ private:
                                 RoutingContext& routingCtx,
                                 const InternalTransactionBatch& batch);
 
+    WriteBatchResponse _execute(OperationContext* opCtx,
+                                RoutingContext& routingCtx,
+                                const MultiWriteBlockingMigrationsBatch& batch);
+
     BulkWriteCommandRequest buildBulkWriteRequestWithoutTxnInfo(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::map<WriteOpId, UUID>& sampleIds,
-        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none) const;
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none,
+        FilterGenericArguments filterGenericArguments = FilterGenericArguments{false}) const;
 
     BSONObj buildBulkWriteRequest(
         OperationContext* opCtx,
         const std::vector<WriteOp>& ops,
         const std::map<NamespaceString, ShardEndpoint>& versionByNss,
         const std::map<WriteOpId, UUID>& sampleIds,
-        bool shouldAppendLsidAndTxnNumber,
-        bool shouldAppendWriteConcern,
-        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none) const;
+        ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+        ShouldAppendWriteConcern shouldAppendWriteConcern,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery = boost::none,
+        FilterGenericArguments filterGenericArguments = FilterGenericArguments{false}) const;
 
     const WriteCommandRef _cmdRef;
 };

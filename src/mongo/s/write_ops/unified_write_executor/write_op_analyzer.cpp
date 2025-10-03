@@ -33,6 +33,7 @@
 #include "mongo/db/global_catalog/router_role_api/collection_routing_info_targeter.h"
 #include "mongo/db/raw_data_operation.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/write_ops/coordinate_multi_update_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -85,12 +86,24 @@ StatusWith<Analysis> WriteOpAnalyzerImpl::analyze(OperationContext* opCtx,
     const bool isTimeseriesRetryableUpdateOp =
         isShardedTimeseries && isUpdate && isRetryableWrite && !inTxn && !isRawData;
 
+    const bool enableMultiWriteBlockingMigrations =
+        coordinate_multi_update_util::shouldCoordinateMultiWrite(
+            opCtx, _pauseMigrationsDuringMultiUpdatesParameter);
+    const bool isMultiWrite = op.isMulti();
+    const bool isDelete = op.getType() == WriteType::kDelete;
+    const bool isMultiWriteBlockingMigrations =
+        (isUpdate || isDelete) && isMultiWrite && enableMultiWriteBlockingMigrations;
+
     auto targetedSampleId = analyze_shard_key::tryGenerateTargetedSampleId(
         opCtx, targeter.getNS(), op.getItemRef().getOpType(), tr.endpoints);
 
     if (tr.useTwoPhaseWriteProtocol || tr.isNonTargetedRetryableWriteWithId) {
         return Analysis{
             BatchType::kNonTargetedWrite, std::move(tr.endpoints), std::move(targetedSampleId)};
+    } else if (isMultiWriteBlockingMigrations) {
+        return Analysis{BatchType::kMultiWriteBlockingMigrations,
+                        std::move(tr.endpoints),
+                        std::move(targetedSampleId)};
     } else if (isTimeseriesRetryableUpdateOp) {
         // Special case for time series since an update could affect two documents in the underlying
         // buckets collection.

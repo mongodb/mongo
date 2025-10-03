@@ -89,3 +89,50 @@ mongo_cc_library(
         "//src/mongo/s:sharding_router_api",
     ],
 )
+
+mongo_cc_library(
+    name = "pause_migrations_during_multi_updates_enablement",
+    srcs = [
+        "pause_migrations_during_multi_updates_enablement.cpp",
+        "//src/mongo/db/cluster_parameters:migration_blocking_operation_cluster_parameters_gen",
+    ],
+    hdrs = [
+        "pause_migrations_during_multi_updates_enablement.h",
+    ],
+    deps = [
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/s:sharding_router_api",
+    ],
+)
+
+mongo_cc_library(
+    name = "sharded_write_ops",
+    srcs = [
+        "batch_write_exec.cpp",
+        "batch_write_op.cpp",
+        "bulk_write_exec.cpp",
+        "coordinate_multi_update_util.cpp",
+        "write_op.cpp",
+    ],
+    hdrs = [
+        "batch_write_exec.h",
+        "batch_write_op.h",
+        "bulk_write_exec.h",
+        "bulk_write_reply_info.h",
+        "coordinate_multi_update_util.h",
+        "write_op.h",
+    ],
+    deps = [
+        "batch_write_types",
+        "fle",
+        "pause_migrations_during_multi_updates_enablement",
+        "wc_error",
+        "write_op_helper",
+        "//src/mongo:base",
+        "//src/mongo:core_headers_library",
+        "//src/mongo/db/timeseries/write_ops:timeseries_write_ops_utils",
+        "//src/mongo/s:sharding_write_without_shard_key_api",
+        "//src/mongo/s/commands/query_cmd:populate_cursor",
+    ],
+)

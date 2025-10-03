@@ -64,19 +64,6 @@ auto getOpAsBson(const BatchItemRef& op) {
     return op.toBSON();
 }
 
-// Prevents arguments from the user's original request from being incorrectly included in the
-// multi-update's inner command to be executed by the shard(s). As an example, this ensures a
-// { w: 0 } write concern specified on the original request will not interfere with the router's
-// ability to receive responses from the shard(s).
-//
-// This currently just drops all of the generic arguments except for rawData. The rawData argument
-// needs to be passed along so that the inner command respects the user-provided option.
-void filterRequestGenericArguments(GenericArguments& args) {
-    auto rawData = args.getRawData();
-    args = {};
-    args.setRawData(rawData);
-}
-
 // Serializes the batched request's underlying command request to BSON, dropping all generic
 // arguments.
 auto getRequestBson(const BatchedCommandRequest& clientRequest) {
@@ -126,6 +113,37 @@ BSONObj makeCommandForOp(bulk_write_exec::BulkWriteOp& bulkWriteOp,
         BSON("ops" << BSON_ARRAY(bulkCrudOp.toBSON())).firstElement());
 }
 
+BatchedCommandResponse parseBatchedResponse(const BSONObj& response) {
+    std::string errMsg;
+    BatchedCommandResponse result;
+    auto success = result.parseBSON(response, &errMsg);
+    uassert(ErrorCodes::FailedToParse, errMsg, success);
+    return result;
+}
+
+}  // namespace
+
+void filterRequestGenericArguments(GenericArguments& args) {
+    auto rawData = args.getRawData();
+    args = {};
+    args.setRawData(rawData);
+}
+
+BulkWriteCommandReply parseBulkResponse(const BSONObj& response) {
+    return BulkWriteCommandReply::parse(
+        response, IDLParserContext{"coordinate_multi_update_util::parseBulkResponse"});
+}
+
+int getWriteOpIndex(const TargetedBatchMap& childBatches) {
+    // There can be multiple entries in childBatches if the multi write targets multiple shards, but
+    // each of these entries is the same write.
+    invariant(!childBatches.empty());
+    invariant(childBatches.begin()->second);
+    const auto& writes = childBatches.begin()->second->getWrites();
+    invariant(writes.size() == 1);
+    return writes.front()->writeOpRef.first;
+}
+
 BSONObj executeCoordinateMultiUpdate(OperationContext* opCtx,
                                      const NamespaceString& nss,
                                      BSONObj writeCommand) {
@@ -156,31 +174,6 @@ BSONObj executeCoordinateMultiUpdate(OperationContext* opCtx,
         });
 }
 
-BatchedCommandResponse parseBatchedResponse(const BSONObj& response) {
-    std::string errMsg;
-    BatchedCommandResponse result;
-    auto success = result.parseBSON(response, &errMsg);
-    uassert(ErrorCodes::FailedToParse, errMsg, success);
-    return result;
-}
-
-BulkWriteCommandReply parseBulkResponse(const BSONObj& response) {
-    return BulkWriteCommandReply::parse(
-        response, IDLParserContext{"coordinate_multi_update_util::parseBulkResponse"});
-}
-
-}  // namespace
-
-int getWriteOpIndex(const TargetedBatchMap& childBatches) {
-    // There can be multiple entries in childBatches if the multi write targets multiple shards, but
-    // each of these entries is the same write.
-    invariant(!childBatches.empty());
-    invariant(childBatches.begin()->second);
-    const auto& writes = childBatches.begin()->second->getWrites();
-    invariant(writes.size() == 1);
-    return writes.front()->writeOpRef.first;
-}
-
 BatchedCommandResponse executeCoordinateMultiUpdate(OperationContext* opCtx,
                                                     BatchWriteOp& batchOp,
                                                     const TargetedBatchMap& childBatches,
@@ -207,6 +200,30 @@ BulkWriteCommandReply executeCoordinateMultiUpdate(OperationContext* opCtx,
     } catch (const DBException& e) {
         return bulk_write_exec::createEmulatedErrorReply(e.toStatus(), 1, boost::none);
     }
+}
+
+bool shouldCoordinateMultiWrite(
+    OperationContext* opCtx, mongo::PauseMigrationsDuringMultiUpdatesEnablement& pauseMigrations) {
+    if (!pauseMigrations.isEnabled()) {
+        // If the cluster parameter is off, return false.
+        return false;
+    }
+
+    if (opCtx->isCommandForwardedFromRouter()) {
+        // Coordinating a multi update involves running the update on a mongod (the db primary
+        // shard), but it uses the same codepath as mongos. This flag is set to prevent the mongod
+        // from repeatedly coordinating the update and forwarding it to itself.
+        return false;
+    }
+
+    if (TransactionRouter::get(opCtx)) {
+        // Similar to the upsert case, if we are in a transaction then the whole of the operation
+        // will execute either before or after any conflicting chunk migrations, so the problem is
+        // avoided.
+        return false;
+    }
+
+    return true;
 }
 
 }  // namespace coordinate_multi_update_util

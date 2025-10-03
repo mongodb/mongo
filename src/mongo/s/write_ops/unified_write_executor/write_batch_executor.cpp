@@ -29,9 +29,13 @@
 
 #include "mongo/s/write_ops/unified_write_executor/write_batch_executor.h"
 
+#include "mongo/db/generic_argument_util.h"
+#include "mongo/db/global_catalog/router_role_api/cluster_commands_helpers.h"
 #include "mongo/db/sharding_environment/grid.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/s/request_types/coordinate_multi_update_gen.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/write_ops/coordinate_multi_update_util.h"
 #include "mongo/s/write_ops/wc_error.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 
@@ -52,12 +56,13 @@ BulkWriteCommandReply parseBulkWriteCommandReply(const BSONObj& responseData) {
 bool WriteBatchExecutor::usesProvidedRoutingContext(const WriteBatch& batch) const {
     // For SimpleWriteBatches, the executor use the provided RoutingContext. For all other batch
     // types, the executor does not use the provided RoutingContext.
-    return std::visit(OverloadedVisitor{[](const SimpleWriteBatch& data) { return true; },
-                                        [](const NonTargetedWriteBatch& data) { return false; },
-                                        [](const InternalTransactionBatch& data) { return false; },
-                                        [](const EmptyBatch& data) {
-                                            return false;
-                                        }},
+    return std::visit(OverloadedVisitor{
+                          [](const SimpleWriteBatch& data) { return true; },
+                          [](const NonTargetedWriteBatch& data) { return false; },
+                          [](const InternalTransactionBatch& data) { return false; },
+                          [](const MultiWriteBlockingMigrationsBatch& data) { return false; },
+                          [](const EmptyBatch& data) { return false; },
+                      },
                       batch.data);
 }
 
@@ -76,7 +81,8 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::map<WriteOpId, UUID>& sampleIds,
-    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) const {
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+    FilterGenericArguments filterGenericArguments) const {
     std::vector<BulkWriteOpVariant> bulkOps;
     std::vector<NamespaceInfoEntry> nsInfos;
     std::map<NamespaceString, int> nsIndexMap;
@@ -144,6 +150,11 @@ BulkWriteCommandRequest WriteBatchExecutor::buildBulkWriteRequestWithoutTxnInfo(
         bulkRequest.setMaxTimeMS(_cmdRef.getMaxTimeMS());
     }
 
+    if (filterGenericArguments == FilterGenericArguments{true}) {
+        coordinate_multi_update_util::filterRequestGenericArguments(
+            bulkRequest.getGenericArguments());
+    }
+
     if (isRetryableWrite) {
         bulkRequest.setStmtIds(stmtIds);
     }
@@ -155,20 +166,26 @@ BSONObj WriteBatchExecutor::buildBulkWriteRequest(
     const std::vector<WriteOp>& ops,
     const std::map<NamespaceString, ShardEndpoint>& versionByNss,
     const std::map<WriteOpId, UUID>& sampleIds,
-    bool shouldAppendLsidAndTxnNumber,
-    bool shouldAppendWriteConcern,
-    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) const {
-    auto bulkRequest = buildBulkWriteRequestWithoutTxnInfo(
-        opCtx, ops, versionByNss, sampleIds, allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+    ShouldAppendLsidAndTxnNumber shouldAppendLsidAndTxnNumber,
+    ShouldAppendWriteConcern shouldAppendWriteConcern,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+    FilterGenericArguments filterGenericArguments) const {
+    auto bulkRequest =
+        buildBulkWriteRequestWithoutTxnInfo(opCtx,
+                                            ops,
+                                            versionByNss,
+                                            sampleIds,
+                                            allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+                                            filterGenericArguments);
     const bool inTransaction = static_cast<bool>(TransactionRouter::get(opCtx));
     BSONObjBuilder builder;
     bulkRequest.serialize(&builder);
 
-    if (shouldAppendLsidAndTxnNumber) {
+    if (shouldAppendLsidAndTxnNumber == ShouldAppendLsidAndTxnNumber{true}) {
         logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
     }
 
-    if (shouldAppendWriteConcern) {
+    if (shouldAppendWriteConcern == ShouldAppendWriteConcern{true}) {
         auto writeConcern = getWriteConcernForShardRequest(opCtx);
         // We don't append write concern in a transaction.
         if (writeConcern && !inTransaction) {
@@ -194,8 +211,8 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                                     shardRequest.ops,
                                                     shardRequest.versionByNss,
                                                     shardRequest.sampleIds,
-                                                    true /* shouldAppendLsidAndTxnNumber */,
-                                                    true /* shouldAppendWriteConcern */);
+                                                    ShouldAppendLsidAndTxnNumber{true},
+                                                    ShouldAppendWriteConcern{true});
         LOGV2_DEBUG(10605503,
                     4,
                     "Constructed request for shard",
@@ -255,8 +272,8 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
                                         {writeOp},
                                         {},        /* versionByNss*/
                                         sampleIds, /* sampleIds */
-                                        false,     /* shouldAppendLsidAndTxnNumber */
-                                        false,     /* shouldAppendWriteConcern */
+                                        ShouldAppendLsidAndTxnNumber{false},
+                                        ShouldAppendWriteConcern{false},
                                         allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
     boost::optional<WriteConcernErrorDetail> wce;
@@ -345,6 +362,33 @@ WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
         : StatusWith<BulkWriteCommandReply>(responseStatus);
 
     return NoRetryWriteBatchResponse{std::move(swBulkWriteResponse), std::move(wce), writeOp};
+}
+
+WriteBatchResponse WriteBatchExecutor::_execute(OperationContext* opCtx,
+                                                RoutingContext& routingCtx,
+                                                const MultiWriteBlockingMigrationsBatch& batch) {
+    const WriteOp& writeOp = batch.op;
+    const auto& nss = writeOp.getNss();
+
+    auto cmdObj = buildBulkWriteRequest(opCtx,
+                                        {writeOp},
+                                        {}, /* versionByNss */
+                                        {}, /* sampleIds */
+                                        ShouldAppendLsidAndTxnNumber{true},
+                                        ShouldAppendWriteConcern{false},
+                                        false, /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */
+                                        FilterGenericArguments{true});
+
+    StatusWith<BulkWriteCommandReply> reply = [&]() {
+        try {
+            return StatusWith(coordinate_multi_update_util::parseBulkResponse(
+                coordinate_multi_update_util::executeCoordinateMultiUpdate(opCtx, nss, cmdObj)));
+        } catch (const DBException& e) {
+            return StatusWith<BulkWriteCommandReply>(e.toStatus());
+        }
+    }();
+
+    return NoRetryWriteBatchResponse{std::move(reply), boost::none, {writeOp}};
 }
 
 }  // namespace unified_write_executor

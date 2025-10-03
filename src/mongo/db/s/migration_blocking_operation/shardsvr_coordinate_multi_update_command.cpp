@@ -79,11 +79,20 @@ public:
             metadata.setUpdateCommand(request().getCommand());
             metadata.setNss(ns());
 
+            // Determine if the command is an upsert. Each coordinated multi write is sent
+            // individually either as an update or a bulk write.
             if (metadata.getUpdateCommand().hasField("updates")) {
                 auto updates = request().getCommand().getField("updates").Array();
-                // Each coordinated multi write in a bulk write is sent individually.
-                invariant(updates.size() == 1);
+                tassert(11057400,
+                        "Expected a single operation when coordinating multi update",
+                        updates.size() == 1);
                 metadata.setIsUpsert(updates.front().Obj().getBoolField("upsert"));
+            } else if (metadata.getUpdateCommand().hasField("bulkWrite")) {
+                auto ops = request().getCommand().getField("ops").Array();
+                tassert(11057401,
+                        "Expected a single operation when coordinating multi update",
+                        ops.size() == 1);
+                metadata.setIsUpsert(ops.front().Obj().getBoolField("upsert"));
             }
 
             MultiUpdateCoordinatorDocument coordinatorDoc;

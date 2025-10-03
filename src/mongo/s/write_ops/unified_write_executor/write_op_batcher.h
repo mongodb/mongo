@@ -115,9 +115,27 @@ struct InternalTransactionBatch {
         return {op.getNss()};
     }
 };
+struct MultiWriteBlockingMigrationsBatch {
+    WriteOp op;
+    boost::optional<UUID> sampleId;
+
+    std::vector<WriteOp> getWriteOps() const {
+        std::vector<WriteOp> result;
+        result.emplace_back(op);
+        return result;
+    }
+
+    std::set<NamespaceString> getInvolvedNamespaces() const {
+        return {op.getNss()};
+    }
+};
 
 struct WriteBatch {
-    std::variant<EmptyBatch, SimpleWriteBatch, NonTargetedWriteBatch, InternalTransactionBatch>
+    std::variant<EmptyBatch,
+                 SimpleWriteBatch,
+                 NonTargetedWriteBatch,
+                 InternalTransactionBatch,
+                 MultiWriteBlockingMigrationsBatch>
         data;
 
     explicit operator bool() const {

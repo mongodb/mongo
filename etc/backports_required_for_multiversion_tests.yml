@@ -65,6 +65,8 @@ last-continuous:
       ticket: SERVER-111406
     - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
       ticket: SERVER-110953
+    - test_file: jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
+      ticket: SERVER-110574
   suites: null
 last-lts:
   all:
@@ -632,4 +634,6 @@ last-lts:
       ticket: SERVER-111406
     - test_file: jstests/sharding/migration_fails_with_spurious_documents.js
       ticket: SERVER-110953
+    - test_file: jstests/sharding/migration_blocking_operation/implicit_create_from_upsert_with_paused_migrations.js
+      ticket: SERVER-110574
   suites: null

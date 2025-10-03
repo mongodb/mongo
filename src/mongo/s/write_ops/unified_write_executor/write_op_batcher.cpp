@@ -309,6 +309,15 @@ WriteOpBatcher::Result OrderedWriteOpBatcher::getNextBatch(OperationContext* opC
                 return {WriteBatch{InternalTransactionBatch{*writeOp, std::move(sampleId)}},
                         std::move(opsWithErrors)};
             }
+            // If the first WriteOp is kMultiWriteBlockingMigration, put it in a
+            // MultiWriteBlockingMigrationsBatch by itself and return the batch.
+            if (analysis.type == kMultiWriteBlockingMigrations) {
+                auto sampleId =
+                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+                return {
+                    WriteBatch{MultiWriteBlockingMigrationsBatch{*writeOp, std::move(sampleId)}},
+                    std::move(opsWithErrors)};
+            }
             // If the first WriteOp is kMultiShard, then add the op to a SimpleBatch and then break
             // and return the batch.
             if (analysis.type == kMultiShard) {
@@ -436,6 +445,14 @@ WriteOpBatcher::Result UnorderedWriteOpBatcher::getNextBatch(OperationContext* o
                 auto sampleId =
                     analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
                 return {WriteBatch{InternalTransactionBatch{writeOp, std::move(sampleId)}},
+                        std::move(opsWithErrors)};
+            }
+            // If the first WriteOp is kMultiWriteBlockingMigration, put it in a
+            // MultiWriteBlockingMigrationsBatch by itself and return the batch.
+            if (analysis.type == kMultiWriteBlockingMigrations) {
+                auto sampleId =
+                    analysis.targetedSampleId.map([](auto& sid) { return sid.getId(); });
+                return {WriteBatch{MultiWriteBlockingMigrationsBatch{writeOp, std::move(sampleId)}},
                         std::move(opsWithErrors)};
             }
             // If the op is kSingleShard or kMultiShard, then add the op to a SimpleBatch and keep

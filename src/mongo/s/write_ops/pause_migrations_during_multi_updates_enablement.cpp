@@ -31,6 +31,7 @@
 
 #include "mongo/db/cluster_parameters/migration_blocking_operation_cluster_parameters_gen.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
 
 #include <random>
