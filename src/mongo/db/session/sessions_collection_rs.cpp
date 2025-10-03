@@ -77,7 +77,7 @@ auto SessionsCollectionRS::_makePrimaryConnection(OperationContext* opCtx) {
     }
 
     auto res = uassertStatusOK(
-        _targeter->findHost(opCtx, ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
+        _targeter->findHost(opCtx, ReadPreferenceSetting(ReadPreference::PrimaryOnly), {}));
 
     auto conn = std::make_unique<ScopedDbConnection>(res.toString());
 

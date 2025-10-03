@@ -47,7 +47,9 @@ ConnectionString RemoteCommandTargeterStandalone::connectionString() {
 }
 
 SemiFuture<HostAndPort> RemoteCommandTargeterStandalone::findHost(
-    const ReadPreferenceSetting& readPref, const CancellationToken& cancelToken) {
+    const ReadPreferenceSetting& readPref,
+    const CancellationToken& cancelToken,
+    const TargetingMetadata& targetingMetadata) {
     return {_hostAndPort};
 }
 
@@ -57,7 +59,9 @@ SemiFuture<std::vector<HostAndPort>> RemoteCommandTargeterStandalone::findHosts(
 }
 
 StatusWith<HostAndPort> RemoteCommandTargeterStandalone::findHost(
-    OperationContext* opCtx, const ReadPreferenceSetting& readPref) {
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata) {
     return _hostAndPort;
 }
 

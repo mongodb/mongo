@@ -484,6 +484,7 @@ mongo_cc_library(
     ],
     deps = [
         ":clientdriver_network",
+        "//src/mongo/client:retry_strategy",
         "//src/mongo/db:service_context",
     ],
 )
@@ -535,6 +536,7 @@ mongo_cc_library(
         "remote_command_targeter_mock.h",
     ],
     deps = [
+        "//src/mongo/client:retry_strategy",
         "//src/mongo/db:server_base",
         "//src/mongo/util/net:network",
     ],

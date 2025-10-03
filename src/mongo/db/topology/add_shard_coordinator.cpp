@@ -166,7 +166,7 @@ ExecutorFuture<void> AddShardCoordinator::_runImpl(
 
                 const auto host = uassertStatusOK(
                     Grid::get(opCtx)->shardRegistry()->getConfigShard()->getTargeter()->findHost(
-                        opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
+                        opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {}));
 
                 try {
                     _runWithRetries(

@@ -127,6 +127,11 @@ public:
                                              const std::vector<HostAndPort>& excludedHosts,
                                              const CancellationToken& cancelToken) override;
 
+    SemiFuture<HostAndPort> getAtLeastOneHostOrRefresh(
+        const ReadPreferenceSetting& readPref,
+        const stdx::unordered_set<HostAndPort>& deprioritizedServers,
+        const CancellationToken& cancelToken) override;
+
     SemiFuture<std::vector<HostAndPort>> getHostsOrRefresh(
         const ReadPreferenceSetting& readPref,
         const std::vector<HostAndPort>& excludedHosts,

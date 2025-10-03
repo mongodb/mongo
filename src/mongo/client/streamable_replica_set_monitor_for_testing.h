@@ -52,6 +52,10 @@ public:
 
     sdam::MockTopologyManager* getTopologyManager();
 
+    HostAndPort getAtLeastOneHostOrRefresh(
+        const ReadPreferenceSetting& criteria,
+        const stdx::unordered_set<HostAndPort>& deprioritizedServers);
+
 private:
     // Executor for monitoring replica sets.
     std::shared_ptr<executor::TaskExecutor> _taskExecutor;

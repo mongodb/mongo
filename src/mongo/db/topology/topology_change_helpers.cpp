@@ -472,7 +472,7 @@ std::unique_ptr<Fetcher> createFetcher(OperationContext* opCtx,
                                        FetcherStatusCallbackFn processStatusCallback,
                                        std::shared_ptr<executor::TaskExecutor> executor) {
     auto host = uassertStatusOK(
-        targeter.findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
+        targeter.findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {}));
 
     auto fetcherCallback = [processDocsCallback,
                             processStatusCallback](const Fetcher::QueryResponseStatus& dataStatus,
@@ -785,7 +785,7 @@ Shard::CommandResponse runCommandForAddShard(OperationContext* opCtx,
                                              const BSONObj& cmdObj,
                                              std::shared_ptr<executor::TaskExecutor> executor) {
     const auto host = uassertStatusOK(
-        targeter.findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
+        targeter.findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {}));
 
     executor::RemoteCommandRequest request(
         host, dbName, cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);

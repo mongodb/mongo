@@ -237,7 +237,7 @@ public:
                     uassertStatusOK(shardRegistry->getShard(opCtx, request.getToShard()));
 
                 return recipientShard->getTargeter()->findHost(
-                    opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+                    opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {});
             }());
 
             long long totalDocsCloned =

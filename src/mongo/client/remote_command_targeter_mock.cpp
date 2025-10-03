@@ -57,8 +57,10 @@ ConnectionString RemoteCommandTargeterMock::connectionString() {
     return _connectionStringReturnValue;
 }
 
-StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* opCtx,
-                                                            const ReadPreferenceSetting& readPref) {
+StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(
+    OperationContext* opCtx,
+    const ReadPreferenceSetting& readPref,
+    const TargetingMetadata& targetingMetadata) {
     if (!_findHostReturnValue.isOK()) {
         return _findHostReturnValue.getStatus();
     }
@@ -67,7 +69,8 @@ StatusWith<HostAndPort> RemoteCommandTargeterMock::findHost(OperationContext* op
 }
 
 SemiFuture<HostAndPort> RemoteCommandTargeterMock::findHost(const ReadPreferenceSetting&,
-                                                            const CancellationToken&) {
+                                                            const CancellationToken&,
+                                                            const TargetingMetadata&) {
     if (!_findHostReturnValue.isOK()) {
         return _findHostReturnValue.getStatus();
     }

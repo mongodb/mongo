@@ -326,7 +326,7 @@ Future<AsyncWorkScheduler::HostAndShard> AsyncWorkScheduler::_targetHostAsync(
             }
 
             auto targeter = shard->getTargeter();
-            return targeter->findHost(readPref, CancellationToken::uncancelable())
+            return targeter->findHost(readPref, CancellationToken::uncancelable(), {})
                 .thenRunOn(_executor)
                 .unsafeToInlineFuture()
                 .then([shard = std::move(shard)](HostAndPort host) mutable -> HostAndShard {

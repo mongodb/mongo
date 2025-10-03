@@ -323,6 +323,33 @@ SemiFuture<HostAndPort> StreamableReplicaSetMonitor::getHostOrRefresh(
         .semi();
 }
 
+SemiFuture<HostAndPort> StreamableReplicaSetMonitor::getAtLeastOneHostOrRefresh(
+    const ReadPreferenceSetting& criteria,
+    const stdx::unordered_set<HostAndPort>& deprioritizedServers,
+    const CancellationToken& cancelToken) {
+    return getHostsOrRefresh(criteria, {}, cancelToken)
+        .thenRunOn(_executor)
+        .then([self = shared_from_this(),
+               deprioritizedServers](const std::vector<HostAndPort>& result) -> HostAndPort {
+            invariant(!result.empty());
+            // We do a random shuffle when we get the hosts so we can just pick the first one
+            if (!deprioritizedServers.empty()) {
+                const auto notDeprioritized = [&](const HostAndPort& server) {
+                    return !deprioritizedServers.contains(server);
+                };
+
+                if (auto it = std::ranges::find_if(result, notDeprioritized); it != result.end()) {
+                    return *it;
+                }
+                // All available servers are in deprioritizedServers set, fallback to first server
+            }
+            // Return first server (either no deprioritized servers specified, or all servers are
+            // deprioritized)
+            return result[0];
+        })
+        .semi();
+}
+
 std::vector<HostAndPort> StreamableReplicaSetMonitor::_extractHosts(
     const std::vector<ServerDescriptionPtr>& serverDescriptions) {
     std::vector<HostAndPort> result;

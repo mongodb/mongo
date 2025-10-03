@@ -81,4 +81,14 @@ sdam::MockTopologyManager* StreamableReplicaSetMonitorForTesting::getTopologyMan
     return _topologyManagerPtr;
 }
 
+HostAndPort StreamableReplicaSetMonitorForTesting::getAtLeastOneHostOrRefresh(
+    const ReadPreferenceSetting& criteria,
+    const stdx::unordered_set<HostAndPort>& deprioritizedServers) {
+    return _replSetMonitor
+        ->getAtLeastOneHostOrRefresh(
+            criteria, deprioritizedServers, CancellationToken::uncancelable())
+        .getNoThrow()
+        .getValue();
+}
+
 }  // namespace mongo

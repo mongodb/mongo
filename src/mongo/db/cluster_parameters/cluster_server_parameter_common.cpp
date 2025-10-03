@@ -118,7 +118,7 @@ StatusWith<std::set<boost::optional<TenantId>>> getTenantsWithConfigDbsOnShard(
     listDbCommand.setNameOnly(true);
     std::set<boost::optional<TenantId>> tenantIds;
 
-    auto swHost = targeter.findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+    auto swHost = targeter.findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {});
     if (!swHost.isOK()) {
         return swHost.getStatus();
     }

@@ -325,7 +325,7 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
         }
 
         const auto shardHostWithStatus = shardWithStatus.getValue()->getTargeter()->findHost(
-            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}, {});
         if (!shardHostWithStatus.isOK()) {
             return CommandSubmissionResult(params.id, shardHostWithStatus.getStatus());
         }

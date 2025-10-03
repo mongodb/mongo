@@ -53,13 +53,15 @@ public:
     }
 
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
-                                     const ReadPreferenceSetting& readPref) override {
-        return _mock->findHost(opCtx, readPref);
+                                     const ReadPreferenceSetting& readPref,
+                                     const TargetingMetadata& targetingMetadata) override {
+        return _mock->findHost(opCtx, readPref, targetingMetadata);
     }
 
     SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     const CancellationToken& cancelToken) override {
-        return _mock->findHost(readPref, cancelToken);
+                                     const CancellationToken& cancelToken,
+                                     const TargetingMetadata& targetingMetadata) override {
+        return _mock->findHost(readPref, cancelToken, targetingMetadata);
     }
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,

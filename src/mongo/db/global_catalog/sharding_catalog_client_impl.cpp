@@ -1226,7 +1226,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
     }());
 
     const auto configShard = _getConfigShard(opCtx);
-    // TODO(SERVER-108323): Use retry strategy or let runBatchWriteCommand retry.
+    // TODO(SERVER-110000): Use retry strategy or let runBatchWriteCommand retry.
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         auto response =
             configShard->runBatchWriteCommand(opCtx,

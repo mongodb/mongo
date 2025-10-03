@@ -54,10 +54,12 @@ public:
     ConnectionString connectionString() override;
 
     StatusWith<HostAndPort> findHost(OperationContext* opCtx,
-                                     const ReadPreferenceSetting& readPref) override;
+                                     const ReadPreferenceSetting& readPref,
+                                     const TargetingMetadata& targetingMetadata) override;
 
     SemiFuture<HostAndPort> findHost(const ReadPreferenceSetting& readPref,
-                                     const CancellationToken& cancelToken) override;
+                                     const CancellationToken& cancelToken,
+                                     const TargetingMetadata& targetingMetadata) override;
 
 
     SemiFuture<std::vector<HostAndPort>> findHosts(const ReadPreferenceSetting& readPref,
