@@ -587,3 +587,6 @@ try-import %workspace%/.bazelrc.bazelisk
 
 # Flags synced from Flag Sync
 try-import %workspace%/.bazelrc.sync
+
+# Place golden test output files where buildscripts/golden_tests.py can find them
+test --test_env=GOLDEN_TEST_CONFIG_PATH
