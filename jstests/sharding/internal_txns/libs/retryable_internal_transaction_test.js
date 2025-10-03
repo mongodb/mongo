@@ -119,10 +119,15 @@ export function RetryableInternalTransactionTest(collectionOptions = {}, initiat
 
     function setUpTestMode(mode) {
         if (mode == kTestMode.kRestart) {
-            st.rs0.restart(0, {
-                remember: true,
-                startClean: false,
-            });
+            st.rs0.restart(
+                0,
+                {
+                    remember: true,
+                    startClean: false,
+                },
+                undefined /* signal */,
+                true /* wait */,
+            );
             st.rs0.waitForPrimary();
         } else if (mode == kTestMode.kFailover) {
             const oldPrimary = st.rs0.getPrimary();
