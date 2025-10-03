@@ -44,7 +44,8 @@ let doesLogMatchRegex = function (logArray, regex) {
 };
 
 let checkSocket = function (path) {
-    assert.eq(fileExists(path), true);
+    const start = new Date();
+    assert(fileExists(path), `${start.toISOString()}: ${path} does not exist`);
     let conn = new Mongo(path);
     assert.commandWorked(conn.getDB("admin").runCommand("ping"), `Expected ping command to succeed for ${path}`);
 };
