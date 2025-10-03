@@ -35,6 +35,7 @@
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/raw_data_operation.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/idl/idl_parser.h"
@@ -129,6 +130,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
     uassert(17385,
             fmt::format("Can't {} to special collection: {}", kStageName, outputNs.coll()),
             !outputNs.isSystem());
+
+    uassert(
+        10203900,
+        fmt::format("Can't {} to collection: {} with rawData enabled", kStageName, outputNs.coll()),
+        !isRawDataOperation(expCtx->getOperationContext()));
 
     uassert(31321,
             fmt::format("Can't {} to internal database: {}",

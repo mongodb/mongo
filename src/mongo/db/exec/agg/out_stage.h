@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/sharding_environment/shard_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
@@ -64,7 +65,10 @@ public:
         : WriterStage<BSONObj>(stageName.data(), pExpCtx, std::move(outputNs)),
           _writeConcern(pExpCtx->getOperationContext()->getWriteConcern()),
           _timeseries(timeseries),
-          _mergeShardId(std::move(mergeShardId)) {};
+          _mergeShardId(std::move(mergeShardId)),
+          _viewlessTimeseriesEnabled(gFeatureFlagCreateViewlessTimeseriesCollections.isEnabled(
+              VersionContext::getDecoration(pExpCtx->getOperationContext()),
+              serverGlobalParams.featureCompatibility.acquireFCVSnapshot())) {};
 
 private:
     void doDispose() override;
@@ -95,8 +99,8 @@ private:
 
     /**
      * Runs a createCollection command to create the view backing the time-series buckets
-     * collection. This should only be called if $out is writing to a time-series collection. If the
-     * function returns, we assume the view is created.
+     * collection. This should only be called if $out is writing to a legacy time-series collection.
+     * If the function returns, we assume the view is created.
      */
     void createTimeseriesView();
 
@@ -116,7 +120,7 @@ private:
 
     void waitWhileFailPointEnabled() override;
 
-    NamespaceString makeBucketNsIfTimeseries(const NamespaceString& ns);
+    NamespaceString makeBucketNsIfLegacyTimeseries(const NamespaceString& ns);
 
     /**
      * Determines if an error exists with the user input and existing collections. This function
@@ -138,8 +142,8 @@ private:
     WriteConcernOptions _writeConcern;
 
     // Holds on to the original collection options and index specs so we can check they didn't
-    // change during computation. For time-series collection these values will be on the buckets
-    // namespace.
+    // change during computation. For time-series collections these values will be translated for
+    // the raw buckets.
     BSONObj _originalOutOptions;
     std::vector<BSONObj> _originalIndexes;
 
@@ -160,6 +164,10 @@ private:
     boost::optional<UUID> _tempNsUUID = boost::none;
 
     boost::optional<ShardId> _mergeShardId;
+
+    // TODO SERVER-111600: Remove this variable and all references to it.
+    // Set if CreateViewlessTimseriesCollections feature flag is enabled
+    bool _viewlessTimeseriesEnabled;
 };
 
 }  // namespace mongo::exec::agg

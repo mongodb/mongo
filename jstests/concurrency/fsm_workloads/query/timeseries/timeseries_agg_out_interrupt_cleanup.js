@@ -13,11 +13,11 @@
  *   assumes_against_mongod_not_mongos,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_out_interrupt_cleanup.js";
+import {areViewlessTimeseriesEnabled} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const timeFieldName = "time";
@@ -92,16 +92,16 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
             "Temporary agg collection left behind: " + tojson(temporaryAggCollections),
         );
 
-        // TODO SERVER-102039: Update this check to work with viewless requires_timeseries,
-        // and remove 'does_not_support_viewless_timeseries_yet' tag.
-        // Also, if possible, understand in BF-39536 / SERVER-110820 why this test would usually
-        // pass (and intermittently fail) before viewless timeseries were enabled with $out.
-        const bucketCollectionPresent = collNames.includes("system.buckets.interrupt_temp_out");
-        const viewPresent = collNames.includes("interrupt_temp_out");
-        assert(
-            !bucketCollectionPresent || viewPresent,
-            "View must be present if bucket collection is present: " + tojson(collNames),
-        );
+        // TODO SERVER-101784 remove these checks once only viewless timeseries exist.
+        if (!areViewlessTimeseriesEnabled(db)) {
+            // Check that if the buckets collection exists then the view also exists
+            const bucketCollectionPresent = collNames.includes("system.buckets.interrupt_temp_out");
+            const viewPresent = collNames.includes("interrupt_temp_out");
+            assert(
+                !bucketCollectionPresent || viewPresent,
+                "View must be present if bucket collection is present: " + tojson(collNames),
+            );
+        }
     };
 
     /**

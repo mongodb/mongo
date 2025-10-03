@@ -18,7 +18,6 @@
  *   assumes_balancer_off,
  *   # We cannot rename to a sharded collection, so the output collection must be unsharded.
  *   assumes_unsharded_collection,
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
@@ -78,6 +77,7 @@ function runOutAndCompareResults({
         const actualOptions = collections[0]["options"]["timeseries"];
         validateCollectionOptions({expected: expectedTSOptions, actual: actualOptions});
 
+        // TODO SERVER-101784 remove these checks once only viewless timeseries exist.
         if (!areViewlessTimeseriesEnabled(testDB)) {
             // Make sure we have both the buckets collection and the timeseries view.
             const bucketsColl = assert.commandWorked(
@@ -93,6 +93,19 @@ function runOutAndCompareResults({
                     .toArray().length,
             );
         }
+
+        let containsDefaultIndex = false;
+        for (const index of outColl.getIndexes()) {
+            if (index == timeseriesDefaultIndex() || bsonUnorderedFieldsCompare(index, timeseriesDefaultIndex()) == 0) {
+                containsDefaultIndex = true;
+                break;
+            }
+        }
+
+        assert(
+            containsDefaultIndex,
+            "Output collection does not contain default timeseries index: " + tojson(timeseriesDefaultIndex()),
+        );
     } else {
         // Make sure the output collection is not a timeseries collection.
         assert(
@@ -134,9 +147,26 @@ function dropOutCollections() {
     observerOutColl.drop();
 }
 
+function timeseriesOptions() {
+    return {timeField: "time", metaField: "tags"};
+}
+
 function createTimeseriesOutCollection() {
-    const timeseriesOptions = {timeField: "time", metaField: "tags"};
-    testDB.createCollection(outColl.getName(), {timeseries: timeseriesOptions});
+    testDB.createCollection(outColl.getName(), {timeseries: timeseriesOptions()});
+}
+
+function timeseriesDefaultIndex() {
+    const metaField = timeseriesOptions()["metaField"];
+    const timeField = timeseriesOptions()["timeField"];
+
+    return {
+        "v": 2,
+        "key": {
+            [metaField]: 1,
+            [timeField]: 1,
+        },
+        "name": metaField + "_1_" + timeField + "_1",
+    };
 }
 
 (function testSourceTimeseriesOutToNonTimeseriesCollection() {
@@ -424,6 +454,7 @@ function createTimeseriesOutCollection() {
     assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7406103);
 })();
 
+// TODO SERVER-111600: Remove this test once only viewless timeseries exists
 (function testCannotHaveConflictingViews() {
     // Tests that an error is raised if a conflicting view exists.
     if (!FixtureHelpers.isMongos(testDB)) {
@@ -433,4 +464,34 @@ function createTimeseriesOutCollection() {
         assert.throwsWithCode(() => inColl.aggregate(pipeline), 7268700);
         assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268700);
     }
+})();
+
+(function testCannotRunWithRawData() {
+    // Drop both collections.
+    dropOutCollections();
+
+    // Creates outColl as a TimeSeries collection with {timeField: "time", metaField: "tags"}, the
+    // rest of the options are the default.
+    createTimeseriesOutCollection();
+
+    let outCollName = outColl.getName();
+    let rawDataSpec = {rawData: true};
+
+    if (!areViewlessTimeseriesEnabled(testDB)) {
+        outCollName = "system.buckets." + outCollName;
+        rawDataSpec = {};
+    }
+
+    const pipeline = [
+        {
+            $out: {
+                db: testDB.getName(),
+                coll: outCollName,
+                timeseries: timeseriesOptions(),
+            },
+        },
+    ];
+
+    // TODO SERVER-108560: Remove 17835 error code
+    assert.throwsWithCode(() => inColl.aggregate(pipeline, rawDataSpec), [17385, 10203900]);
 })();

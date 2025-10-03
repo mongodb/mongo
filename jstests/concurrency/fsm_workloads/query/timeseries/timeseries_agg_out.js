@@ -16,14 +16,16 @@
  *   command_not_supported_in_serverless,
  *   requires_getmore,
  *   uses_getmore_outside_of_transaction,
- *   # TODO SERVER-102039 $out is not yet supported for viewless timeseries collections
- *   does_not_support_viewless_timeseries_yet,
  * ]
  */
 import {interruptedQueryErrors} from "jstests/concurrency/fsm_libs/assert.js";
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {isMongos} from "jstests/concurrency/fsm_workload_helpers/server_types.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/query/agg/agg_out.js";
+import {
+    areViewlessTimeseriesEnabled,
+    getTimeseriesBucketsColl,
+} from "jstests/core/timeseries/libs/viewless_timeseries_util.js";
 
 export const $config = extendWorkload($baseConfig, function ($config, $super) {
     const timeFieldName = "time";
@@ -175,8 +177,19 @@ export const $config = extendWorkload($baseConfig, function ($config, $super) {
     $config.teardown = function teardown(db) {
         const collNames = db.getCollectionNames();
 
-        // Ensure that for the buckets collection there is a corresponding view.
-        assert(!(collNames.includes("system.buckets.timeseries_agg_out") && !collNames.includes("timeseries_agg_out")));
+        // TODO SERVER-101784 remove these checks once only viewless timeseries exist.
+        if (areViewlessTimeseriesEnabled(db)) {
+            // Ensure that there is no buckets collection or view on the timeseries collection.
+            const viewCount = db
+                .getCollection("system.views")
+                .find({viewOn: getTimeseriesBucketsColl("timeseries_agg_out")})
+                .toArray().length;
+            assert.eq(viewCount, 0);
+            assert(!collNames.includes("system.buckets.timeseries_agg_out"));
+        } else {
+            // Ensure that for the buckets collection there is a corresponding view.
+            assert(collNames.includes("system.buckets.timeseries_agg_out") && collNames.includes("timeseries_agg_out"));
+        }
     };
 
     /**

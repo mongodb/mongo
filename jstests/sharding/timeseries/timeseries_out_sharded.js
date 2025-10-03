@@ -59,6 +59,7 @@ function runOutAndCompareResults({
     options: expectedTSOptions = null,
     value: valueToCheck = null,
     outputDB: outputDB = testDB,
+    checkForDefaultIndex: checkForDefaultIndex = true,
 }) {
     // Gets the expected results from a non time-series observer input collection.
     const observerResults = TimeseriesAggTests.getOutputAggregateResults(
@@ -111,6 +112,25 @@ function runOutAndCompareResults({
             .getCollection("system.views")
             .find({viewOn: getTimeseriesBucketsColl(outColl.getName())})
             .toArray().length;
+
+        if (checkForDefaultIndex) {
+            let containsDefaultIndex = false;
+            for (const index of outColl.getIndexes()) {
+                if (
+                    index == timeseriesDefaultIndex() ||
+                    bsonUnorderedFieldsCompare(index, timeseriesDefaultIndex()) == 0
+                ) {
+                    containsDefaultIndex = true;
+                    break;
+                }
+            }
+
+            assert(
+                containsDefaultIndex,
+                "Output collection does not contain default timeseries index: " + tojson(timeseriesDefaultIndex()),
+            );
+        }
+
         if (areViewlessTimeseriesEnabled(testDB)) {
             // Make sure that neither the buckets collection, nor the view get created.
             assert.eq(0, bucketsCollCount);
@@ -161,9 +181,26 @@ function dropOutCollections() {
     observerOutColl.drop();
 }
 
+function timeseriesOptions() {
+    return {timeField: "time", metaField: "tags"};
+}
+
 function createTimeseriesOutCollection() {
-    const timeseriesOptions = {timeField: "time", metaField: "tags"};
-    testDB.createCollection(outColl.getName(), {timeseries: timeseriesOptions});
+    testDB.createCollection(outColl.getName(), {timeseries: timeseriesOptions()});
+}
+
+function timeseriesDefaultIndex() {
+    const metaField = timeseriesOptions()["metaField"];
+    const timeField = timeseriesOptions()["timeField"];
+
+    return {
+        "v": 2,
+        "key": {
+            [metaField]: 1,
+            [timeField]: 1,
+        },
+        "name": metaField + "_1_" + timeField + "_1",
+    };
 }
 
 (function testSourceTimeseriesOutToNonTimeseriesCollection() {
@@ -294,11 +331,13 @@ function createTimeseriesOutCollection() {
 
     const observerPipeline = [{$out: {db: destDB.getName(), coll: observerOutColl.getName()}}];
 
+    // TODO SERVER-111869: Test should pass with checkForDefaultIndex set to true once bug is fixed.
     runOutAndCompareResults({
         observer: observerPipeline,
         timeseries: timeseriesPipeline,
         options: tsOptions,
         outputDB: destDB,
+        checkForDefaultIndex: false,
     });
 })();
 
@@ -438,12 +477,43 @@ function createTimeseriesOutCollection() {
     assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7406103);
 })();
 
+// TODO SERVER-111600: Remove this test once only viewless timeseries exists
 (function testCannotHaveConflictingViews() {
     // Tests that an error is raised if a conflicting view exists.
     assert.commandWorked(testDB.createCollection("view_out", {viewOn: "out"}));
     const pipeline = [{$out: {db: testDB.getName(), coll: "view_out", timeseries: {timeField: "time"}}}];
     assert.throwsWithCode(() => inColl.aggregate(pipeline), 7268700);
     assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268700);
+})();
+
+(function testCannotRunWithRawData() {
+    // Drop both collections.
+    dropOutCollections();
+
+    // Creates outColl as a TimeSeries collection with {timeField: "time", metaField: "tags"}, the
+    // rest of the options are the default.
+    createTimeseriesOutCollection();
+
+    let outCollName = outColl.getName();
+    let rawDataSpec = {rawData: true};
+
+    if (!areViewlessTimeseriesEnabled(testDB)) {
+        outCollName = "system.buckets." + outCollName;
+        rawDataSpec = {};
+    }
+
+    const pipeline = [
+        {
+            $out: {
+                db: testDB.getName(),
+                coll: outCollName,
+                timeseries: timeseriesOptions(),
+            },
+        },
+    ];
+
+    // TODO SERVER-108560: Remove 17835 error code
+    assert.throwsWithCode(() => inColl.aggregate(pipeline, rawDataSpec), [17385, 10203900]);
 })();
 
 st.stop();
